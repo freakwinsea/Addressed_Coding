@@ -260,7 +260,11 @@ def cmd_brief(args) -> int:
         sys.stdout.write(cheatsheet(registry, notes=not args.no_notes))
         return 0
 
-    refreshed = render_guide(registry)
+    if args.minimal and args.write:
+        print("--minimal is for printing a study instrument, not for --write", file=sys.stderr)
+        return 2
+
+    refreshed = render_guide(registry, minimal=args.minimal)
     path = guide_path(registry)
     if args.write:
         if path.read_text(encoding="utf-8") == refreshed:
@@ -338,6 +342,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--table-only", action="store_true", help="just the address table")
     p.add_argument("--no-notes", action="store_true", help="omit the pinned-semantics notes")
+    p.add_argument(
+        "--minimal",
+        action="store_true",
+        help="withhold the worked patterns — use this when measuring a model, "
+        "since those patterns solve most of the study's tasks outright",
+    )
     p.add_argument(
         "--write",
         action="store_true",

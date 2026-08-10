@@ -1,0 +1,13 @@
+phonebook 0.1
+
+ext 000-0000001 STARTS_WITH_HASH (line: text) -> bool {
+  200-0000010@[line, "#"] -> hit
+  return hit
+}
+
+500-0000001@["experiments/data/log.txt"] -> text
+200-0000001@[text] -> lines
+300-0000002@[lines, 000-0000001] -> hits
+300-0000009@[hits] -> count
+600-0000006@[count, 0] -> has_any
+100-0000001@[has_any]

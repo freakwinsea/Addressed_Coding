@@ -1,0 +1,14 @@
+phonebook 0.1
+
+ext 000-0000001 LINE_LENGTH (line: text) -> int {
+  200-0000011@[line] -> len
+  return len
+}
+
+500-0000001@["experiments/data/words.txt"] -> text
+200-0000001@[text] -> lines
+300-0000003@[lines, 000-0000001] -> lengths
+300-0000005@[lengths] -> sorted_lens
+300-0000007@[sorted_lens] -> rev_lens
+300-0000011@[rev_lens, 0] -> max_len
+100-0000001@[max_len]

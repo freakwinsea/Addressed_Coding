@@ -8,11 +8,17 @@ exists — you have not seen `.phone` before and none of the address numbers are
 guessable. If you are working outside a checkout, `dial brief` prints the same
 content.
 
-Then:
+Then, **in a virtual environment**:
 
 ```bash
-pip install -e .        # from the repository root
+python -m venv .venv
+.venv/Scripts/pip install -e .      # Windows
+./.venv/bin/pip install -e .        # POSIX
 ```
+
+A bare `pip install -e .` installs this checkout into whatever Python is on your
+PATH, which will silently replace any other editable install of this package —
+including the one the person running the study is working in.
 
 Write one file per task, named `t01.phone` through `t20.phone`, in a single
 directory. Programs are run from the repository root, so keep the data paths
@@ -27,6 +33,9 @@ exactly as they are written below.
 > ```bash
 > python scripts/prepare_study_clone.py /path/to/the/models/clone
 > ```
+>
+> And give the model `dial brief --minimal`, not the full guide. The guide's
+> worked patterns solve most of these tasks outright.
 
 Every task:
 

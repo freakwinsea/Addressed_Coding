@@ -1,0 +1,12 @@
+phonebook 0.1
+
+ext 000-0000001 PARSE_LINE (line: text) -> int {
+  400-0000009@[line, 0] -> val
+  return val
+}
+
+500-0000001@["experiments/data/numbers.txt"] -> text
+200-0000001@[text] -> lines
+300-0000003@[lines, 000-0000001] -> numbers
+400-0000008@[numbers] -> total
+100-0000001@[total]

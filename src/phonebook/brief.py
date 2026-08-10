@@ -75,18 +75,40 @@ def guide_path(registry: Registry) -> Path:
     return registry.root.parent / "docs" / "WRITING-PHONE.md"
 
 
-def render_guide(registry: Registry) -> str:
-    """The writing guide with its generated table section refreshed."""
+#: Section 5 is eight worked patterns — filter a list, fold a total, rank a
+#: tally. Excellent documentation for a real user, and a near-complete solution
+#: key for the study's task set, which was written in the same sitting. A run
+#: with it in context measures recall of an example the experimenter supplied,
+#: not use of the language. `--minimal` withholds it; everything else stays,
+#: because syntax, rules, constraints, and the address table are the language
+#: itself rather than the method.
+WORKED_PATTERNS = re.compile(r"\n## 5\. Patterns you will need\n.*?(?=\n## 6\.)", re.DOTALL)
+
+WITHHELD_NOTICE = """## 5. Patterns you will need
+
+*Withheld. The worked patterns that normally sit here solve most of the study's
+tasks outright, so they are removed when this guide is used as a measuring
+instrument. Everything else is intact: the rules above, and below them the full
+address table with the semantics each contract pins.*"""
+
+
+def render_guide(registry: Registry, minimal: bool = False) -> str:
+    """The writing guide with its generated table section refreshed.
+
+    `minimal` produces the study instrument — see WORKED_PATTERNS.
+    """
     path = guide_path(registry)
     source = path.read_text(encoding="utf-8")
     table = cheatsheet(registry)
-    pattern = re.compile(
-        re.escape(BEGIN) + r".*?" + re.escape(END),
-        re.DOTALL,
-    )
+    pattern = re.compile(re.escape(BEGIN) + r".*?" + re.escape(END), re.DOTALL)
     if not pattern.search(source):
         raise ValueError(f"{path.name} has no generated-table markers")
-    return pattern.sub(f"{BEGIN}\n\n{table}\n{END}", source)
+    rendered = pattern.sub(f"{BEGIN}\n\n{table}\n{END}", source)
+    if minimal:
+        rendered, count = WORKED_PATTERNS.subn("\n" + WITHHELD_NOTICE + "\n", rendered)
+        if count != 1:
+            raise ValueError("could not locate the worked-patterns section to withhold")
+    return rendered
 
 
 def guide_is_current(registry: Registry) -> bool:

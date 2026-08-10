@@ -1,0 +1,7 @@
+phonebook 0.1
+
+500-0000001@["experiments/data/words.txt"] -> text
+200-0000001@[text] -> lines
+200-0000007@[text] -> upper_text
+200-0000001@[upper_text] -> upper_lines
+100-0000002@[upper_lines]

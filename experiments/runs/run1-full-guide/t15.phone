@@ -1,0 +1,16 @@
+phonebook 0.1
+
+ext 000-0000001 FORMAT_ROW (row: map<text,text>) -> text {
+  300-0000014@[row, "name", ""] -> name
+  300-0000014@[row, "category", ""] -> category
+  300-0000001@[" (", category, ")"] -> suffix_parts
+  200-0000004@[suffix_parts, ""] -> suffix
+  300-0000001@[name, suffix] -> parts
+  200-0000004@[parts, ""] -> res
+  return res
+}
+
+500-0000003@["experiments/data/inventory.csv"] -> rows
+300-0000003@[rows, 000-0000001] -> formatted
+300-0000005@[formatted] -> sorted_res
+100-0000002@[sorted_res]

@@ -1,0 +1,5 @@
+phonebook 0.1
+
+500-0000001@["experiments/data/words.txt"] -> text
+200-0000011@[text] -> len
+100-0000001@[len]

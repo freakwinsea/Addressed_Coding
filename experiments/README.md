@@ -18,11 +18,34 @@ open one it has to remember.
 
 If it loses, that is worth knowing too, and it is cheap to find out.
 
+## Run 1 was invalid. Read this before trusting a number.
+
+The first run scored **20/20 correct, 20/20 contracts**, in one pass, without
+iterating. It does not mean what it looks like.
+
+`docs/WRITING-PHONE.md` §5 is eight worked patterns — *filter a list*, *fold a
+total*, *rank a tally* — and the guide and the task set were written in the same
+sitting. All eight map onto tasks. §5's filter example even uses the literal
+`"ERROR"`, which is t06. The model was handed the method and applied it. That
+measures recall of a supplied example, not use of the language.
+
+**Use `dial brief --minimal` for any measured run.** It withholds §5 and keeps
+everything else — syntax, rules, constraints, and the full address table. §5
+stays in the guide for real users, where a worked example is exactly what you
+want; it just cannot also be the measuring instrument.
+
+Two things from run 1 do survive, because the confound does not reach them:
+
+- **All 20 tasks are expressible, and a model can find its way around the
+  address space.** Nothing was impossible or awkward enough to defeat it.
+- **`checks` was 20/20 on files written before anything was run.** The patterns
+  gave away the method, not the syntax, the arity, or the types.
+
 ## Method
 
 **Arms.** Same 20 tasks, twice.
 
-- **Treatment:** `.phone`, with `docs/WRITING-PHONE.md` in context.
+- **Treatment:** `.phone`, with `dial brief --minimal` in context.
 - **Control:** Python, with no extra context — the model already knows it.
 
 Python is the fair control rather than Rust. Rust would confound the result with
