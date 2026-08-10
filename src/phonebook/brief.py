@@ -84,12 +84,19 @@ def guide_path(registry: Registry) -> Path:
 #: itself rather than the method.
 WORKED_PATTERNS = re.compile(r"\n## 5\. Patterns you will need\n.*?(?=\n## 6\.)", re.DOTALL)
 
-WITHHELD_NOTICE = """## 5. Patterns you will need
+_SECTION = re.compile(r"^## (\d+)\. ", re.MULTILINE)
 
-*Withheld. The worked patterns that normally sit here solve most of the study's
-tasks outright, so they are removed when this guide is used as a measuring
-instrument. Everything else is intact: the rules above, and below them the full
-address table with the semantics each contract pins.*"""
+
+def _renumber_sections(text: str) -> str:
+    """Close the gap left by a removed section.
+
+    Removing §5 and leaving the heading numbers at 1,2,3,4,6,7,8 announces that
+    something was taken out. An earlier version put an explicit notice in its
+    place, which was worse: it told a model reading the guide that content had
+    been withheld from it for measurement — in the first document it opens.
+    """
+    counter = iter(range(1, 100))
+    return _SECTION.sub(lambda _: f"## {next(counter)}. ", text)
 
 
 def render_guide(registry: Registry, minimal: bool = False) -> str:
@@ -105,9 +112,10 @@ def render_guide(registry: Registry, minimal: bool = False) -> str:
         raise ValueError(f"{path.name} has no generated-table markers")
     rendered = pattern.sub(f"{BEGIN}\n\n{table}\n{END}", source)
     if minimal:
-        rendered, count = WORKED_PATTERNS.subn("\n" + WITHHELD_NOTICE + "\n", rendered)
+        rendered, count = WORKED_PATTERNS.subn("", rendered)
         if count != 1:
             raise ValueError("could not locate the worked-patterns section to withhold")
+        rendered = _renumber_sections(rendered)
     return rendered
 
 

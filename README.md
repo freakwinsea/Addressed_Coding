@@ -259,7 +259,7 @@ src/phonebook/     the toolchain: parser, checker, resolver, interpreter, emitte
 examples/          .phone programs
 generated/         committed output of `dial emit`, so the diff is reviewable
 tests/             unit tests plus a conformance suite written in .phone itself
-experiments/       the agent-authoring study: 20 tasks, data, reference solutions
+experiments/       the agent-authoring study: 20 tasks and their data
 docs/              the spec, the design notes, the audit model, the writing guide
 ```
 

@@ -102,7 +102,7 @@ src/phonebook/            parser, checker, resolver, interpreter, emitters, audi
 examples/                 .phone programs
 generated/                committed emitter output — regenerate, do not hand-edit
 tests/conformance/        .phone programs + committed .expected, run on all backends
-experiments/              the agent-authoring study: tasks, data, reference solutions
+experiments/              the agent-authoring study: tasks and their data
 docs/                     SPEC, DESIGN-NOTES, AUDIT, WRITING-PHONE
 ```
 

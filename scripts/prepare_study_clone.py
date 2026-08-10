@@ -28,7 +28,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "src")]
 
-from phonebook.brief import WITHHELD_NOTICE, WORKED_PATTERNS  # noqa: E402
+from phonebook.brief import WORKED_PATTERNS, _renumber_sections  # noqa: E402
 
 GUIDE = "docs/WRITING-PHONE.md"
 
@@ -115,12 +115,12 @@ def withhold_patterns(root: Path) -> str:
     if not path.exists():
         return "no guide in this clone"
     source = path.read_text(encoding="utf-8")
-    if "*Withheld." in source:
+    if "## 5. Patterns you will need" not in source:
         return "already withheld"
-    rewritten, count = WORKED_PATTERNS.subn("\n" + WITHHELD_NOTICE + "\n", source)
+    rewritten, count = WORKED_PATTERNS.subn("", source)
     if count != 1:
         raise SystemExit(f"could not find the worked-patterns section in {GUIDE}")
-    path.write_text(rewritten, encoding="utf-8", newline="\n")
+    path.write_text(_renumber_sections(rewritten), encoding="utf-8", newline="\n")
     return "withheld"
 
 
