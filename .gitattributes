@@ -4,4 +4,6 @@
 *.jpg binary
 *.svg text eol=lf
 
-docs/origins/*.html linguist-vendored
+# .phone is the source language here, not a config format.
+*.phone text eol=lf
+*.expected text eol=lf

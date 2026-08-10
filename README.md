@@ -246,15 +246,15 @@ src/phonebook/     the toolchain: parser, checker, resolver, interpreter, emitte
 examples/          .phone programs
 generated/         committed output of `dial emit`, so the diff is reviewable
 tests/             unit tests plus a conformance suite written in .phone itself
-docs/origins/      the two ideation sessions this design came out of, verbatim
+docs/              the spec, the design notes, and the audit model
 ```
 
 ## Provenance
 
-This project was designed in two recursive ideation sessions with frontier
-models, and both transcripts are committed under
-[docs/origins/](docs/origins/) — including the red-teaming that produced the
-pure-immutable kernel, the `000` local-extension block, and the audit model. The
-design notes say which objection produced which decision.
+Designed across two long red-teaming sessions with frontier models. The
+transcripts are not published, but [docs/DESIGN-NOTES.md](docs/DESIGN-NOTES.md)
+records which objection produced which decision — including the ones that
+produced the pure-immutable kernel, the `000` local-extension block, and the
+audit model, and the ones still unanswered.
 
 MIT licensed.

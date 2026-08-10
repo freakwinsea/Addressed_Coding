@@ -1,8 +1,11 @@
 # Design notes
 
-Which objection produced which decision. The two sessions this project came out
-of are committed verbatim in [origins/](origins/); this file is the part worth
-reading, which is where the idea got pushed on and had to change.
+Which objection produced which decision.
+
+The design came out of two long red-teaming sessions with frontier models. The
+transcripts are not published; this file is the part worth reading anyway, which
+is where the idea got pushed on and had to change. Quotations below are from
+those sessions.
 
 ---
 

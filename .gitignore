@@ -11,10 +11,6 @@ venv/
 target/
 .cargo-target/
 
-# Saved-page asset bundles for the origin transcripts. The HTML and the
-# extracted markdown are committed; several megabytes of vendor CSS/JS are not.
-docs/origins/*_files/
-
 # Demo and test scratch
 .demo/
 demo_report.md
