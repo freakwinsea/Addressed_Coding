@@ -27,6 +27,13 @@ SECRET = [
     "experiments/expected",
 ]
 
+#: Not secret, but it tests the answer key, so it fails once the key is gone.
+#: A clone where `pytest` fails out of the box would send a model off repairing
+#: a repository that is not broken.
+DEPENDS_ON_KEY = [
+    "tests/test_experiments.py",
+]
+
 #: Present in a real user's checkout, so they stay. Worth knowing they are
 #: there: a model may legitimately learn the idiom from them, which is part of
 #: the honest setup rather than a leak.
@@ -69,18 +76,23 @@ def main() -> int:
 
     for name in found:
         shutil.rmtree(root / name)
-        print(f"removed {name}")
+        print(f"removed {name}  (answers)")
+    for name in DEPENDS_ON_KEY:
+        path = root / name
+        if path.exists():
+            path.unlink()
+            print(f"removed {name}  (tests the answers)")
     if not found:
-        print("nothing to remove; the clone was already clean")
+        print("no answer key present; the clone was already clean")
 
     print()
-    print("left in place (a real user would have these too):")
+    print("left in place — a real user would have these too:")
     for name in FAIR_GAME:
         if (root / name).exists():
             print(f"  {name}")
     print()
-    print("Note that tests/test_experiments.py will now fail in this clone.")
-    print("That is expected — it tests the answer key you just removed.")
+    print("`pytest` should now pass in this clone. If it does not, that is a")
+    print("real failure and not an artefact of the scrub.")
     return 0
 
 
