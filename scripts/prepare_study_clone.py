@@ -25,6 +25,13 @@ import shutil
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent.parent
+sys.path[:0] = [str(ROOT / "src")]
+
+from phonebook.brief import WITHHELD_NOTICE, WORKED_PATTERNS  # noqa: E402
+
+GUIDE = "docs/WRITING-PHONE.md"
+
 #: Directories that give the answers away outright.
 #:
 #: `runs/` is the one that is easy to forget: archiving a completed run commits
@@ -80,6 +87,36 @@ def _force_remove(func, path, _exc):
     func(path)
 
 
+def _is_leftover(path: Path) -> bool:
+    """An empty `attempts/` is where the model is about to work, not a leftover."""
+    if not path.exists():
+        return False
+    if path.is_dir():
+        return any(path.iterdir())
+    return True
+
+
+def withhold_patterns(root: Path) -> str:
+    """Replace the clone's guide with the version that withholds section 5.
+
+    Telling the operator to hand over `dial brief --minimal` is not enough: run 1
+    opened `docs/WRITING-PHONE.md` directly and read all 597 lines. If the full
+    guide is sitting in the clone, that is the guide that gets used. So the
+    substitution happens here, in the file the model will actually open.
+    """
+    path = root / GUIDE
+    if not path.exists():
+        return "no guide in this clone"
+    source = path.read_text(encoding="utf-8")
+    if "*Withheld." in source:
+        return "already withheld"
+    rewritten, count = WORKED_PATTERNS.subn("\n" + WITHHELD_NOTICE + "\n", source)
+    if count != 1:
+        raise SystemExit(f"could not find the worked-patterns section in {GUIDE}")
+    path.write_text(rewritten, encoding="utf-8", newline="\n")
+    return "withheld"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("clone", help="path to the clone the model will work in")
@@ -88,6 +125,11 @@ def main() -> int:
         "--keep-git",
         action="store_true",
         help="keep .git, leaving the answer key recoverable from history",
+    )
+    parser.add_argument(
+        "--keep-patterns",
+        action="store_true",
+        help="leave the guide's worked patterns in place; they solve most of the tasks",
     )
     args = parser.parse_args()
 
@@ -106,12 +148,17 @@ def main() -> int:
 
     found = [name for name in SECRET if (root / name).exists()]
     recoverable = (root / ".git").exists() and not args.keep_git
-    stale = [name for name in PRIOR_RUN_ARTEFACTS if (root / name).exists()]
+    stale = [name for name in PRIOR_RUN_ARTEFACTS if _is_leftover(root / name)]
     scoring = [name for name in NOT_THE_MODELS_JOB if (root / name).exists()]
+    guide = root / GUIDE
+    patterned = (
+        not args.keep_patterns
+        and guide.exists()
+        and "*Withheld." not in guide.read_text(encoding="utf-8")
+    )
 
     if args.check:
-        problems = found or recoverable or stale or scoring
-        if problems:
+        if found or recoverable or stale or scoring or patterned:
             print("NOT READY:")
             for name in found:
                 print(f"  {name}  — answers")
@@ -121,8 +168,10 @@ def main() -> int:
                 print(f"  {name}  — left over from an earlier run")
             for name in scoring:
                 print(f"  {name}  — scoring is not the model's job")
+            if patterned:
+                print(f"  {GUIDE}  — worked patterns solve most of the tasks")
             return 1
-        print("ready — no answer key, no earlier run, no scoring tools")
+        print("ready — no answer key, no earlier run, no scoring tools, patterns withheld")
         return 0
 
     for name in found:
@@ -144,6 +193,14 @@ def main() -> int:
         print(f"removed {name}  (left over from an earlier run)")
     if not found:
         print("no answer key present in the working tree")
+
+    if args.keep_patterns:
+        print()
+        print("WARNING: the guide's worked patterns are still in place. They solve")
+        print("         most of the task set; run 1 was invalidated by exactly this.")
+    else:
+        outcome = withhold_patterns(root)
+        print(f"{GUIDE}: worked patterns {outcome}")
 
     if (root / ".git").exists():
         if args.keep_git:
