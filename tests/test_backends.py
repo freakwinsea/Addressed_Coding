@@ -68,6 +68,30 @@ def test_generated_python_is_valid_and_stable(name, registry, python_backend, ro
 
 
 @pytest.mark.parametrize("name", EXAMPLES)
+@pytest.mark.parametrize("emitter", ["python", "rust"])
+def test_generated_source_names_its_origin_relative_to_the_repo(
+    name, emitter, registry, python_backend, rust_backend, root
+):
+    """Generated files are committed and byte-compared, so no absolute paths.
+
+    Regression guard: the emitters used to echo whatever path they were handed
+    into the provenance banner. `scripts/demo.py` passes absolute paths, so the
+    committed goldens embedded the generating machine's directory layout and the
+    golden test could only pass on that one machine. The golden test cannot
+    catch this by itself — it passes wherever the goldens were made.
+    """
+    emit = emit_python if emitter == "python" else emit_rust
+    backend = python_backend if emitter == "python" else rust_backend
+    source = emit(check(parse_file(root / "examples" / f"{name}.phone"), registry), backend)
+    banner = source.splitlines()[0]
+
+    assert f"examples/{name}.phone" in banner
+    assert ":" not in banner.split("from")[-1], f"drive letter leaked into: {banner}"
+    assert "\\" not in banner, f"backslash leaked into: {banner}"
+    assert str(root) not in source, "the repository's own path must not appear"
+
+
+@pytest.mark.parametrize("name", EXAMPLES)
 def test_generated_rust_matches_the_committed_golden_file(name, registry, rust_backend, root):
     """Regenerating must not silently change what is committed under generated/."""
     checked = check(parse_file(root / "examples" / f"{name}.phone"), registry)
