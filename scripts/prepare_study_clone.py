@@ -51,13 +51,20 @@ DEPENDS_ON_KEY = [
     "tests/test_experiments.py",
 ]
 
-#: The scorer needs the answer key, so in a scrubbed clone it can only fail.
-#: Leaving it there tells a model that scoring is part of its job and that a
-#: key exists somewhere it cannot reach — which is pressure to go looking.
-#: Scoring is the experimenter's job and happens in the source repository.
+#: Written for whoever runs the study, and ruinous for whoever is studied.
+#:
+#: The scorer needs the answer key, so in a scrubbed clone it can only fail —
+#: and leaving it there tells a model that scoring is part of its job and that a
+#: key exists somewhere it cannot reach, which is pressure to go looking.
+#:
+#: `experiments/README.md` is worse. Its "what to watch for" table names the
+#: method for eight of the twenty tasks outright: t14 is ENTRIES then PAIR_KEY,
+#: t18 is REDUCE with a two-parameter extension, t13 and t17 are sort-then-take.
+#: The model needs TASKS.md and nothing else from this directory.
 NOT_THE_MODELS_JOB = [
     "scripts/score_attempts.py",
     "scripts/prepare_study_clone.py",
+    "experiments/README.md",
 ]
 
 #: Anything a previous run left behind. A clone that already contains twenty
