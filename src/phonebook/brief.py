@@ -87,10 +87,10 @@ _SECTION = re.compile(r"^## (\d+)\. ", re.MULTILINE)
 def _renumber_sections(text: str) -> str:
     """Close the gap left by a removed section.
 
-    Removing §5 and leaving the heading numbers at 1,2,3,4,6,7,8 announces that
-    something was taken out. An earlier version put an explicit notice in its
-    place, which was worse: it told a model reading the guide that content had
-    been withheld from it for measurement — in the first document it opens.
+    Heading numbers running 1,2,3,4,6,7,8 are their own announcement, and an
+    explicit note in place of the missing section is a louder one. Neither
+    belongs in a document that should read as complete. See
+    experiments/README.md for why that matters.
     """
     counter = iter(range(1, 100))
     return _SECTION.sub(lambda _: f"## {next(counter)}. ", text)
