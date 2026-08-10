@@ -68,6 +68,11 @@ python scripts/prepare_study_clone.py /path/to/the/models/clone
 python scripts/prepare_study_clone.py /path/to/the/models/clone --check   # verify
 ```
 
+Deleting the files is not sufficient on its own —
+`git show HEAD:experiments/reference/t01_line_count.phone` brings the whole key
+back — so the script removes `.git` as well. Update the clone to the commit you
+want *before* scrubbing it, because afterwards you cannot pull.
+
 Run it against the *model's* clone, never your own — scoring needs the key. The
 script refuses to run against this checkout for that reason.
 

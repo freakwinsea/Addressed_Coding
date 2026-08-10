@@ -5,6 +5,10 @@ A full checkout contains worked solutions to all twenty tasks in
 model with the repository can simply read them, and any result collected that
 way measures nothing.
 
+Deleting the files is not enough. Git history still has them, and
+`git show HEAD:experiments/reference/t01_line_count.phone` brings the whole key
+back — so `.git` goes too, unless you pass `--keep-git` and accept that.
+
 Run this against the *model's* clone, never your own — scoring needs the key.
 
     python scripts/prepare_study_clone.py /path/to/agents/clone
@@ -44,10 +48,21 @@ FAIR_GAME = [
 ]
 
 
+def _force_remove(func, path, _exc):
+    """Git keeps pack files read-only, which Windows refuses to delete."""
+    Path(path).chmod(0o700)
+    func(path)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("clone", help="path to the clone the model will work in")
     parser.add_argument("--check", action="store_true", help="report without deleting")
+    parser.add_argument(
+        "--keep-git",
+        action="store_true",
+        help="keep .git, leaving the answer key recoverable from history",
+    )
     args = parser.parse_args()
 
     root = Path(args.clone).resolve()
@@ -64,12 +79,15 @@ def main() -> int:
         return 2
 
     found = [name for name in SECRET if (root / name).exists()]
+    recoverable = (root / ".git").exists() and not args.keep_git
 
     if args.check:
-        if found:
+        if found or recoverable:
             print("NOT CLEAN — the model can read the answers:")
             for name in found:
                 print(f"  {name}")
+            if recoverable:
+                print("  .git  (history still holds them: git show HEAD:<path>)")
             return 1
         print("clean — no answer key present")
         return 0
@@ -83,7 +101,16 @@ def main() -> int:
             path.unlink()
             print(f"removed {name}  (tests the answers)")
     if not found:
-        print("no answer key present; the clone was already clean")
+        print("no answer key present in the working tree")
+
+    if (root / ".git").exists():
+        if args.keep_git:
+            print()
+            print("WARNING: .git kept. The answer key is still recoverable with")
+            print("         git show HEAD:experiments/reference/<file>")
+        else:
+            shutil.rmtree(root / ".git", onerror=_force_remove)
+            print("removed .git  (history holds the answers too)")
 
     print()
     print("left in place — a real user would have these too:")
