@@ -19,11 +19,17 @@ Rust, and all three produce identical bytes.
 That last sentence is the entire value proposition, and `scripts/demo.py` is the
 test of it. If a change breaks it, the change is wrong.
 
+Open defects are recorded in [docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md). Read
+it before concluding you have found a new one.
+
 ## Setup
 
 ```bash
 pip install -e ".[dev]"
 ```
+
+The editable install from a clone is the **only** supported path today — a built
+wheel contains no registry data and cannot run. See KI-1.
 
 Without installing, put both packages on the path — the toolchain lives in
 `src/` and the runtime in `runtime/python/`, which are separate roots:
@@ -146,3 +152,4 @@ readable side by side; that symmetry is how divergence gets noticed.
 | Fix a checker or parser bug | `src/phonebook/{checker,parser}.py`, add a case to `tests/test_frontend.py` |
 | Change generated code | `src/phonebook/emit/`, then `python scripts/demo.py` and commit `generated/` |
 | Understand why something is the way it is | [docs/DESIGN-NOTES.md](docs/DESIGN-NOTES.md) |
+| Pick up a known defect | [docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md) |

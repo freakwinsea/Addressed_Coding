@@ -44,8 +44,37 @@ hypothesis, not a scoring flaw. A `.phone` program that fails `dial check` never
 runs, and the error names the fix. Note how often that happens: it is the
 difference between a wrong answer and a *caught* wrong answer.
 
-**One attempt each, no retries.** First-attempt validity is the number worth
-having. Retries measure the loop, not the language.
+**Two protocols, and they measure different things.** Decide which one you are
+running before you start, because the numbers are not comparable.
+
+| | Model sees | Measures |
+|---|---|---|
+| **One-shot** | the guide and the tasks, as text. No repository, no tools. | first-attempt generation. `checks` failures are real failures. |
+| **Agentic** | a checkout, so it can run `dial check`, `dial search`, `dial run` | whether the contract layer is a usable feedback loop. `checks` ends near 100% by construction; what matters is how many iterations it took and what it got wrong first. |
+
+The agentic protocol is the more realistic setting and the more flattering one.
+Do not report its `checks` column as if it were the one-shot number.
+
+**No retries in the one-shot arm.** First-attempt validity is the number worth
+having; retries measure the loop, not the language.
+
+## Do not hand over the answer key
+
+A full clone contains solutions to every task in `reference/` and their exact
+outputs in `expected/`. Strip them from the model's checkout first:
+
+```bash
+python scripts/prepare_study_clone.py /path/to/the/models/clone
+python scripts/prepare_study_clone.py /path/to/the/models/clone --check   # verify
+```
+
+Run it against the *model's* clone, never your own — scoring needs the key. The
+script refuses to run against this checkout for that reason.
+
+`examples/`, `generated/`, and `tests/conformance/` are left in place. A real
+user of the language would have them, and a model that learns the idiom from
+`examples/word_freq.phone` is doing something legitimate. Worth remembering when
+reading results for t14, which is the task closest to a shipped example.
 
 ## Running it
 

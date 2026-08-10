@@ -1,8 +1,32 @@
 # The 20 tasks
 
-Give this file to the model along with `docs/WRITING-PHONE.md` (or the output of
-`dial brief`). **Do not give it `experiments/reference/` or
-`experiments/expected/` — those are the scoring key.**
+## Before you start
+
+Read **[docs/WRITING-PHONE.md](../docs/WRITING-PHONE.md)** first, all of it. It
+is about 6,000 tokens and it is the only description of this language that
+exists — you have not seen `.phone` before and none of the address numbers are
+guessable. If you are working outside a checkout, `dial brief` prints the same
+content.
+
+Then:
+
+```bash
+pip install -e .        # from the repository root
+```
+
+Write one file per task, named `t01.phone` through `t20.phone`, in a single
+directory. Programs are run from the repository root, so keep the data paths
+exactly as they are written below.
+
+---
+
+> **Running this as a study?** A full clone contains worked solutions in
+> `experiments/reference/` and the exact outputs in `experiments/expected/`.
+> Strip them from the model's clone first, or the result measures nothing:
+>
+> ```bash
+> python scripts/prepare_study_clone.py /path/to/the/models/clone
+> ```
 
 Every task:
 
@@ -12,7 +36,7 @@ Every task:
 - is solvable with the 54 registered addresses. If one seems to need something
   that does not exist, it can be built from what does.
 
-Save each answer as `t01.phone` … `t20.phone` in one directory, then:
+Score a finished set with:
 
 ```bash
 python scripts/score_attempts.py path/to/that/directory

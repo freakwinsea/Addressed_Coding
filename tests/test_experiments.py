@@ -7,6 +7,8 @@ against it is noise. That should fail the build, not the experiment.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from phonebook.brief import guide_is_current, guide_path
 from phonebook.checker import check
@@ -48,12 +50,36 @@ def test_reference_solution_checks_and_matches(index, registry: Registry, root, 
     assert via_interpreter(path) == expected.replace("\r\n", "\n")
 
 
-def test_reference_solutions_are_not_reachable_from_the_task_sheet(root):
-    """The answer key must not leak into what the model is handed."""
+def test_task_sheet_gives_no_answers_away(root):
+    """The sheet the model reads must not contain any of the solution."""
     tasks = (root / "experiments" / "TASKS.md").read_text(encoding="utf-8")
-    assert "Do not give it `experiments/reference/`" in tasks
-    for line in tasks.splitlines():
-        assert "000-000" not in line, "TASKS.md must not contain worked addresses"
+    for number, line in enumerate(tasks.splitlines(), 1):
+        assert "000-000" not in line, f"TASKS.md:{number} names a local extension"
+        assert not re.search(r"\b[1-9]00-\d{7}\b", line), (
+            f"TASKS.md:{number} names a registered address — the tasks describe "
+            f"what to compute, never which address to dial"
+        )
+
+
+def test_task_sheet_warns_about_the_answer_key(root):
+    """Whoever runs the study has to be told to strip reference/ and expected/."""
+    tasks = (root / "experiments" / "TASKS.md").read_text(encoding="utf-8")
+    assert "prepare_study_clone" in tasks
+    assert "experiments/reference/" in tasks
+
+
+def test_scrub_script_removes_everything_that_gives_answers(root):
+    """Whatever the scrub script deletes must cover every directory with answers."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "prepare_study_clone", root / "scripts" / "prepare_study_clone.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    for name in ("experiments/reference", "experiments/expected"):
+        assert name in module.SECRET, f"{name} holds answers but is not scrubbed"
 
 
 def test_writing_guide_covers_every_address(root, registry: Registry):

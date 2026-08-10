@@ -203,6 +203,9 @@ actually supports. See [docs/AUDIT.md](docs/AUDIT.md).
 
 ## Try it
 
+Clone first — an editable install from a checkout is the only supported path
+today ([KI-1](docs/KNOWN-ISSUES.md)).
+
 ```bash
 pip install -e .
 
