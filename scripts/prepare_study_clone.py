@@ -26,9 +26,15 @@ import sys
 from pathlib import Path
 
 #: Directories that give the answers away outright.
+#:
+#: `runs/` is the one that is easy to forget: archiving a completed run commits
+#: twenty working solutions to this exact task set, so every later clone ships
+#: with a fuller answer key than `reference/` is. Archive runs, but never let a
+#: model see them.
 SECRET = [
     "experiments/reference",
     "experiments/expected",
+    "experiments/runs",
 ]
 
 #: Not secret, but it tests the answer key, so it fails once the key is gone.
@@ -36,6 +42,26 @@ SECRET = [
 #: a repository that is not broken.
 DEPENDS_ON_KEY = [
     "tests/test_experiments.py",
+]
+
+#: The scorer needs the answer key, so in a scrubbed clone it can only fail.
+#: Leaving it there tells a model that scoring is part of its job and that a
+#: key exists somewhere it cannot reach — which is pressure to go looking.
+#: Scoring is the experimenter's job and happens in the source repository.
+NOT_THE_MODELS_JOB = [
+    "scripts/score_attempts.py",
+    "scripts/prepare_study_clone.py",
+]
+
+#: Anything a previous run left behind. A clone that already contains twenty
+#: finished solutions will not get twenty new ones written — the work looks
+#: done, so the model verifies instead of authoring, and the run is wasted.
+PRIOR_RUN_ARTEFACTS = [
+    "attempts",
+    "experiments/out/errors.txt",
+    "experiments/out/restock.csv",
+    ".pytest_cache",
+    "phonebook_lang.egg-info",
 ]
 
 #: Present in a real user's checkout, so they stay. Worth knowing they are
@@ -80,16 +106,23 @@ def main() -> int:
 
     found = [name for name in SECRET if (root / name).exists()]
     recoverable = (root / ".git").exists() and not args.keep_git
+    stale = [name for name in PRIOR_RUN_ARTEFACTS if (root / name).exists()]
+    scoring = [name for name in NOT_THE_MODELS_JOB if (root / name).exists()]
 
     if args.check:
-        if found or recoverable:
-            print("NOT CLEAN — the model can read the answers:")
+        problems = found or recoverable or stale or scoring
+        if problems:
+            print("NOT READY:")
             for name in found:
-                print(f"  {name}")
+                print(f"  {name}  — answers")
             if recoverable:
-                print("  .git  (history still holds them: git show HEAD:<path>)")
+                print("  .git  — history still holds them: git show HEAD:<path>")
+            for name in stale:
+                print(f"  {name}  — left over from an earlier run")
+            for name in scoring:
+                print(f"  {name}  — scoring is not the model's job")
             return 1
-        print("clean — no answer key present")
+        print("ready — no answer key, no earlier run, no scoring tools")
         return 0
 
     for name in found:
@@ -100,6 +133,15 @@ def main() -> int:
         if path.exists():
             path.unlink()
             print(f"removed {name}  (tests the answers)")
+    for name in NOT_THE_MODELS_JOB:
+        path = root / name
+        if path.exists():
+            path.unlink()
+            print(f"removed {name}  (scoring is not the model's job)")
+    for name in stale:
+        path = root / name
+        shutil.rmtree(path, onerror=_force_remove) if path.is_dir() else path.unlink()
+        print(f"removed {name}  (left over from an earlier run)")
     if not found:
         print("no answer key present in the working tree")
 

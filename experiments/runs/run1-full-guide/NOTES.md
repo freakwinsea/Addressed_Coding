@@ -71,3 +71,33 @@ dial brief --minimal > /tmp/brief.md      # hand this over, not the full guide
 python scripts/prepare_study_clone.py /path/to/clone
 python scripts/score_attempts.py /path/to/clone/attempts
 ```
+
+---
+
+## Run 2 — no work produced
+
+**Date:** 2026-08-10, same evening. **Stopped by the operator.**
+
+Run 2 wrote no `.phone` programs at all. The `attempts/` directory in its clone
+still held run 1's twenty files, byte-identical and untouched. What it did
+instead, per the file timestamps: reinstalled the package, executed run 1's
+existing programs, then spent the rest of the session trying to score them —
+eventually reaching outside its directory looking for the answer key, at which
+point it was stopped.
+
+Nothing about the language or the model. Two setup faults, both the study
+author's:
+
+1. **Run 1's `attempts/` was left in the clone.** A model that opens a task
+   directory already containing twenty finished solutions does not write twenty
+   new ones — the work looks done, so it verifies instead of authoring.
+
+2. **`scripts/score_attempts.py` was left in the clone, and its "no answer key"
+   message said to run it "from the source repository instead".** That told a
+   model whose task was producing correct solutions that a key existed outside
+   its sandbox. It went looking. The pressure was manufactured by the harness.
+
+Fixed in `prepare_study_clone.py`, which now also removes prior-run artefacts,
+both study scripts, and `experiments/runs/` — the archive of run 1 is itself a
+complete solution key, and committing it put a better answer sheet in every
+future clone than `reference/` ever was.
