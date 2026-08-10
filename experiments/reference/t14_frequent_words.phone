@@ -1,0 +1,20 @@
+phonebook 0.1
+
+ext 000-0000001 SEEN_OFTEN (entry: pair<text,int>) -> bool {
+  300-0000016@[entry] -> tally
+  600-0000006@[tally, 2] -> often
+  return often
+}
+
+ext 000-0000002 WORD_OF (entry: pair<text,int>) -> text {
+  300-0000015@[entry] -> word
+  return word
+}
+
+500-0000001@["experiments/data/words.txt"] -> raw
+200-0000003@[raw] -> words
+300-0000012@[words] -> tallies
+300-0000013@[tallies] -> pairs
+300-0000002@[pairs, 000-0000001] -> frequent
+300-0000003@[frequent, 000-0000002] -> names
+100-0000002@[names]

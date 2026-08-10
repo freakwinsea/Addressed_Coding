@@ -1,0 +1,12 @@
+phonebook 0.1
+
+ext 000-0000001 CATEGORY_OF (row: map<text,text>) -> text {
+  300-0000014@[row, "category", "?"] -> category
+  return category
+}
+
+500-0000003@["experiments/data/inventory.csv"] -> rows
+300-0000003@[rows, 000-0000001] -> categories
+300-0000008@[categories] -> distinct
+300-0000005@[distinct] -> ordered
+100-0000002@[ordered]

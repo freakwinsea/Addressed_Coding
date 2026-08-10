@@ -1,0 +1,13 @@
+phonebook 0.1
+
+ext 000-0000001 IS_COMMENT (line: text) -> bool {
+  200-0000010@[line, "#"] -> starts
+  return starts
+}
+
+500-0000001@["experiments/data/log.txt"] -> raw
+200-0000001@[raw] -> lines
+300-0000002@[lines, 000-0000001] -> comments
+300-0000009@[comments] -> n
+600-0000006@[n, 0] -> found
+100-0000001@[found]

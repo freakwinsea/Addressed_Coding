@@ -1,0 +1,4 @@
+the address is the identity and the number is the handle
+a contract is a promise and an implementation is how the promise is kept
+the number outlives the library and the library outlives nothing
+change the name and the number still points at the same capability

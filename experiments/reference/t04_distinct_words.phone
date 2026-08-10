@@ -1,0 +1,6 @@
+phonebook 0.1
+500-0000001@["experiments/data/words.txt"] -> raw
+200-0000003@[raw] -> words
+300-0000008@[words] -> distinct
+300-0000009@[distinct] -> n
+100-0000001@[n]

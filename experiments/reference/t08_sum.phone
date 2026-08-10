@@ -1,0 +1,12 @@
+phonebook 0.1
+
+ext 000-0000001 AS_NUMBER (cell: text) -> int {
+  400-0000009@[cell, 0] -> value
+  return value
+}
+
+500-0000001@["experiments/data/numbers.txt"] -> raw
+200-0000001@[raw] -> lines
+300-0000003@[lines, 000-0000001] -> numbers
+400-0000008@[numbers] -> total
+100-0000001@[total]

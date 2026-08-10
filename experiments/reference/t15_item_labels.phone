@@ -1,0 +1,14 @@
+phonebook 0.1
+
+ext 000-0000001 LABEL_OF (row: map<text,text>) -> text {
+  300-0000014@[row, "name", "?"] -> name
+  300-0000014@[row, "category", "?"] -> category
+  300-0000001@[name, " (", category, ")"] -> parts
+  200-0000004@[parts, ""] -> label
+  return label
+}
+
+500-0000003@["experiments/data/inventory.csv"] -> rows
+300-0000003@[rows, 000-0000001] -> labels
+300-0000005@[labels] -> ordered
+100-0000002@[ordered]

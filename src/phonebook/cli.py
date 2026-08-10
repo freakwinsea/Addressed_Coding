@@ -251,6 +251,28 @@ def cmd_registry(args) -> int:
     return 1
 
 
+def cmd_brief(args) -> int:
+    """Print (or refresh) everything a newcomer needs to write a program."""
+    from .brief import cheatsheet, guide_path, render_guide
+
+    registry = Registry.load()
+    if args.table_only:
+        sys.stdout.write(cheatsheet(registry, notes=not args.no_notes))
+        return 0
+
+    refreshed = render_guide(registry)
+    path = guide_path(registry)
+    if args.write:
+        if path.read_text(encoding="utf-8") == refreshed:
+            print(f"{path.name} is already current")
+            return 0
+        path.write_text(refreshed, encoding="utf-8", newline="\n")
+        print(f"refreshed the address table in {path.as_posix()}")
+        return 0
+    sys.stdout.write(refreshed)
+    return 0
+
+
 def cmd_conformance(args) -> int:
     from .conformance import run_suite
 
@@ -309,6 +331,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--strict", action="store_true", help="exit non-zero if review is needed")
     p.add_argument("--no-bodies", action="store_true", help="omit local extension source")
     p.set_defaults(func=cmd_audit)
+
+    p = sub.add_parser(
+        "brief",
+        help="print everything needed to write a .phone program — paste this into a model",
+    )
+    p.add_argument("--table-only", action="store_true", help="just the address table")
+    p.add_argument("--no-notes", action="store_true", help="omit the pinned-semantics notes")
+    p.add_argument(
+        "--write",
+        action="store_true",
+        help="refresh the generated table inside docs/WRITING-PHONE.md",
+    )
+    p.set_defaults(func=cmd_brief)
 
     p = sub.add_parser("conformance", help="run the cross-backend conformance suite")
     p.add_argument("--backend", choices=TARGETS + ("interpreter",), default="interpreter")

@@ -1,0 +1,15 @@
+phonebook 0.1
+
+ext 000-0000001 NEEDS_RESTOCK (row: map<text,text>) -> bool {
+  300-0000014@[row, "qty", "0"] -> cell
+  400-0000009@[cell, 0] -> qty
+  600-0000006@[qty, 10] -> plenty
+  return plenty
+}
+
+500-0000003@["experiments/data/inventory.csv"] -> rows
+300-0000002@[rows, 000-0000001] -> stocked
+300-0000001@["name", "qty"] -> columns
+500-0000004@["experiments/out/restock.csv", stocked, columns]
+300-0000009@[stocked] -> n
+100-0000001@[n]

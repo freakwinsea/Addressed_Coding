@@ -1,0 +1,5 @@
+phonebook 0.1
+500-0000001@["experiments/data/words.txt"] -> raw
+200-0000007@[raw] -> shouted
+200-0000001@[shouted] -> lines
+100-0000002@[lines]

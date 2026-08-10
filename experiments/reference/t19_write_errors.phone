@@ -1,0 +1,14 @@
+phonebook 0.1
+
+ext 000-0000001 IS_ERROR (line: text) -> bool {
+  200-0000009@[line, "ERROR"] -> found
+  return found
+}
+
+500-0000001@["experiments/data/log.txt"] -> raw
+200-0000001@[raw] -> lines
+300-0000002@[lines, 000-0000001] -> errors
+200-0000004@[errors, "\n"] -> body
+500-0000002@["experiments/out/errors.txt", body]
+300-0000009@[errors] -> n
+100-0000001@[n]

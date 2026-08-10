@@ -1,0 +1,14 @@
+phonebook 0.1
+
+ext 000-0000001 AS_NUMBER (cell: text) -> int {
+  400-0000009@[cell, 0] -> value
+  return value
+}
+
+500-0000001@["experiments/data/numbers.txt"] -> raw
+200-0000001@[raw] -> lines
+300-0000003@[lines, 000-0000001] -> numbers
+300-0000005@[numbers] -> ascending
+300-0000007@[ascending] -> descending
+300-0000011@[descending, 0] -> largest
+100-0000001@[largest]

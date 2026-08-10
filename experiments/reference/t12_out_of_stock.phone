@@ -1,0 +1,18 @@
+phonebook 0.1
+
+ext 000-0000001 IS_EMPTY_STOCK (row: map<text,text>) -> bool {
+  300-0000014@[row, "qty", ""] -> cell
+  400-0000009@[cell, -1] -> qty
+  600-0000004@[qty, 0] -> empty
+  return empty
+}
+
+ext 000-0000002 NAME_OF (row: map<text,text>) -> text {
+  300-0000014@[row, "name", "?"] -> name
+  return name
+}
+
+500-0000003@["experiments/data/inventory.csv"] -> rows
+300-0000002@[rows, 000-0000001] -> empties
+300-0000003@[empties, 000-0000002] -> names
+100-0000002@[names]

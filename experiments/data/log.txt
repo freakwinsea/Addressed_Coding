@@ -1,0 +1,10 @@
+# service log, 2026-08-01
+2026-08-01 10:14:02 INFO service started
+2026-08-01 10:14:07 WARN cache miss rate high
+2026-08-01 10:15:31 ERROR upstream timeout
+2026-08-01 10:15:33 INFO retrying
+2026-08-01 10:16:04 ERROR upstream timeout
+2026-08-01 10:16:05 WARN degraded mode
+2026-08-01 10:21:47 INFO recovered
+2026-08-01 10:44:12 ERROR checksum mismatch
+2026-08-01 10:44:13 INFO shutting down

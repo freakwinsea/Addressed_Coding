@@ -215,9 +215,19 @@ dial emit     examples/word_freq.phone --target rust
 dial audit    examples/audit_demo.phone --strict
 dial conformance --backend rust             # the independent implementation
 
+dial brief                                  # everything needed to write a program
 python scripts/demo.py                      # the whole proof, one command
-pytest                                      # 180+ tests, including the ledger
+pytest                                      # 200+ tests, including the ledger
 ```
+
+## An open question
+
+Both ideation sessions claimed a closed, enumerable address space should be a
+better generation target for a language model than recalled syntax — no
+hallucinated APIs, verifiable before execution. Neither tested it.
+[experiments/](experiments/) is that test: 20 tasks, a scoring harness, verified
+reference solutions, and priors recorded in advance so they can be wrong in
+public. No results yet.
 
 ## What is deliberately not here
 
@@ -246,8 +256,15 @@ src/phonebook/     the toolchain: parser, checker, resolver, interpreter, emitte
 examples/          .phone programs
 generated/         committed output of `dial emit`, so the diff is reviewable
 tests/             unit tests plus a conformance suite written in .phone itself
-docs/              the spec, the design notes, and the audit model
+experiments/       the agent-authoring study: 20 tasks, data, reference solutions
+docs/              the spec, the design notes, the audit model, the writing guide
 ```
+
+Two files are written for agents rather than people:
+[AGENTS.md](AGENTS.md) orients a coding agent working *on* the repo, and
+[docs/WRITING-PHONE.md](docs/WRITING-PHONE.md) — `dial brief` — is a
+self-contained ~6k-token guide to writing *in* the language, with the address
+table generated from the registry so it cannot drift.
 
 ## Provenance
 

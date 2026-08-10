@@ -19,3 +19,8 @@ examples/data/.cache/telemetry.dat
 
 # No external dependencies; the library lock file is noise.
 runtime/rust/phonebook_rt/Cargo.lock
+
+# Study scratch: task output and collected model attempts.
+experiments/out/*
+!experiments/out/.gitkeep
+attempts/
