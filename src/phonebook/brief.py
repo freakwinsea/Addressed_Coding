@@ -75,13 +75,10 @@ def guide_path(registry: Registry) -> Path:
     return registry.root.parent / "docs" / "WRITING-PHONE.md"
 
 
-#: Section 5 is eight worked patterns — filter a list, fold a total, rank a
-#: tally. Excellent documentation for a real user, and a near-complete solution
-#: key for the study's task set, which was written in the same sitting. A run
-#: with it in context measures recall of an example the experimenter supplied,
-#: not use of the language. `--minimal` withholds it; everything else stays,
-#: because syntax, rules, constraints, and the address table are the language
-#: itself rather than the method.
+#: Section 5 is eight worked patterns. Good documentation, and too much of a
+#: head start in some contexts, so `--minimal` omits it. Everything else stays:
+#: syntax, rules, constraints, and the address table are the language itself
+#: rather than the method. See experiments/README.md for when that matters.
 WORKED_PATTERNS = re.compile(r"\n## 5\. Patterns you will need\n.*?(?=\n## 6\.)", re.DOTALL)
 
 _SECTION = re.compile(r"^## (\d+)\. ", re.MULTILINE)

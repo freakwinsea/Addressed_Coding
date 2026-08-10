@@ -228,9 +228,10 @@ pytest                                      # 200+ tests, including the ledger
 Both ideation sessions claimed a closed, enumerable address space should be a
 better generation target for a language model than recalled syntax — no
 hallucinated APIs, verifiable before execution. Neither tested it.
-[experiments/](experiments/) is that test: 20 tasks, a scoring harness, verified
-reference solutions, and priors recorded in advance so they can be wrong in
-public. No results yet.
+[experiments/](experiments/) is that test: 20 tasks across four difficulty
+tiers, a scoring harness, and priors recorded in advance so they can be wrong in
+public. Three runs so far, no valid data — every failure so far has been in the
+harness rather than in the thing being measured, and they are written up.
 
 ## What is deliberately not here
 

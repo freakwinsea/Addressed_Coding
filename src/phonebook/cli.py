@@ -345,8 +345,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--minimal",
         action="store_true",
-        help="withhold the worked patterns — use this when measuring a model, "
-        "since those patterns solve most of the study's tasks outright",
+        help="omit section 5, the worked patterns",
     )
     p.add_argument(
         "--write",
