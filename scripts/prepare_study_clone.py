@@ -32,6 +32,11 @@ from phonebook.brief import WORKED_PATTERNS, _renumber_sections  # noqa: E402
 
 GUIDE = "docs/WRITING-PHONE.md"
 
+#: One definition of "the patterns are still there", used by both the check and
+#: the rewrite. They drifted apart once already, and --check quietly passed a
+#: clone it should have rejected.
+PATTERNS_HEADING = "## 5. Patterns you will need"
+
 #: Directories that give the answers away outright.
 #:
 #: `runs/` is the one that is easy to forget: archiving a completed run commits
@@ -115,7 +120,7 @@ def withhold_patterns(root: Path) -> str:
     if not path.exists():
         return "no guide in this clone"
     source = path.read_text(encoding="utf-8")
-    if "## 5. Patterns you will need" not in source:
+    if PATTERNS_HEADING not in source:
         return "already withheld"
     rewritten, count = WORKED_PATTERNS.subn("", source)
     if count != 1:
@@ -161,7 +166,7 @@ def main() -> int:
     patterned = (
         not args.keep_patterns
         and guide.exists()
-        and "*Withheld." not in guide.read_text(encoding="utf-8")
+        and PATTERNS_HEADING in guide.read_text(encoding="utf-8")
     )
 
     if args.check:
