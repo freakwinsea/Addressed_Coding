@@ -1,0 +1,7 @@
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.svg text eol=lf
+
+docs/origins/*.html linguist-vendored

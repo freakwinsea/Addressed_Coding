@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+env:
+  PYTHONIOENCODING: utf-8
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ runner.temp }}/phonebook-cargo-target
+          key: cargo-${{ runner.os }}-${{ hashFiles('runtime/rust/**/*.rs', '**/Cargo.toml') }}
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      # The registry has to be trustworthy before anything built on it is.
+      # This includes the immutability ledger: an issued contract that changed
+      # without a version bump fails the build here.
+      - name: Lint the registry
+        run: dial registry lint
+
+      - name: Test
+        run: pytest -q
+
+      # The claim the project exists to test: one source, three execution
+      # paths, identical bytes.
+      - name: Cross-backend proof
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/phonebook-cargo-target
+        run: python scripts/demo.py --report demo_report.md
+
+      - name: Conformance on every backend
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/phonebook-cargo-target
+        run: |
+          dial conformance --backend interpreter
+          dial conformance --backend python
+          dial conformance --backend rust
+
+      - name: Audit report
+        run: dial audit examples/audit_demo.phone
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.13'
+        with:
+          name: demo-report
+          path: demo_report.md
+
+  rust:
+    name: rust runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        run: cargo fmt --manifest-path runtime/rust/phonebook_rt/Cargo.toml --check
+      - name: Clippy
+        run: cargo clippy --manifest-path runtime/rust/phonebook_rt/Cargo.toml -- -D warnings

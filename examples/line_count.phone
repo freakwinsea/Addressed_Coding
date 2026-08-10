@@ -1,0 +1,20 @@
+phonebook 0.1
+
+# Count the lines in a file that still have content after trimming.
+#
+# The predicate is a local extension, passed to FILTER by address. That is the
+# only way to supply behavior in this language: there are no lambdas, so every
+# piece of custom logic has an address you can look up and read.
+
+ext 000-0000001 NOT_BLANK (line: text) -> bool {
+  200-0000005@[line]     -> trimmed    # TRIM
+  600-0000007@[trimmed]  -> blank      # IS_EMPTY
+  600-0000001@[blank]    -> keep       # NOT
+  return keep
+}
+
+500-0000001@["examples/data/notes.txt"]  -> text     # READ_TEXT_FILE
+200-0000001@[text]                       -> lines    # SPLIT_LINES
+300-0000002@[lines, 000-0000001]         -> kept     # FILTER
+300-0000009@[kept]                       -> n        # COUNT
+100-0000001@[n]                                      # PRINT

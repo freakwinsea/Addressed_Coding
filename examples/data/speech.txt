@@ -1,0 +1,12 @@
+A number is a handle, not a name. The number identifies the capability, and the
+name is only how the phonebook renders that number for a human reader. Change
+the name and the number still points at the same capability; change the
+capability and the number must change with it.
+
+The contract is the promise. The implementation is how the promise is kept
+today, in this language, with this library. A promise can be kept in many ways,
+and the ways will change, and the promise will not.
+
+So the number outlives the library. The number outlives the language. The number
+outlives the person who dialed it, which is the entire point of writing the
+number down instead of writing the code down.

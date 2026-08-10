@@ -1,0 +1,39 @@
+phonebook 0.1
+
+# TO_TEXT is the single rendering rule for the whole language, so every
+# backend's idea of how a value looks has to come through here. Python would
+# say "True"; the contract says "true", and the contract wins.
+
+100-0000005@[true] -> t1
+100-0000001@[t1]
+100-0000005@[false] -> t2
+100-0000001@[t2]
+100-0000005@[-42] -> t3
+100-0000001@[t3]
+100-0000005@["already text"] -> t4
+100-0000001@[t4]
+
+300-0000001@["a", "b"] -> letters
+100-0000005@[letters] -> t5
+100-0000001@[t5]
+
+300-0000001@[1, 2, 3] -> digits
+100-0000005@[digits] -> t6
+100-0000001@[t6]
+
+# PRINT defers to TO_TEXT, so a raw boolean prints the same way.
+600-0000005@[1, 2] -> is_less
+100-0000001@[is_less]
+
+# SELECT is eager and typed: both arms exist before the choice is made.
+100-0000003@[is_less, "smaller", "larger"] -> label
+100-0000001@[label]
+
+600-0000004@["a", "A"] -> same          # EQUALS is case sensitive
+100-0000001@[same]
+600-0000007@[" "] -> blank              # whitespace is not empty
+100-0000001@[blank]
+
+300-0000001@["x", "y"] -> pairparts
+200-0000004@[pairparts, ""] -> joined   # empty separator is fine for JOIN
+100-0000001@[joined]

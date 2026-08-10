@@ -1,0 +1,380 @@
+{
+  "area": "300",
+  "title": "Collections",
+  "description": "Lists, maps, and pairs. This block carries the higher-order operations, whose callable arguments are passed as addresses.",
+  "entries": [
+    {
+      "address": "300-0000001",
+      "name": "LIST",
+      "summary": "Build a list from the given values",
+      "keywords": ["list", "array", "collect", "build", "make", "of"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "items", "type": "T", "variadic": true }],
+        "output": { "name": "list", "type": "list<T>" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Variadic. All items must unify to a single element type.", "At least one item is required in v0: with no items there is nothing to infer the element type from."]
+      },
+      "examples": ["300-0000001@[word, tally] -> parts"],
+      "conformance": [{ "id": "list.basic", "args": ["a", "b"], "expect": ["a", "b"] }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000002",
+      "name": "FILTER",
+      "summary": "Retain values satisfying a predicate",
+      "description": "Applies the predicate to each element in order and keeps those for which it returns true. The predicate is supplied as an address, usually a local 000 extension.",
+      "keywords": ["filter", "select", "where", "retain", "keep", "only", "matching"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "sequence", "type": "list<T>" },
+          { "name": "predicate", "type": "callable(T)->bool" }
+        ],
+        "output": { "name": "kept", "type": "list<T>" },
+        "effects": [],
+        "errors": ["predicate_failure"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Relative order of kept elements is preserved.", "The predicate is applied to every element exactly once, left to right."]
+      },
+      "examples": ["300-0000002@[lines, 000-0000001] -> kept"],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000003",
+      "name": "MAP",
+      "summary": "Transform every value in a list",
+      "keywords": ["map", "transform", "convert", "apply", "each", "project"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "sequence", "type": "list<T>" },
+          { "name": "transform", "type": "callable(T)->R" }
+        ],
+        "output": { "name": "mapped", "type": "list<R>" },
+        "effects": [],
+        "errors": ["transform_failure"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Applied left to right, exactly once per element. Length is preserved."]
+      },
+      "examples": ["300-0000003@[rows, 000-0000002] -> names"],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000004",
+      "name": "REDUCE",
+      "summary": "Fold a list into a single value from the left",
+      "description": "Starts from the initial value and combines it with each element in order: combine(combine(initial, x0), x1), and so on.",
+      "keywords": ["reduce", "fold", "accumulate", "aggregate", "total", "combine"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "sequence", "type": "list<T>" },
+          { "name": "combine", "type": "callable(A,T)->A" },
+          { "name": "initial", "type": "A" }
+        ],
+        "output": { "name": "folded", "type": "A" },
+        "effects": [],
+        "errors": ["combine_failure"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["LEFT fold, always. An empty list returns the initial value untouched."]
+      },
+      "examples": ["300-0000004@[widths, 000-0000003, 0] -> total"],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000005",
+      "name": "SORT",
+      "summary": "Sort a list into ascending order",
+      "keywords": ["sort", "order", "ascending", "arrange", "rank"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "sequence", "type": "list<T>" }],
+        "output": { "name": "sorted", "type": "list<T>" },
+        "constraints": { "T": "comparable" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "STABLE.",
+          "int sorts numerically; text sorts by Unicode scalar value, which is not locale-aware and is identical in every backend.",
+          "bool sorts false before true."
+        ]
+      },
+      "examples": ["300-0000005@[names] -> ordered"],
+      "conformance": [
+        { "id": "sort.ints", "args": [[3, 1, 2]], "expect": [1, 2, 3] },
+        { "id": "sort.text_codepoint", "args": [["b", "A", "a"]], "expect": ["A", "a", "b"] }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000006",
+      "name": "SORT_BY",
+      "summary": "Sort a list by a derived key",
+      "description": "Computes a key for each element with the given address and sorts by that key, stably.",
+      "keywords": ["sort", "order", "by", "key", "rank", "descending", "arrange"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "sequence", "type": "list<T>" },
+          { "name": "key", "type": "callable(T)->K" },
+          { "name": "descending", "type": "bool" }
+        ],
+        "output": { "name": "sorted", "type": "list<T>" },
+        "constraints": { "K": "comparable" },
+        "effects": [],
+        "errors": ["key_failure"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "STABLE in both directions: elements with equal keys keep their original relative order even when descending is true.",
+          "Descending sorts by reversed key comparison, NOT by reversing the sorted list, which would break stability."
+        ]
+      },
+      "examples": ["300-0000006@[tallies, 000-0000004, true] -> ranked"],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000007",
+      "name": "REVERSE",
+      "summary": "Reverse the order of a list",
+      "keywords": ["reverse", "flip", "backwards", "invert", "descending"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "sequence", "type": "list<T>" }],
+        "output": { "name": "reversed", "type": "list<T>" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic"
+      },
+      "examples": ["300-0000007@[ordered] -> descending"],
+      "conformance": [{ "id": "reverse.basic", "args": [["a", "b", "c"]], "expect": ["c", "b", "a"] }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000008",
+      "name": "UNIQUE",
+      "summary": "Remove duplicate values, keeping the first of each",
+      "keywords": ["unique", "distinct", "dedupe", "deduplicate", "set", "once"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "sequence", "type": "list<T>" }],
+        "output": { "name": "distinct", "type": "list<T>" },
+        "constraints": { "T": "keyable" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["FIRST-OCCURRENCE order is preserved. This is not a sorted set and does not reorder anything."]
+      },
+      "examples": ["300-0000008@[words] -> vocabulary"],
+      "conformance": [{ "id": "unique.first_wins", "args": [["b", "a", "b", "c", "a"]], "expect": ["b", "a", "c"] }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000009",
+      "name": "COUNT",
+      "summary": "Count the items in a list",
+      "keywords": ["count", "length", "size", "how many", "total", "number of", "len"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "sequence", "type": "list<T>" }],
+        "output": { "name": "total", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic"
+      },
+      "examples": ["300-0000009@[kept] -> n"],
+      "conformance": [
+        { "id": "count.basic", "args": [["a", "b"]], "expect": 2 },
+        { "id": "count.empty", "args": [[]], "expect": 0 }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000010",
+      "name": "TAKE",
+      "summary": "Keep the first n items of a list",
+      "keywords": ["take", "first", "head", "limit", "top", "truncate", "n"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "sequence", "type": "list<T>" },
+          { "name": "n", "type": "int" }
+        ],
+        "output": { "name": "taken", "type": "list<T>" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["n is clamped: larger than the list returns the whole list, negative returns an empty list. Never an error."]
+      },
+      "examples": ["300-0000010@[ranked, 10] -> top"],
+      "conformance": [
+        { "id": "take.basic", "args": [["a", "b", "c"], 2], "expect": ["a", "b"] },
+        { "id": "take.over", "args": [["a"], 5], "expect": ["a"] },
+        { "id": "take.negative", "args": [["a"], -1], "expect": [] }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000011",
+      "name": "FIRST",
+      "summary": "Take the first item, or a fallback when the list is empty",
+      "description": "Total by construction: there is no optional type in v0, so the caller supplies the value to use for an empty list.",
+      "keywords": ["first", "head", "front", "initial", "default", "fallback"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "sequence", "type": "list<T>" },
+          { "name": "fallback", "type": "T" }
+        ],
+        "output": { "name": "value", "type": "T" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Never fails. An empty list returns the fallback."]
+      },
+      "examples": ["300-0000011@[matches, \"none\"] -> best"],
+      "conformance": [
+        { "id": "first.basic", "args": [["a", "b"], "z"], "expect": "a" },
+        { "id": "first.fallback", "args": [[], "z"], "expect": "z" }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000012",
+      "name": "COUNT_OCCURRENCES",
+      "summary": "Tally how many times each value appears",
+      "keywords": ["count", "occurrences", "tally", "frequency", "histogram", "group", "how many times"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "sequence", "type": "list<T>" }],
+        "output": { "name": "tallies", "type": "map<T,int>" },
+        "constraints": { "T": "keyable" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["The result is a map, which has no inherent order. Use ENTRIES (300-0000013) to get a deterministically ordered view."]
+      },
+      "examples": ["300-0000012@[words] -> tallies"],
+      "conformance": [{ "id": "count_occurrences.basic", "args": [["a", "b", "a"]], "expect": { "a": 2, "b": 1 } }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000013",
+      "name": "ENTRIES",
+      "summary": "List a map's key/value pairs, sorted by key",
+      "description": "The bridge from maps to lists. Sorting by key is part of the contract, not an implementation accident: it is what makes map-derived output identical across backends whose maps iterate differently.",
+      "keywords": ["entries", "items", "pairs", "kv", "map to list", "unpack"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "mapping", "type": "map<K,V>" }],
+        "output": { "name": "pairs", "type": "list<pair<K,V>>" },
+        "constraints": { "K": "comparable" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "SORTED BY KEY, ascending, always.",
+          "Python dicts iterate in insertion order and Rust BTreeMaps iterate in key order. Sorting here is what removes that difference from every program's output."
+        ]
+      },
+      "examples": ["300-0000013@[tallies] -> pairs"],
+      "conformance": [{ "id": "entries.sorted", "args": [{ "b": 1, "a": 2 }], "expect": [["a", 2], ["b", 1]] }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000014",
+      "name": "GET",
+      "summary": "Look up a key in a map, or a fallback when absent",
+      "keywords": ["get", "lookup", "index", "field", "key", "value", "fetch", "column"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "mapping", "type": "map<K,V>" },
+          { "name": "key", "type": "K" },
+          { "name": "fallback", "type": "V" }
+        ],
+        "output": { "name": "value", "type": "V" },
+        "constraints": { "K": "keyable" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Never fails. A missing key returns the fallback."]
+      },
+      "examples": ["300-0000014@[row, \"name\", \"\"] -> name"],
+      "conformance": [
+        { "id": "get.present", "args": [{ "a": 1 }, "a", 0], "expect": 1 },
+        { "id": "get.absent", "args": [{ "a": 1 }, "z", 0], "expect": 0 }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000015",
+      "name": "PAIR_KEY",
+      "summary": "Take the key half of a pair",
+      "keywords": ["pair", "key", "first", "left", "tuple"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "pair<K,V>" }],
+        "output": { "name": "key", "type": "K" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic"
+      },
+      "examples": ["300-0000015@[entry] -> word"],
+      "conformance": [{ "id": "pair_key.basic", "args": [["a", 1]], "expect": "a" }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "300-0000016",
+      "name": "PAIR_VALUE",
+      "summary": "Take the value half of a pair",
+      "keywords": ["pair", "value", "second", "right", "tuple"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "pair<K,V>" }],
+        "output": { "name": "value", "type": "V" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic"
+      },
+      "examples": ["300-0000016@[entry] -> tally"],
+      "conformance": [{ "id": "pair_value.basic", "args": [["a", 1]], "expect": 1 }],
+      "status": "active",
+      "since": "0.1.0"
+    }
+  ]
+}

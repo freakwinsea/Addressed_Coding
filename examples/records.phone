@@ -1,0 +1,25 @@
+phonebook 0.1
+
+# Load records, filter by a rule, project one field, sort, print.
+#
+# READ_CSV never guesses types: every cell is text until something converts it.
+# PARSE_INT (400-0000009) takes a fallback rather than raising, so a malformed
+# age cannot crash the program — it simply fails the age test.
+
+ext 000-0000001 IS_ADULT (row: map<text,text>) -> bool {
+  300-0000014@[row, "age", ""] -> cell    # GET
+  400-0000009@[cell, -1]       -> age     # PARSE_INT
+  600-0000006@[age, 17]        -> adult   # GREATER_THAN
+  return adult
+}
+
+ext 000-0000002 NAME_OF (row: map<text,text>) -> text {
+  300-0000014@[row, "name", "?"] -> name  # GET
+  return name
+}
+
+500-0000003@["examples/data/people.csv"] -> rows     # READ_CSV
+300-0000002@[rows, 000-0000001]          -> adults   # FILTER
+300-0000003@[adults, 000-0000002]        -> names    # MAP
+300-0000005@[names]                      -> ordered  # SORT
+100-0000002@[ordered]                                # PRINT_LINES

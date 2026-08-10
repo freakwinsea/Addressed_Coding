@@ -1,0 +1,27 @@
+phonebook 0.1
+
+# Both backends hand-write the same CSV state machine rather than delegating to
+# a library, so this exercises quoting, embedded commas, padding short rows, and
+# the LF-only line endings that make the written bytes identical everywhere.
+
+ext 000-0000001 DESCRIBE (row: map<text,text>) -> text {
+  300-0000014@[row, "name", "?"]  -> name
+  300-0000014@[row, "note", "?"]  -> note
+  300-0000014@[row, "city", "?"]  -> city
+  300-0000001@[name, note, city]  -> parts
+  200-0000004@[parts, " / "]      -> line
+  return line
+}
+
+500-0000003@["tests/conformance/data/quoted.csv"] -> rows   # READ_CSV
+300-0000009@[rows] -> n
+100-0000001@[n]
+
+300-0000003@[rows, 000-0000001] -> described
+100-0000002@[described]
+
+300-0000001@["name", "note", "city"] -> columns
+500-0000004@["tests/conformance/data/.out.csv", rows, columns]   # WRITE_CSV
+500-0000001@["tests/conformance/data/.out.csv"] -> written      # READ_TEXT_FILE
+200-0000001@[written] -> lines
+100-0000002@[lines]

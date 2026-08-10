@@ -1,0 +1,45 @@
+phonebook 0.1
+
+# Text semantics that would otherwise differ between a language that indexes
+# strings by character and one that indexes them by byte.
+
+200-0000011@["héllo"] -> n1        # LENGTH counts scalar values, not bytes
+100-0000001@[n1]
+
+200-0000012@["abcdef", 1, 4] -> s1  # SLICE
+100-0000001@[s1]
+200-0000012@["abc", 0, 99] -> s2    # clamps rather than failing
+100-0000001@[s2]
+200-0000012@["abc", -5, 2] -> s3    # negative clamps to 0, never wraps
+100-0000001@[s3]
+200-0000012@["abc", 2, 1] -> s4     # inverted range is empty
+100-0000001@[s4]
+
+200-0000006@["ÄbC"] -> low          # LOWERCASE is ASCII-only by contract
+100-0000001@[low]
+200-0000007@["ßb"] -> up            # so 'ß' does not become 'SS'
+100-0000001@[up]
+
+200-0000008@["aaa", "aa", "a"] -> r1   # REPLACE never rescans its own output
+100-0000001@[r1]
+
+200-0000001@["a\nb\n"] -> l1        # SPLIT_LINES absorbs one trailing newline
+300-0000009@[l1] -> c1
+100-0000001@[c1]
+200-0000001@["a\n\n"] -> l2         # but not two
+300-0000009@[l2] -> c2
+100-0000001@[c2]
+200-0000001@["a\r\nb\r\n"] -> l3    # CRLF and LF agree
+200-0000004@[l3, "|"] -> j3
+100-0000001@[j3]
+
+200-0000002@["a,,b", ","] -> p1     # SPLIT keeps empty segments
+200-0000004@[p1, "|"] -> j1
+100-0000001@[j1]
+
+200-0000003@["  the   quick\nfox "] -> w1   # SPLIT_WORDS drops empties
+200-0000004@[w1, "|"] -> j2
+100-0000001@[j2]
+
+200-0000009@["hello", ""] -> has    # every text contains the empty string
+100-0000001@[has]

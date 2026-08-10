@@ -1,0 +1,165 @@
+{
+  "area": "600",
+  "title": "Logic and comparison",
+  "description": "Boolean algebra and comparison. Nothing here short-circuits: arguments are already-bound values, so both sides have been computed before the operator is reached.",
+  "entries": [
+    {
+      "address": "600-0000001",
+      "name": "NOT",
+      "summary": "Invert a boolean",
+      "keywords": ["not", "invert", "negate", "opposite", "unless"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "bool" }],
+        "output": { "name": "result", "type": "bool" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic"
+      },
+      "examples": ["600-0000001@[blank] -> has_content"],
+      "conformance": [{ "id": "not.basic", "args": [true], "expect": false }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "600-0000002",
+      "name": "AND",
+      "summary": "True when both booleans are true",
+      "keywords": ["and", "both", "conjunction", "all"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "bool" }, { "name": "b", "type": "bool" }],
+        "output": { "name": "result", "type": "bool" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["EAGER. There is no short-circuit, because both operands are already-bound values."]
+      },
+      "examples": ["600-0000002@[is_adult, has_name] -> eligible"],
+      "conformance": [
+        { "id": "and.true", "args": [true, true], "expect": true },
+        { "id": "and.false", "args": [true, false], "expect": false }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "600-0000003",
+      "name": "OR",
+      "summary": "True when either boolean is true",
+      "keywords": ["or", "either", "any", "disjunction"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "bool" }, { "name": "b", "type": "bool" }],
+        "output": { "name": "result", "type": "bool" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["EAGER, mirroring AND (600-0000002)."]
+      },
+      "examples": ["600-0000003@[is_comment, is_blank] -> skip"],
+      "conformance": [
+        { "id": "or.true", "args": [false, true], "expect": true },
+        { "id": "or.false", "args": [false, false], "expect": false }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "600-0000004",
+      "name": "EQUALS",
+      "summary": "Test two values of the same type for equality",
+      "keywords": ["equals", "equal", "same", "is", "matches", "eq"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
+        "output": { "name": "result", "type": "bool" },
+        "constraints": { "T": "keyable" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Text equality is exact code-point equality: no case folding, no Unicode normalization, no locale."]
+      },
+      "examples": ["600-0000004@[status, \"active\"] -> is_active"],
+      "conformance": [
+        { "id": "equals.text", "args": ["a", "a"], "expect": true },
+        { "id": "equals.case_sensitive", "args": ["a", "A"], "expect": false }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "600-0000005",
+      "name": "LESS_THAN",
+      "summary": "True when the first value orders before the second",
+      "keywords": ["less", "lt", "smaller", "before", "under", "below"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
+        "output": { "name": "result", "type": "bool" },
+        "constraints": { "T": "comparable" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Ordering matches SORT (300-0000005): numeric for int, Unicode scalar value for text, false before true for bool."]
+      },
+      "examples": ["600-0000005@[age, 18] -> is_minor"],
+      "conformance": [
+        { "id": "less_than.ints", "args": [1, 2], "expect": true },
+        { "id": "less_than.text", "args": ["A", "a"], "expect": true }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "600-0000006",
+      "name": "GREATER_THAN",
+      "summary": "True when the first value orders after the second",
+      "keywords": ["greater", "gt", "bigger", "after", "over", "above", "more"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
+        "output": { "name": "result", "type": "bool" },
+        "constraints": { "T": "comparable" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Ordering matches LESS_THAN (600-0000005)."]
+      },
+      "examples": ["600-0000006@[age, 17] -> is_adult"],
+      "conformance": [{ "id": "greater_than.ints", "args": [2, 1], "expect": true }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "600-0000007",
+      "name": "IS_EMPTY",
+      "summary": "True when text has no characters",
+      "description": "Tests text only. For lists, compare COUNT (300-0000009) against 0; keeping this address monomorphic avoids a union type in the checker.",
+      "keywords": ["empty", "blank", "nothing", "is empty", "no content"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }],
+        "output": { "name": "result", "type": "bool" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Whitespace is NOT empty. Combine with TRIM (200-0000005) to test for blankness."]
+      },
+      "examples": ["600-0000007@[trimmed] -> blank"],
+      "conformance": [
+        { "id": "is_empty.yes", "args": [""], "expect": true },
+        { "id": "is_empty.whitespace_is_not_empty", "args": [" "], "expect": false }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    }
+  ]
+}

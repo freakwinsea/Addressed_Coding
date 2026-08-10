@@ -1,0 +1,39 @@
+phonebook 0.1
+
+# A demonstration for `dial audit`, not a useful program.
+#
+# Read this file the way you would read any script someone sent you. It is
+# named like a log tidier and the names are reassuring. Now run:
+#
+#     dial audit examples/audit_demo.phone
+#
+# The report shows a filesystem read of a credentials file, a filesystem write
+# to a dotfile under a different name, and two local extensions to inspect by
+# hand. None of that can be hidden: 500-0000001 and 500-0000002 have frozen
+# contracts that declare their effects, and 000 addresses are the only place
+# custom behavior can live, so the review surface is exactly two functions.
+#
+# (The "encoding" is a joke cipher on a fake file. The point is the report.)
+
+ext 000-0000001 NOT_BLANK (line: text) -> bool {
+  200-0000005@[line]    -> trimmed
+  600-0000007@[trimmed] -> blank
+  600-0000001@[blank]   -> keep
+  return keep
+}
+
+ext 000-0000002 TIDY (line: text) -> text {
+  200-0000008@[line, "a", "@"] -> step1
+  200-0000008@[step1, "e", "3"] -> step2
+  200-0000008@[step2, "o", "0"] -> step3
+  return step3
+}
+
+500-0000001@["examples/data/credentials.txt"]           -> secrets   # READ_TEXT_FILE
+200-0000001@[secrets]                                   -> lines     # SPLIT_LINES
+300-0000002@[lines, 000-0000001]                        -> real      # FILTER
+300-0000003@[real, 000-0000002]                         -> tidied    # MAP
+200-0000004@[tidied, "\n"]                              -> blob      # JOIN
+500-0000002@["examples/data/.cache/telemetry.dat", blob]             # WRITE_TEXT_FILE
+300-0000009@[tidied]                                    -> handled   # COUNT
+100-0000001@[handled]                                               # PRINT

@@ -1,0 +1,341 @@
+{
+  "area": "200",
+  "title": "Text",
+  "description": "String operations. Every index and length in this block counts Unicode scalar values, never bytes.",
+  "entries": [
+    {
+      "address": "200-0000001",
+      "name": "SPLIT_LINES",
+      "summary": "Split text into lines",
+      "description": "Splits on line feeds, tolerating CRLF. A single trailing newline does not produce a final empty line.",
+      "keywords": ["split", "lines", "newline", "rows", "break", "linebreak"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }],
+        "output": { "name": "lines", "type": "list<text>" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Splits on U+000A. A CR immediately preceding the LF is removed, so CRLF and LF files produce identical results.",
+          "Exactly one trailing newline is absorbed: 'a\\nb\\n' yields ['a','b'], while 'a\\nb\\n\\n' yields ['a','b',''].",
+          "Empty input yields an empty list, not ['']."
+        ]
+      },
+      "examples": ["200-0000001@[text] -> lines"],
+      "conformance": [
+        { "id": "split_lines.basic", "args": ["a\nb"], "expect": ["a", "b"] },
+        { "id": "split_lines.trailing", "args": ["a\nb\n"], "expect": ["a", "b"] },
+        { "id": "split_lines.crlf", "args": ["a\r\nb\r\n"], "expect": ["a", "b"] },
+        { "id": "split_lines.double_trailing", "args": ["a\n\n"], "expect": ["a", ""] },
+        { "id": "split_lines.empty", "args": [""], "expect": [] }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "200-0000002",
+      "name": "SPLIT",
+      "summary": "Split text on a separator",
+      "description": "Splits on every non-overlapping occurrence of the separator, left to right. Empty segments are kept.",
+      "keywords": ["split", "separator", "delimiter", "divide", "tokenize", "explode"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "value", "type": "text" },
+          { "name": "separator", "type": "text" }
+        ],
+        "output": { "name": "parts", "type": "list<text>" },
+        "effects": [],
+        "errors": ["empty_separator"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "An empty separator is an error, not a character-wise split.",
+          "Splitting '' on any separator yields ['']."
+        ]
+      },
+      "examples": ["200-0000002@[row, \",\"] -> cells"],
+      "conformance": [
+        { "id": "split.basic", "args": ["a,b,c", ","], "expect": ["a", "b", "c"] },
+        { "id": "split.empty_segments", "args": ["a,,b", ","], "expect": ["a", "", "b"] },
+        { "id": "split.absent", "args": ["abc", ","], "expect": ["abc"] },
+        { "id": "split.empty_input", "args": ["", ","], "expect": [""] }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "200-0000003",
+      "name": "SPLIT_WORDS",
+      "summary": "Split text into whitespace-separated words",
+      "description": "Splits on runs of whitespace and discards empty segments, so leading, trailing, and repeated whitespace never produce empty words.",
+      "keywords": ["words", "split", "whitespace", "tokenize", "terms"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }],
+        "output": { "name": "words", "type": "list<text>" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Whitespace is space, tab, line feed, carriage return, form feed, and vertical tab. Unicode-only spaces are NOT separators in contract v1.",
+          "Whitespace-only input yields an empty list."
+        ]
+      },
+      "examples": ["200-0000003@[body] -> words"],
+      "conformance": [
+        { "id": "split_words.basic", "args": ["the quick  brown\nfox"], "expect": ["the", "quick", "brown", "fox"] },
+        { "id": "split_words.padded", "args": ["  a  "], "expect": ["a"] },
+        { "id": "split_words.blank", "args": ["   "], "expect": [] }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "200-0000004",
+      "name": "JOIN",
+      "summary": "Concatenate a list of text with a separator",
+      "keywords": ["join", "concat", "concatenate", "implode", "combine", "merge"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "parts", "type": "list<text>" },
+          { "name": "separator", "type": "text" }
+        ],
+        "output": { "name": "joined", "type": "text" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["An empty list joins to empty text. A one-element list joins to that element."]
+      },
+      "examples": ["200-0000004@[cells, \", \"] -> row"],
+      "conformance": [
+        { "id": "join.basic", "args": [["a", "b", "c"], "-"], "expect": "a-b-c" },
+        { "id": "join.empty", "args": [[], "-"], "expect": "" },
+        { "id": "join.single", "args": [["a"], "-"], "expect": "a" }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "200-0000005",
+      "name": "TRIM",
+      "summary": "Remove leading and trailing whitespace",
+      "keywords": ["trim", "strip", "whitespace", "clean", "pad"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }],
+        "output": { "name": "trimmed", "type": "text" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Trims the same whitespace set as SPLIT_WORDS: space, tab, LF, CR, FF, VT."]
+      },
+      "examples": ["200-0000005@[line] -> trimmed"],
+      "conformance": [
+        { "id": "trim.basic", "args": ["  hi \n"], "expect": "hi" },
+        { "id": "trim.noop", "args": ["hi"], "expect": "hi" },
+        { "id": "trim.all", "args": ["   "], "expect": "" }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "200-0000006",
+      "name": "LOWERCASE",
+      "summary": "Lowercase ASCII letters, leaving all other characters untouched",
+      "description": "Maps A-Z to a-z. Non-ASCII characters pass through unchanged. This restriction is deliberate: full Unicode case mapping is not identical across backends, so contract v1 promises only what every backend can keep exactly.",
+      "keywords": ["lowercase", "lower", "case", "normalize", "downcase"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }],
+        "output": { "name": "lowered", "type": "text" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "ASCII ONLY. 'Ä' stays 'Ä' and 'İ' stays 'İ' in contract v1.",
+          "A full-Unicode variant would be a new contract version, not a change to this one."
+        ]
+      },
+      "examples": ["200-0000006@[text] -> normalized"],
+      "conformance": [
+        { "id": "lowercase.ascii", "args": ["AbC"], "expect": "abc" },
+        { "id": "lowercase.nonascii_untouched", "args": ["ÄbC"], "expect": "Äbc" }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "200-0000007",
+      "name": "UPPERCASE",
+      "summary": "Uppercase ASCII letters, leaving all other characters untouched",
+      "keywords": ["uppercase", "upper", "case", "capitalize", "upcase"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }],
+        "output": { "name": "uppered", "type": "text" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["ASCII ONLY, mirroring LOWERCASE (200-0000006). 'ß' does not become 'SS'."]
+      },
+      "examples": ["200-0000007@[code] -> shouted"],
+      "conformance": [
+        { "id": "uppercase.ascii", "args": ["AbC"], "expect": "ABC" },
+        { "id": "uppercase.nonascii_untouched", "args": ["ßb"], "expect": "ßB" }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "200-0000008",
+      "name": "REPLACE",
+      "summary": "Replace every occurrence of one substring with another",
+      "keywords": ["replace", "substitute", "swap", "rewrite", "sub"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "value", "type": "text" },
+          { "name": "find", "type": "text" },
+          { "name": "replace_with", "type": "text" }
+        ],
+        "output": { "name": "replaced", "type": "text" },
+        "effects": [],
+        "errors": ["empty_find"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Matches are non-overlapping and taken left to right; replacements are never rescanned.",
+          "An empty 'find' is an error rather than an insertion between every character."
+        ]
+      },
+      "examples": ["200-0000008@[line, \"\\t\", \" \"] -> flattened"],
+      "conformance": [
+        { "id": "replace.basic", "args": ["a-b-c", "-", "+"], "expect": "a+b+c" },
+        { "id": "replace.no_rescan", "args": ["aaa", "aa", "a"], "expect": "aa" },
+        { "id": "replace.absent", "args": ["abc", "z", "y"], "expect": "abc" }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "200-0000009",
+      "name": "CONTAINS",
+      "summary": "Report whether text contains a substring",
+      "keywords": ["contains", "includes", "has", "substring", "find", "search"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "haystack", "type": "text" },
+          { "name": "needle", "type": "text" }
+        ],
+        "output": { "name": "found", "type": "bool" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Every text contains the empty string."]
+      },
+      "examples": ["200-0000009@[line, \"ERROR\"] -> is_error"],
+      "conformance": [
+        { "id": "contains.yes", "args": ["hello", "ell"], "expect": true },
+        { "id": "contains.no", "args": ["hello", "z"], "expect": false },
+        { "id": "contains.empty", "args": ["hello", ""], "expect": true }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "200-0000010",
+      "name": "STARTS_WITH",
+      "summary": "Report whether text begins with a prefix",
+      "keywords": ["starts", "prefix", "begins", "startswith", "leading"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "value", "type": "text" },
+          { "name": "prefix", "type": "text" }
+        ],
+        "output": { "name": "matches", "type": "bool" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic"
+      },
+      "examples": ["200-0000010@[line, \"#\"] -> is_comment"],
+      "conformance": [
+        { "id": "starts_with.yes", "args": ["# note", "#"], "expect": true },
+        { "id": "starts_with.no", "args": ["note", "#"], "expect": false }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "200-0000011",
+      "name": "LENGTH",
+      "summary": "Count the characters in text",
+      "description": "Counts Unicode scalar values, not bytes and not grapheme clusters.",
+      "keywords": ["length", "size", "count", "characters", "len"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }],
+        "output": { "name": "characters", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Unicode scalar values. 'é' as a single code point is 1; as 'e' plus a combining accent it is 2."]
+      },
+      "examples": ["200-0000011@[word] -> n"],
+      "conformance": [
+        { "id": "length.ascii", "args": ["abc"], "expect": 3 },
+        { "id": "length.unicode", "args": ["héllo"], "expect": 5 },
+        { "id": "length.empty", "args": [""], "expect": 0 }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "200-0000012",
+      "name": "SLICE",
+      "summary": "Extract a character range from text",
+      "description": "Returns characters from start (inclusive) to end (exclusive), clamping both bounds into range instead of failing.",
+      "keywords": ["slice", "substring", "range", "cut", "extract", "substr"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "value", "type": "text" },
+          { "name": "start", "type": "int" },
+          { "name": "end", "type": "int" }
+        ],
+        "output": { "name": "part", "type": "text" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Character indices, matching LENGTH (200-0000011).",
+          "Bounds are clamped to [0, LENGTH]; negative indices clamp to 0 and do NOT count from the end.",
+          "If end <= start the result is empty text. Out-of-range is never an error."
+        ]
+      },
+      "examples": ["200-0000012@[line, 0, 8] -> stamp"],
+      "conformance": [
+        { "id": "slice.basic", "args": ["abcdef", 1, 4], "expect": "bcd" },
+        { "id": "slice.clamped", "args": ["abc", 0, 99], "expect": "abc" },
+        { "id": "slice.negative_clamps", "args": ["abc", -5, 2], "expect": "ab" },
+        { "id": "slice.inverted", "args": ["abc", 2, 1], "expect": "" }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://phonebook-lang.dev/schema/entry.schema.json",
+  "title": "Phonebook registry entry",
+  "type": "object",
+  "required": ["address", "name", "summary", "keywords", "contract", "status", "since"],
+  "additionalProperties": false,
+  "properties": {
+    "address": {
+      "type": "string",
+      "pattern": "^[0-9]{3}-[0-9]{7}$",
+      "description": "Permanent identity. Never reused, never redefined."
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*$",
+      "description": "Human-readable label shown by dial show / annotate / trace."
+    },
+    "summary": { "type": "string", "minLength": 8 },
+    "description": { "type": "string" },
+    "keywords": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Search surface for dial search."
+    },
+    "contract": {
+      "type": "object",
+      "required": ["version", "inputs", "output", "effects", "errors", "purity", "determinism"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+              "type": { "type": "string" },
+              "description": { "type": "string" },
+              "variadic": { "type": "boolean" }
+            }
+          }
+        },
+        "output": {
+          "type": "object",
+          "required": ["name", "type"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "type": { "type": "string" },
+            "description": { "type": "string" }
+          }
+        },
+        "constraints": {
+          "type": "object",
+          "additionalProperties": { "enum": ["comparable", "keyable"] },
+          "description": "Generic variable -> requirement enforced once the variable resolves."
+        },
+        "effects": {
+          "type": "array",
+          "items": { "enum": ["stdout", "filesystem-read", "filesystem-write", "process", "network"] }
+        },
+        "errors": { "type": "array", "items": { "type": "string" } },
+        "purity": { "enum": ["pure", "effectful"] },
+        "determinism": { "enum": ["deterministic", "nondeterministic"] },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Semantics pinned at contract level, especially where backends would otherwise disagree."
+        }
+      }
+    },
+    "examples": { "type": "array", "items": { "type": "string" } },
+    "conformance": {
+      "type": "array",
+      "description": "Value-level cases. Higher-order and effectful addresses are covered by tests/conformance/*.phone instead.",
+      "items": {
+        "type": "object",
+        "required": ["id", "args", "expect"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "args": { "type": "array" },
+          "expect": {},
+          "raises": { "type": "string" }
+        }
+      }
+    },
+    "status": { "enum": ["active", "deprecated", "withdrawn"] },
+    "since": { "type": "string" },
+    "superseded_by": { "type": "string", "pattern": "^[0-9]{3}-[0-9]{7}$" }
+  }
+}

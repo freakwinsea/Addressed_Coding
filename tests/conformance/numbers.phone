@@ -1,0 +1,42 @@
+phonebook 0.1
+
+# The two contracts that exist because Python and Rust disagree.
+#
+# DIV truncates toward zero: Python's // would floor and give -4 for the first
+# case. MOD takes the dividend's sign: Python's % would give 1 for the second.
+# Rust gets both for free. If either backend ever stops bending, this file is
+# what notices.
+
+400-0000004@[-7, 2] -> a    # DIV  -> -3, not -4
+100-0000001@[a]
+400-0000004@[7, -2] -> b    # DIV  -> -3
+100-0000001@[b]
+400-0000004@[7, 2] -> c     # DIV  ->  3
+100-0000001@[c]
+
+400-0000005@[-7, 2] -> d    # MOD  -> -1, not 1
+100-0000001@[d]
+400-0000005@[7, -2] -> e    # MOD  ->  1
+100-0000001@[e]
+
+# a == DIV(a,b)*b + MOD(a,b) must hold for the pair to be coherent.
+400-0000003@[a, 2] -> f
+400-0000001@[f, d] -> g     # -3*2 + -1 = -7
+100-0000001@[g]
+
+400-0000009@["  42 ", 0] -> h      # PARSE_INT, padded
+100-0000001@[h]
+400-0000009@["1_000", -1] -> i     # underscores rejected
+100-0000001@[i]
+400-0000009@["n/a", -1] -> j       # fallback, never a fault
+100-0000001@[j]
+400-0000009@["-42", 0] -> k
+100-0000001@[k]
+
+300-0000001@[3, 1, 2] -> nums
+400-0000008@[nums] -> total        # SUM
+100-0000001@[total]
+400-0000006@[3, 9] -> smaller      # MIN
+100-0000001@[smaller]
+400-0000007@[3, 9] -> larger       # MAX
+100-0000001@[larger]

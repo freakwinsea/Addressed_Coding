@@ -1,0 +1,2 @@
+# The audit demo writes telemetry.dat here. Kept so the write target exists —
+# WRITE_TEXT_FILE (500-0000002) does not create parent directories, by contract.

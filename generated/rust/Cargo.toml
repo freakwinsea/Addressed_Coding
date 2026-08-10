@@ -1,0 +1,11 @@
+[package]
+name = "phonebook_examples"
+version = "0.1.0"
+edition = "2021"
+description = "Generated Rust for the .phone examples. Every file in src/bin is machine-written by `dial emit --target rust`."
+license = "MIT"
+
+[dependencies]
+phonebook_rt = { path = "../../runtime/rust/phonebook_rt" }
+
+[workspace]

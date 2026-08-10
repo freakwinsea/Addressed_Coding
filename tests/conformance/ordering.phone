@@ -1,0 +1,63 @@
+phonebook 0.1
+
+# The ordering contracts. These are the difference between "the same program"
+# and "the same output": Python dicts iterate in insertion order, Rust BTreeMaps
+# iterate in key order, and without ENTRIES sorting by key the two backends
+# would disagree on every map-derived result.
+
+ext 000-0000001 SECOND (entry: pair<text,int>) -> int {
+  300-0000016@[entry] -> tally
+  return tally
+}
+
+ext 000-0000002 SHOW (entry: pair<text,int>) -> text {
+  300-0000015@[entry]       -> key
+  300-0000016@[entry]       -> value
+  100-0000005@[value]       -> shown
+  300-0000001@[key, shown]  -> parts
+  200-0000004@[parts, "="]  -> line
+  return line
+}
+
+# Insertion order here is d, b, a, c — deliberately not sorted.
+300-0000001@["d", "b", "a", "c", "b", "a", "b"] -> items
+
+300-0000008@[items] -> distinct          # UNIQUE keeps first-occurrence order
+200-0000004@[distinct, "|"] -> j1
+100-0000001@[j1]
+
+300-0000005@[items] -> sorted_items      # SORT is by code point
+200-0000004@[sorted_items, "|"] -> j2
+100-0000001@[j2]
+
+300-0000012@[items] -> tallies           # COUNT_OCCURRENCES -> map
+300-0000013@[tallies] -> pairs           # ENTRIES -> sorted by key
+300-0000003@[pairs, 000-0000002] -> shown_pairs
+200-0000004@[shown_pairs, "|"] -> j3
+100-0000001@[j3]
+
+# a=2, b=3, c=1, d=1 — so c and d tie. Sorting by count descending must leave
+# them in key order, because SORT_BY is stable and ENTRIES already sorted.
+300-0000006@[pairs, 000-0000001, true] -> ranked
+300-0000003@[ranked, 000-0000002] -> shown_ranked
+200-0000004@[shown_ranked, "|"] -> j4
+100-0000001@[j4]
+
+300-0000007@[sorted_items] -> backwards  # REVERSE
+200-0000004@[backwards, "|"] -> j5
+100-0000001@[j5]
+
+300-0000010@[sorted_items, 99] -> over   # TAKE clamps
+300-0000009@[over] -> c1
+100-0000001@[c1]
+300-0000010@[sorted_items, -1] -> under  # negative n is empty, not an error
+300-0000009@[under] -> c2
+100-0000001@[c2]
+
+300-0000011@[under, "fallback"] -> f1    # FIRST on empty
+100-0000001@[f1]
+300-0000011@[items, "fallback"] -> f2
+100-0000001@[f2]
+
+300-0000014@[tallies, "zzz", -1] -> missing   # GET on a missing key
+100-0000001@[missing]

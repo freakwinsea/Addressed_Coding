@@ -1,0 +1,12 @@
+[package]
+name = "phonebook_rt"
+version = "0.1.0"
+edition = "2021"
+description = "The Rust runtime: one function per phonebook address."
+license = "MIT"
+
+[dependencies]
+
+[lints.clippy]
+ptr_arg = "allow"          # every runtime function takes &T by convention
+needless_return = "allow"

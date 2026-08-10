@@ -1,0 +1,107 @@
+{
+  "area": "500",
+  "title": "Input / Output",
+  "description": "The only block in v0 with declared effects. Every address here shows up in a dial audit capability report; nothing in any other block can touch the filesystem.",
+  "entries": [
+    {
+      "address": "500-0000001",
+      "name": "READ_TEXT_FILE",
+      "summary": "Read a whole UTF-8 file as text",
+      "keywords": ["read", "file", "load", "open", "input", "text", "slurp"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "path", "type": "text" }],
+        "output": { "name": "content", "type": "text" },
+        "effects": ["filesystem-read"],
+        "errors": ["file_not_found", "decode_error", "permission_denied"],
+        "purity": "effectful",
+        "determinism": "deterministic",
+        "notes": [
+          "UTF-8 only. Invalid bytes are a decode_error, never replacement characters.",
+          "Content is returned byte-for-byte; no newline translation happens here. SPLIT_LINES (200-0000001) is where CRLF is normalized."
+        ]
+      },
+      "examples": ["500-0000001@[\"examples/data/input.txt\"] -> text"],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "500-0000002",
+      "name": "WRITE_TEXT_FILE",
+      "summary": "Write text to a file as UTF-8, replacing it if it exists",
+      "keywords": ["write", "file", "save", "output", "store", "dump"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "path", "type": "text" },
+          { "name": "content", "type": "text" }
+        ],
+        "output": { "name": "nothing", "type": "unit" },
+        "effects": ["filesystem-write"],
+        "errors": ["permission_denied", "path_not_writable"],
+        "purity": "effectful",
+        "determinism": "deterministic",
+        "notes": [
+          "TRUNCATES an existing file. There is no append address in v0.",
+          "Writes exactly the given content: no trailing newline is added and no newline translation is performed, so output is byte-identical on every platform.",
+          "Parent directories are not created."
+        ]
+      },
+      "examples": ["500-0000002@[\"out/report.txt\", body]"],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "500-0000003",
+      "name": "READ_CSV",
+      "summary": "Read a CSV file with a header row into a list of records",
+      "description": "Parses a comma-separated file whose first row names the columns, producing one map per data row.",
+      "keywords": ["csv", "read", "load", "table", "records", "rows", "spreadsheet", "data"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "path", "type": "text" }],
+        "output": { "name": "rows", "type": "list<map<text,text>>" },
+        "effects": ["filesystem-read"],
+        "errors": ["file_not_found", "decode_error", "malformed_csv", "permission_denied"],
+        "purity": "effectful",
+        "determinism": "deterministic",
+        "notes": [
+          "Comma separated, double-quote quoting, doubled quotes escape a quote inside a quoted field. No other dialects in contract v1.",
+          "The first row is the header. A file with only a header yields an empty list.",
+          "Rows with more cells than headers are a malformed_csv error; rows with fewer are padded with empty text, so every record has exactly the header's keys.",
+          "Values are never trimmed, coerced, or type-guessed. Everything is text; use PARSE_INT (400-0000009) explicitly."
+        ]
+      },
+      "examples": ["500-0000003@[\"examples/data/people.csv\"] -> rows"],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "500-0000004",
+      "name": "WRITE_CSV",
+      "summary": "Write records to a CSV file with a header row",
+      "keywords": ["csv", "write", "save", "export", "table", "records", "output"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "path", "type": "text" },
+          { "name": "rows", "type": "list<map<text,text>>" },
+          { "name": "columns", "type": "list<text>" }
+        ],
+        "output": { "name": "nothing", "type": "unit" },
+        "effects": ["filesystem-write"],
+        "errors": ["permission_denied", "path_not_writable"],
+        "purity": "effectful",
+        "determinism": "deterministic",
+        "notes": [
+          "The columns list fixes both which fields are written and their order; keys not listed are dropped and listed keys missing from a row are written as empty.",
+          "Lines end with a single U+000A on every platform.",
+          "A field is quoted only when it contains a comma, a double quote, CR, or LF. Quotes inside are doubled. This minimal-quoting rule is part of the contract so output is byte-identical across backends."
+        ]
+      },
+      "examples": ["500-0000004@[\"out/adults.csv\", adults, headers]"],
+      "status": "active",
+      "since": "0.1.0"
+    }
+  ]
+}

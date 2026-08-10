@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phonebook-lang"
+version = "0.1.0"
+description = "A human-operable semantic layer above programming languages: permanent addresses, versioned contracts, swappable backends."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["intermediate-representation", "semantic", "compiler", "registry", "audit"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Software Development :: Compilers",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+dial = "phonebook.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src", "runtime/python"]
+
+[tool.setuptools.package-data]
+phonebook = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

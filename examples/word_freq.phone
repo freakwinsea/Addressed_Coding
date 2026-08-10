@@ -1,0 +1,35 @@
+phonebook 0.1
+
+# The ten most frequent words in a file.
+#
+# Worth noticing: COUNT_OCCURRENCES returns a map, and maps iterate differently
+# in Python and Rust. ENTRIES (300-0000013) is contracted to sort by key, and
+# SORT_BY (300-0000006) is contracted to be stable, so ties break alphabetically
+# in every backend. Identical output across languages is a promise made in the
+# registry, not a coincidence of implementation.
+
+ext 000-0000001 TALLY_OF (entry: pair<text,int>) -> int {
+  300-0000016@[entry] -> tally         # PAIR_VALUE
+  return tally
+}
+
+ext 000-0000002 AS_LINE (entry: pair<text,int>) -> text {
+  300-0000015@[entry]       -> word    # PAIR_KEY
+  300-0000016@[entry]       -> tally   # PAIR_VALUE
+  100-0000005@[tally]       -> shown   # TO_TEXT
+  300-0000001@[word, shown] -> parts   # LIST
+  200-0000004@[parts, ": "] -> line    # JOIN
+  return line
+}
+
+500-0000001@["examples/data/speech.txt"]  -> raw       # READ_TEXT_FILE
+200-0000006@[raw]                         -> lowered   # LOWERCASE
+200-0000008@[lowered, ".", " "]           -> nodots    # REPLACE
+200-0000008@[nodots, ",", " "]            -> clean     # REPLACE
+200-0000003@[clean]                       -> words     # SPLIT_WORDS
+300-0000012@[words]                       -> tallies   # COUNT_OCCURRENCES
+300-0000013@[tallies]                     -> entries   # ENTRIES
+300-0000006@[entries, 000-0000001, true]  -> ranked    # SORT_BY
+300-0000010@[ranked, 10]                  -> top       # TAKE
+300-0000003@[top, 000-0000002]            -> report    # MAP
+100-0000002@[report]                                   # PRINT_LINES

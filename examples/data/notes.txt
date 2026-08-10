@@ -1,0 +1,11 @@
+the address is the identity
+
+everything else is allowed to change underneath it
+
+
+a contract says what an address promises
+an implementation says how that promise is kept today
+
+
+the phonebook may gain information
+it may never quietly change what an address means

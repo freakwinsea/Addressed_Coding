@@ -1,0 +1,156 @@
+{
+  "area": "100",
+  "title": "Core",
+  "description": "Output, selection, and the universal text rendering used by every other block.",
+  "entries": [
+    {
+      "address": "100-0000001",
+      "name": "PRINT",
+      "summary": "Write a value to standard output followed by a newline",
+      "description": "Renders the value with the same rules as TO_TEXT (100-0000005) and writes it to standard output followed by a single line feed.",
+      "keywords": ["print", "output", "display", "show", "write", "stdout", "echo"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "any", "description": "Value to render and write" }],
+        "output": { "name": "nothing", "type": "unit" },
+        "effects": ["stdout"],
+        "errors": [],
+        "purity": "effectful",
+        "determinism": "deterministic",
+        "notes": [
+          "The line terminator is a single U+000A, never CRLF, on every platform.",
+          "Rendering follows TO_TEXT exactly, including 'true'/'false' for booleans."
+        ]
+      },
+      "examples": ["100-0000001@[count]"],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "100-0000002",
+      "name": "PRINT_LINES",
+      "summary": "Write each item of a text list on its own line",
+      "description": "Writes every element of the list to standard output, each followed by a single line feed. An empty list writes nothing.",
+      "keywords": ["print", "lines", "output", "list", "display", "each"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "lines", "type": "list<text>", "description": "Lines to write in order" }],
+        "output": { "name": "nothing", "type": "unit" },
+        "effects": ["stdout"],
+        "errors": [],
+        "purity": "effectful",
+        "determinism": "deterministic",
+        "notes": ["An empty list produces no output at all, not a blank line."]
+      },
+      "examples": ["100-0000002@[report]"],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "100-0000003",
+      "name": "SELECT",
+      "summary": "Choose between two values based on a condition",
+      "description": "Returns when_true if the condition holds, otherwise when_false. Both arms are evaluated before the choice is made; this is a selection expression, not a branch.",
+      "keywords": ["if", "select", "choose", "ternary", "conditional", "branch", "either"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "condition", "type": "bool" },
+          { "name": "when_true", "type": "T" },
+          { "name": "when_false", "type": "T" }
+        ],
+        "output": { "name": "chosen", "type": "T" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "EAGER: both arms are already-bound values, so both have been computed. There is no short-circuit and no lazy branch in v0."
+        ]
+      },
+      "examples": ["100-0000003@[is_adult, \"adult\", \"minor\"] -> label"],
+      "conformance": [
+        { "id": "select.true", "args": [true, "a", "b"], "expect": "a" },
+        { "id": "select.false", "args": [false, "a", "b"], "expect": "b" }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "100-0000004",
+      "name": "IDENTITY",
+      "summary": "Return the value unchanged",
+      "description": "Returns its input. Useful as a key function for SORT_BY and as a placeholder while wiring a program.",
+      "keywords": ["identity", "same", "passthrough", "noop", "unchanged"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "T" }],
+        "output": { "name": "same", "type": "T" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic"
+      },
+      "examples": ["100-0000004@[value] -> copy"],
+      "conformance": [{ "id": "identity.text", "args": ["x"], "expect": "x" }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "100-0000005",
+      "name": "TO_TEXT",
+      "summary": "Render any value as text",
+      "description": "Produces the canonical text form of a value. This is the single rendering rule for the whole language; PRINT and PRINT_LINES defer to it.",
+      "keywords": ["text", "string", "render", "convert", "stringify", "format", "to string"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "any" }],
+        "output": { "name": "rendered", "type": "text" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "bool renders as 'true' or 'false' (lowercase) in every backend. Python's native 'True' is explicitly NOT the contract.",
+          "int renders in base 10 with a leading '-' for negatives.",
+          "text renders as itself, unquoted.",
+          "list renders as '[a, b, c]' with each element rendered by this same rule.",
+          "pair renders as '(k, v)'."
+        ]
+      },
+      "examples": ["100-0000005@[count] -> label"],
+      "conformance": [
+        { "id": "to_text.bool_true", "args": [true], "expect": "true" },
+        { "id": "to_text.bool_false", "args": [false], "expect": "false" },
+        { "id": "to_text.int", "args": [-42], "expect": "-42" },
+        { "id": "to_text.text", "args": ["hi"], "expect": "hi" },
+        { "id": "to_text.list", "args": [["a", "b"]], "expect": "[a, b]" }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "100-0000006",
+      "name": "ASSERT",
+      "summary": "Fail with a message unless a condition holds",
+      "description": "If the condition is false, execution stops with assertion_failed and the given message. If it holds, nothing happens.",
+      "keywords": ["assert", "check", "require", "verify", "guard", "precondition"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "condition", "type": "bool" },
+          { "name": "message", "type": "text" }
+        ],
+        "output": { "name": "nothing", "type": "unit" },
+        "effects": [],
+        "errors": ["assertion_failed"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["The failure message is written to standard error, not standard output, so it never pollutes a program's comparable output."]
+      },
+      "examples": ["100-0000006@[has_rows, \"input must not be empty\"]"],
+      "status": "active",
+      "since": "0.1.0"
+    }
+  ]
+}

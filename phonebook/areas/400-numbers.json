@@ -1,0 +1,216 @@
+{
+  "area": "400",
+  "title": "Numbers",
+  "description": "Integer arithmetic. v0 has no floating point; 'float' is a reserved type name with no addresses. DIV and MOD pin the two places Python and Rust disagree about negative operands.",
+  "entries": [
+    {
+      "address": "400-0000001",
+      "name": "ADD",
+      "summary": "Add two integers",
+      "keywords": ["add", "plus", "sum", "increment", "total"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }, { "name": "b", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Integers are 64-bit signed. Overflow is an error, not a wrap and not a promotion to arbitrary precision."]
+      },
+      "examples": ["400-0000001@[n, 1] -> next"],
+      "conformance": [{ "id": "add.basic", "args": [2, 3], "expect": 5 }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "400-0000002",
+      "name": "SUB",
+      "summary": "Subtract the second integer from the first",
+      "keywords": ["subtract", "minus", "difference", "less", "decrement"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }, { "name": "b", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic"
+      },
+      "examples": ["400-0000002@[total, used] -> remaining"],
+      "conformance": [{ "id": "sub.basic", "args": [5, 3], "expect": 2 }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "400-0000003",
+      "name": "MUL",
+      "summary": "Multiply two integers",
+      "keywords": ["multiply", "times", "product", "scale"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }, { "name": "b", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic"
+      },
+      "examples": ["400-0000003@[width, height] -> area"],
+      "conformance": [{ "id": "mul.basic", "args": [4, 3], "expect": 12 }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "400-0000004",
+      "name": "DIV",
+      "summary": "Divide two integers, truncating toward zero",
+      "description": "Integer division. The rounding direction is pinned by contract because the host languages disagree: Python's // floors toward negative infinity, Rust's / truncates toward zero. This address promises truncation, and every backend is held to it.",
+      "keywords": ["divide", "division", "quotient", "over", "split"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }, { "name": "b", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["division_by_zero", "overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "TRUNCATES TOWARD ZERO: -7 / 2 is -3, not -4.",
+          "A Python backend must NOT use // here. This is the clearest example in the registry of a contract overriding a host language's default."
+        ]
+      },
+      "examples": ["400-0000004@[total, n] -> mean"],
+      "conformance": [
+        { "id": "div.basic", "args": [7, 2], "expect": 3 },
+        { "id": "div.negative_truncates", "args": [-7, 2], "expect": -3 },
+        { "id": "div.negative_divisor", "args": [7, -2], "expect": -3 },
+        { "id": "div.by_zero", "args": [1, 0], "expect": null, "raises": "division_by_zero" }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "400-0000005",
+      "name": "MOD",
+      "summary": "Remainder of integer division, taking the sign of the dividend",
+      "description": "The companion to DIV: a == DIV(a,b) * b + MOD(a,b) always holds. Python's % takes the sign of the divisor, so a Python backend must not use it directly.",
+      "keywords": ["mod", "modulo", "remainder", "rest", "percent"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }, { "name": "b", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["division_by_zero"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "SIGN OF THE DIVIDEND: -7 mod 2 is -1, not 1.",
+          "Consistent with DIV (400-0000004) so that a == DIV(a,b)*b + MOD(a,b)."
+        ]
+      },
+      "examples": ["400-0000005@[n, 2] -> parity"],
+      "conformance": [
+        { "id": "mod.basic", "args": [7, 2], "expect": 1 },
+        { "id": "mod.negative_dividend", "args": [-7, 2], "expect": -1 },
+        { "id": "mod.negative_divisor", "args": [7, -2], "expect": 1 },
+        { "id": "mod.by_zero", "args": [1, 0], "expect": null, "raises": "division_by_zero" }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "400-0000006",
+      "name": "MIN",
+      "summary": "The smaller of two integers",
+      "keywords": ["min", "minimum", "smaller", "least", "lowest"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }, { "name": "b", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic"
+      },
+      "examples": ["400-0000006@[n, 10] -> capped"],
+      "conformance": [{ "id": "min.basic", "args": [3, 9], "expect": 3 }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "400-0000007",
+      "name": "MAX",
+      "summary": "The larger of two integers",
+      "keywords": ["max", "maximum", "larger", "greatest", "highest"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }, { "name": "b", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic"
+      },
+      "examples": ["400-0000007@[n, 0] -> floored"],
+      "conformance": [{ "id": "max.basic", "args": [3, 9], "expect": 9 }],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "400-0000008",
+      "name": "SUM",
+      "summary": "Add up a list of integers",
+      "keywords": ["sum", "total", "add up", "aggregate", "accumulate"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "values", "type": "list<int>" }],
+        "output": { "name": "total", "type": "int" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["An empty list sums to 0.", "Summed left to right."]
+      },
+      "examples": ["400-0000008@[tallies] -> total"],
+      "conformance": [
+        { "id": "sum.basic", "args": [[1, 2, 3]], "expect": 6 },
+        { "id": "sum.empty", "args": [[]], "expect": 0 }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    },
+    {
+      "address": "400-0000009",
+      "name": "PARSE_INT",
+      "summary": "Read an integer from text, or a fallback when it is not one",
+      "keywords": ["parse", "int", "integer", "number", "convert", "atoi", "read number"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "value", "type": "text" },
+          { "name": "fallback", "type": "int" }
+        ],
+        "output": { "name": "parsed", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Never fails; unparseable text returns the fallback.",
+          "Accepts optional leading '-' or '+' then ASCII digits, with surrounding whitespace trimmed first. Underscores, other digit systems, and other bases are rejected."
+        ]
+      },
+      "examples": ["400-0000009@[cell, 0] -> age"],
+      "conformance": [
+        { "id": "parse_int.basic", "args": ["42", 0], "expect": 42 },
+        { "id": "parse_int.negative", "args": ["-42", 0], "expect": -42 },
+        { "id": "parse_int.padded", "args": ["  7 ", 0], "expect": 7 },
+        { "id": "parse_int.garbage", "args": ["n/a", -1], "expect": -1 },
+        { "id": "parse_int.underscores_rejected", "args": ["1_000", -1], "expect": -1 }
+      ],
+      "status": "active",
+      "since": "0.1.0"
+    }
+  ]
+}
