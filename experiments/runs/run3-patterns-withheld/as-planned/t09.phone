@@ -1,0 +1,14 @@
+phonebook 0.1
+
+ext 000-0000001 PARSE_LINE (line: text) -> int {
+  400-0000009@[line, 0] -> val
+  return val
+}
+
+500-0000001@["experiments/data/numbers.txt"] -> text
+200-0000001@[text]                           -> lines
+300-0000003@[lines, 000-0000001]             -> ints
+300-0000005@[ints]                           -> sorted_ints
+300-0000007@[sorted_ints]                    -> desc_ints
+300-0000011@[desc_ints, 0]                   -> max_val
+100-0000001@[max_val]

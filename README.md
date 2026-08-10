@@ -230,8 +230,14 @@ better generation target for a language model than recalled syntax — no
 hallucinated APIs, verifiable before execution. Neither tested it.
 [experiments/](experiments/) is that test: 20 tasks across four difficulty
 tiers, a scoring harness, and priors recorded in advance so they can be wrong in
-public. Three runs so far, no valid data — every failure so far has been in the
-harness rather than in the thing being measured, and they are written up.
+public.
+
+Three runs so far. The first two were void — the first because the guide's
+worked examples solved most of the tasks, the second because the harness left
+the previous run's answers lying around. The third scored 20/20, and the
+interesting number is that its *plan*, written before it ran anything, scored
+19/20: one address typed with six digits instead of seven, caught by `dial
+check` and fixed. Every write-up is committed, including the void ones.
 
 ## What is deliberately not here
 

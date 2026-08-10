@@ -1,0 +1,12 @@
+phonebook 0.1
+
+ext 000-0000001 GET_LEN (word: text) -> int {
+  200-0000011@[word] -> len
+  return len
+}
+
+500-0000001@["experiments/data/words.txt"] -> text
+200-0000003@[text]                         -> words
+300-0000006@[words, 000-0000001, true]     -> sorted_words
+300-0000011@[sorted_words, ""]             -> longest
+100-0000001@[longest]

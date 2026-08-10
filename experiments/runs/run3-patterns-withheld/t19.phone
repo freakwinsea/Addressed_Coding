@@ -1,0 +1,21 @@
+phonebook 0.1
+
+ext 000-0000001 HAS_ERROR (line: text) -> bool {
+  200-0000009@[line, "ERROR"] -> contains_error
+  return contains_error
+}
+
+ext 000-0000002 ADD_NEWLINE (line: text) -> text {
+  300-0000001@[line, "\n"] -> parts
+  200-0000004@[parts, ""]  -> line_with_nl
+  return line_with_nl
+}
+
+500-0000001@["experiments/data/log.txt"] -> text
+200-0000001@[text]                       -> lines
+300-0000002@[lines, 000-0000001]         -> filtered
+300-0000009@[filtered]                   -> count
+300-0000003@[filtered, 000-0000002]      -> lines_with_nl
+200-0000004@[lines_with_nl, ""]          -> content
+500-0000002@["experiments/out/errors.txt", content]
+100-0000001@[count]

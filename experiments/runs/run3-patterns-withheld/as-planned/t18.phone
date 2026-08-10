@@ -1,0 +1,15 @@
+phonebook 0.1
+
+ext 000-0000001 ROW_VALUE (row: map<text,text>) -> int {
+  300-0000014@[row, "qty", "0"] -> qty_str
+  400-0000009@[qty_str, 0] -> qty
+  300-0000014@[row, "price_cents", "0"] -> price_str
+  400-0000009@[price_str, 0] -> price
+  400-0000003@[qty, price] -> val
+  return val
+}
+
+500-0000003@["experiments/data/inventory.csv"] -> rows
+300-0000003@[rows, 000-0000001]                -> row_values
+400-0000008@[row_values]                       -> total_sum
+100-0000001@[total_sum]

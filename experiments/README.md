@@ -18,6 +18,26 @@ open one it has to remember.
 
 If it loses, that is worth knowing too, and it is cheap to find out.
 
+## Results so far
+
+| Run | Setup | Contracts | Correct | Verdict |
+|---|---|---|---|---|
+| 1 | full guide, patterns visible | 20/20 | 20/20 | void — the guide solved the tasks |
+| 2 | patterns withheld | — | — | void — no work produced, see run 1 notes |
+| 3 | patterns withheld, task sheet cleaned | 20/20 | **20/20** | sound, with a caveat |
+
+Run 3's real finding is not the 20. It planned every program before running
+anything, and that plan scores **19/20**: one address typed with six digits
+instead of seven. `dial check` named it, the model fixed it, and nothing else
+changed across twenty files. The gap between 19 and 20 is one character, and it
+is the only measurement here that is about the language rather than the harness.
+
+Run 3 also beat the reference solutions twice — passing a registered address
+straight to `MAP`, and sidestepping the two-parameter `REDUCE` that the task set
+was built to stress. Details in `runs/run3-patterns-withheld/NOTES.md`,
+including the caveat: a stray UTF-16 file in the clone told it that something
+had been withheld for measurement, though not what.
+
 ## Run 1 was invalid. Read this before trusting a number.
 
 The first run scored **20/20 correct, 20/20 contracts**, in one pass, without

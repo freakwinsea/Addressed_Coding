@@ -24,3 +24,8 @@ runtime/rust/phonebook_rt/Cargo.lock
 experiments/out/*
 !experiments/out/.gitkeep
 attempts/
+
+# `dial brief > file` on PowerShell writes UTF-16 and one of these got
+# committed once, invisible to every ASCII leak scan. Never again.
+brief.md
+*.brief.md

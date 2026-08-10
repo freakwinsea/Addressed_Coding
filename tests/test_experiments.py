@@ -95,6 +95,41 @@ def test_task_sheet_is_free_of_meta(root):
     )
 
 
+def test_every_tracked_text_file_is_utf8(root):
+    """A UTF-16 file in the repo is invisible to every ASCII leak scan.
+
+    `dial brief > brief.md` under PowerShell writes UTF-16, one of those got
+    committed, and it shipped in every study clone carrying a notice that
+    content had been withheld for measurement. Neither `grep withheld` nor
+    `grep -I withheld` could see it: the bytes are `w\\0i\\0t\\0h\\0`, so an
+    ASCII search cannot match, whatever flags it uses.
+
+    Scanning is not the fix. Refusing to hold such a file is.
+    """
+    import subprocess
+
+    listing = subprocess.run(
+        ["git", "ls-files"], cwd=str(root), capture_output=True, text=True, check=True
+    )
+    binary_suffixes = {".png", ".jpg", ".jpeg", ".ico", ".gif", ".pdf", ".woff", ".woff2"}
+    offenders = []
+    for name in listing.stdout.split("\n"):
+        if not name.strip():
+            continue
+        path = root / name
+        if path.suffix.lower() in binary_suffixes or not path.exists():
+            continue
+        raw = path.read_bytes()
+        if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+            offenders.append(f"{name} (UTF-16 BOM)")
+            continue
+        try:
+            raw.decode("utf-8")
+        except UnicodeDecodeError:
+            offenders.append(f"{name} (not valid UTF-8)")
+    assert offenders == [], f"tracked files that are not UTF-8 text: {offenders}"
+
+
 def test_setup_instructions_still_exist_somewhere(root):
     """Removing them from the task sheet must not lose them."""
     readme = (root / "experiments" / "README.md").read_text(encoding="utf-8")

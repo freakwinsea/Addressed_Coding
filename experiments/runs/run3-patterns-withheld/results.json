@@ -1,0 +1,182 @@
+[
+  {
+    "task": "t01",
+    "file": "t01.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t02",
+    "file": "t02.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t03",
+    "file": "t03.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t04",
+    "file": "t04.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t05",
+    "file": "t05.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t06",
+    "file": "t06.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t07",
+    "file": "t07.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t08",
+    "file": "t08.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t09",
+    "file": "t09.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t10",
+    "file": "t10.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t11",
+    "file": "t11.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t12",
+    "file": "t12.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t13",
+    "file": "t13.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t14",
+    "file": "t14.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t15",
+    "file": "t15.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t16",
+    "file": "t16.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t17",
+    "file": "t17.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t18",
+    "file": "t18.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t19",
+    "file": "t19.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t20",
+    "file": "t20.phone",
+    "language": "phone",
+    "parses": true,
+    "checks": true,
+    "correct": true,
+    "error": ""
+  }
+]
