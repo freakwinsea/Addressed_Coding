@@ -61,11 +61,45 @@ def test_task_sheet_gives_no_answers_away(root):
         )
 
 
-def test_task_sheet_warns_about_the_answer_key(root):
-    """Whoever runs the study has to be told to strip reference/ and expected/."""
-    tasks = (root / "experiments" / "TASKS.md").read_text(encoding="utf-8")
-    assert "prepare_study_clone" in tasks
-    assert "experiments/reference/" in tasks
+#: Vocabulary that belongs in experiments/README.md and never in the task sheet.
+#: Telling a model it is being studied changes what it does, and naming the
+#: answer key it cannot reach is what sent run 2 hunting outside its sandbox.
+META_LEAKS = [
+    "study",
+    "experiment",
+    "the model",
+    "score_attempts",
+    "prepare_study_clone",
+    "experiments/reference",
+    "experiments/expected",
+    "answer key",
+    "measur",
+    "you have not seen",
+]
+
+
+#: `experiments/data` and `experiments/out` are just where the files live. The
+#: tasks have to name them, so they are removed before scanning for the word.
+LEGITIMATE_PATHS = ["experiments/data", "experiments/out", "experiments/"]
+
+
+def test_task_sheet_is_free_of_meta(root):
+    """The task sheet must describe the work and nothing about the work's purpose."""
+    tasks = (root / "experiments" / "TASKS.md").read_text(encoding="utf-8").lower()
+    for path in LEGITIMATE_PATHS:
+        tasks = tasks.replace(path, "<data>")
+    found = [term for term in META_LEAKS if term in tasks]
+    assert found == [], (
+        f"TASKS.md leaks experimenter-facing language: {found}. "
+        f"Setup and scoring instructions belong in experiments/README.md."
+    )
+
+
+def test_setup_instructions_still_exist_somewhere(root):
+    """Removing them from the task sheet must not lose them."""
+    readme = (root / "experiments" / "README.md").read_text(encoding="utf-8")
+    assert "prepare_study_clone" in readme
+    assert "score_attempts" in readme
 
 
 def test_scrub_script_removes_everything_that_gives_answers(root):

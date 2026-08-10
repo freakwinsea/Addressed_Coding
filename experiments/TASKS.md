@@ -2,13 +2,12 @@
 
 ## Before you start
 
-Read **[docs/WRITING-PHONE.md](../docs/WRITING-PHONE.md)** first, all of it. It
-is about 6,000 tokens and it is the only description of this language that
-exists — you have not seen `.phone` before and none of the address numbers are
-guessable. If you are working outside a checkout, `dial brief` prints the same
-content.
+Read **[docs/WRITING-PHONE.md](../docs/WRITING-PHONE.md)** first, all of it.
+It is the complete definition of this language — the syntax, the rules, and
+every one of the 54 addresses with the behavior each one guarantees. Address
+numbers cannot be worked out from first principles; they are looked up.
 
-Then, **in a virtual environment**:
+Then install, **into a virtual environment**:
 
 ```bash
 python -m venv .venv
@@ -16,26 +15,12 @@ python -m venv .venv
 ./.venv/bin/pip install -e .        # POSIX
 ```
 
-A bare `pip install -e .` installs this checkout into whatever Python is on your
-PATH, which will silently replace any other editable install of this package —
-including the one the person running the study is working in.
+A bare `pip install -e .` would make this checkout the package for whatever
+Python is on your PATH, replacing any other editable install of it.
 
 Write one file per task, named `t01.phone` through `t20.phone`, in a single
 directory. Programs are run from the repository root, so keep the data paths
 exactly as they are written below.
-
----
-
-> **Running this as a study?** A full clone contains worked solutions in
-> `experiments/reference/` and the exact outputs in `experiments/expected/`.
-> Strip them from the model's clone first, or the result measures nothing:
->
-> ```bash
-> python scripts/prepare_study_clone.py /path/to/the/models/clone
-> ```
->
-> And give the model `dial brief --minimal`, not the full guide. The guide's
-> worked patterns solve most of these tasks outright.
 
 Every task:
 
@@ -45,11 +30,8 @@ Every task:
 - is solvable with the 54 registered addresses. If one seems to need something
   that does not exist, it can be built from what does.
 
-Score a finished set with:
-
-```bash
-python scripts/score_attempts.py path/to/that/directory
-```
+`dial check <file>` validates a program against the contracts without running
+it, and `dial run <file>` executes it.
 
 ---
 

@@ -81,6 +81,25 @@ Do not report its `checks` column as if it were the one-shot number.
 **No retries in the one-shot arm.** First-attempt validity is the number worth
 having; retries measure the loop, not the language.
 
+## Keep the task sheet free of meta
+
+`TASKS.md` is the one file from this directory the model reads, and it must
+describe the work and nothing else. It previously carried a note explaining that
+worked solutions live in `experiments/reference/`, that their outputs live in
+`experiments/expected/`, and that both had been stripped from the model's clone.
+
+That is almost certainly what sent run 2 outside its sandbox. The answer key was
+hidden and the model was handed a note saying so — a puzzle with a stated
+solution just out of reach, addressed to something whose job was to be correct.
+
+Nothing in `TASKS.md` should mention a study, an experimenter, scoring, an
+answer key, or what the model has or has not seen before. `tests/test_experiments.py`
+enforces that against a vocabulary list, because this is the third time
+experimenter-facing prose has leaked into subject-facing material and it will
+not be the last time it is attempted.
+
+Setup instructions belong here instead.
+
 ## Do not hand over the answer key
 
 A full clone contains solutions to every task in `reference/` and their exact
