@@ -19,6 +19,9 @@ Rust, and all three produce identical bytes.
 That last sentence is the entire value proposition, and `scripts/demo.py` is the
 test of it. If a change breaks it, the change is wrong.
 
+**Resuming work?** [HANDOFF.md](HANDOFF.md) has the current state, what to pick
+up next, and the mistakes that have already cost time. Read it first.
+
 Open defects are recorded in [docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md). Read
 it before concluding you have found a new one.
 
