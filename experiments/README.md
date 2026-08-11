@@ -159,6 +159,36 @@ user of the language would have them, and a model that learns the idiom from
 `examples/word_freq.phone` is doing something legitimate. Worth remembering when
 reading results for t14, which is the task closest to a shipped example.
 
+## A bias in the expected outputs, stated up front
+
+The tasks encode two of Phonebook's contract decisions. t10 requires division
+that truncates toward zero; t11 requires the words `true` and `false` in
+lowercase. Both are stated explicitly in the task text, so neither arm is being
+ambushed — but the treatment arm gets them from `DIV` and `TO_TEXT` for free,
+while the control arm has to notice the requirement and implement it. Python's
+`//` floors and `str(True)` is `"True"`.
+
+That is a real asymmetry favouring the treatment arm, worth roughly two tasks.
+It was discovered by hand-writing the control solutions for a smoke test, not
+by reasoning about it in advance. If the arms come out close, subtract it before
+concluding anything.
+
+## Running the control arm
+
+```bash
+python scripts/make_control_kit.py /path/to/control-kit
+```
+
+That produces a standalone directory: the same twenty tasks with a Python
+preamble, the same data, the same layout. The sheet is *derived* from
+`TASKS.md` rather than written separately — two hand-maintained sheets would
+drift, and a drifted control arm looks like a comparison while measuring two
+different things. `tests/test_experiments.py` asserts they stay identical and
+that the control sheet never mentions Phonebook, addresses, or a second arm.
+
+Give the model the directory. Score with the same harness; the `checks` column
+reports `n/a`, which is the asymmetry under test rather than missing data.
+
 ## Running it
 
 ```bash

@@ -95,6 +95,50 @@ def test_task_sheet_is_free_of_meta(root):
     )
 
 
+class TestControlArm:
+    """The control arm must ask for the same work, in a sheet that never
+    mentions the other arm."""
+
+    def build(self, root, tmp_path):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "make_control_kit", root / "scripts" / "make_control_kit.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        kit = tmp_path / "kit"
+        module.build(kit)
+        return kit, module
+
+    def test_tasks_are_identical_to_the_treatment_arm(self, root, tmp_path):
+        """Derived, not copied. Two hand-maintained sheets would drift, and a
+        drifted control arm looks like a comparison while measuring two
+        different things."""
+        kit, module = self.build(root, tmp_path)
+        treatment = module.task_body((root / "experiments" / "TASKS.md").read_text("utf-8"))
+        control = module.task_body((kit / "TASKS.md").read_text("utf-8"))
+        assert control == treatment
+
+    def test_the_control_sheet_never_mentions_the_other_arm(self, root, tmp_path):
+        kit, _ = self.build(root, tmp_path)
+        sheet = (kit / "TASKS.md").read_text("utf-8").lower()
+        for term in ("phone", "dial", "address", "registry", "contract", "54"):
+            assert term not in sheet, f"the control sheet mentions {term!r}"
+
+    def test_the_kit_carries_the_same_data(self, root, tmp_path):
+        kit, _ = self.build(root, tmp_path)
+        for name in ("words.txt", "numbers.txt", "log.txt", "inventory.csv"):
+            original = (root / "experiments" / "data" / name).read_bytes()
+            assert (kit / "experiments" / "data" / name).read_bytes() == original
+
+    def test_all_twenty_tasks_survive_the_derivation(self, root, tmp_path):
+        kit, _ = self.build(root, tmp_path)
+        sheet = (kit / "TASKS.md").read_text("utf-8")
+        for n in range(1, TASK_COUNT + 1):
+            assert f"**t{n:02d}.**" in sheet
+
+
 def test_every_tracked_text_file_is_utf8(root):
     """A UTF-16 file in the repo is invisible to every ASCII leak scan.
 
