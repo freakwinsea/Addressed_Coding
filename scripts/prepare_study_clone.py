@@ -99,6 +99,30 @@ def _force_remove(func, path, _exc):
     func(path)
 
 
+BINARY_SUFFIXES = {".png", ".jpg", ".jpeg", ".ico", ".gif", ".pdf", ".woff", ".woff2", ".exe"}
+SKIP_DIRS = {".venv", "venv", "target", ".git", "__pycache__", ".pytest_cache"}
+
+
+def unreadable_text_files(root: Path) -> list[str]:
+    """Files a leak scan cannot read, and therefore cannot clear.
+
+    A UTF-16 file survived four scans of a study clone: PowerShell's `>` writes
+    UTF-16, so the bytes are `w\\0i\\0t\\0h\\0` and no ASCII search can match,
+    whatever flags it uses. Anything here has to be read by eye or deleted,
+    because "the scan found nothing" means nothing about it.
+    """
+    offenders = []
+    for path in root.rglob("*"):
+        if not path.is_file() or path.suffix.lower() in BINARY_SUFFIXES:
+            continue
+        if SKIP_DIRS & set(path.relative_to(root).parts):
+            continue
+        raw = path.read_bytes()
+        if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+            offenders.append(path.relative_to(root).as_posix())
+    return offenders
+
+
 def _is_leftover(path: Path) -> bool:
     """An empty `attempts/` is where the model is about to work, not a leftover."""
     if not path.exists():
@@ -169,9 +193,13 @@ def main() -> int:
         and PATTERNS_HEADING in guide.read_text(encoding="utf-8")
     )
 
+    unreadable = unreadable_text_files(root)
+
     if args.check:
-        if found or recoverable or stale or scoring or patterned:
+        if found or recoverable or stale or scoring or patterned or unreadable:
             print("NOT READY:")
+            for name in unreadable:
+                print(f"  {name}  — UTF-16; no ASCII scan can see inside it")
             for name in found:
                 print(f"  {name}  — answers")
             if recoverable:
