@@ -232,12 +232,19 @@ hallucinated APIs, verifiable before execution. Neither tested it.
 tiers, a scoring harness, and priors recorded in advance so they can be wrong in
 public.
 
-Three runs so far. The first two were void — the first because the guide's
-worked examples solved most of the tasks, the second because the harness left
-the previous run's answers lying around. The third scored 20/20, and the
-interesting number is that its *plan*, written before it ran anything, scored
-19/20: one address typed with six digits instead of seven, caught by `dial
-check` and fixed. Every write-up is committed, including the void ones.
+**The answer was no.** Two models writing `.phone` scored 20/20; a third
+writing Python scored 20/20. Sixty programs, sixty correct, no detectable
+difference — the tasks are inside every model's competence in both languages,
+and Python's standard library was the wrong control for a claim about
+unfamiliar APIs. The null result and two void earlier runs are all written up.
+
+What did differ, in every run, was verification rather than generation. Run 3's
+plan scored 19/20 and its delivery 20/20; `dial check` found the one character
+between them before anything executed, and the Python arm has no equivalent
+step. Mutating a correct program and asking only what each side rejects
+*without running it* — wrong operation, swapped arguments, undefined name —
+gives three caught out of three against zero out of three. That is the next
+study, and a narrower claim than the one this one set out to test.
 
 ## What is deliberately not here
 

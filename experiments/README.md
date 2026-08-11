@@ -26,6 +26,37 @@ If it loses, that is worth knowing too, and it is cheap to find out.
 | 2 | patterns withheld | — | — | void — no work produced, see run 1 notes |
 | 3 | patterns withheld, task sheet cleaned | 20/20 | **20/20** | sound, with a caveat |
 | 4 | as run 3, different model | 20/20 | **20/20** | sound |
+| 5 | **control arm — Python**, third model | n/a | **20/20** | sound |
+
+## The answer is a null result
+
+Three sound runs, three models, sixty programs, sixty correct. The task set
+cannot detect a difference between `.phone` and Python, so it cannot answer the
+question it was built for. Any claim of the form "models write `.phone` more
+reliably" is unsupported at this scale.
+
+Two things came out of it anyway.
+
+**Python was the wrong control for the actual claim.** The ideation sessions
+claimed *no hallucinated APIs* — a closed address space beating a surface the
+model must recall. Python's standard library is the surface models know best, so
+this tested the claim where it was least likely to hold.
+
+**What differed in every run was verification, not generation.** Run 3's plan
+scored 19/20 and its delivery 20/20; `dial check` found the single character
+between them before anything ran. The control arm has no such step — `checks`
+read `n/a` twenty times. A probe mutating a correct program in both languages
+and asking only what each rejects *before running*:
+
+| single-point mutation | `dial check` | `python -c compile` |
+|---|---|---|
+| wrong operation | **caught** | missed |
+| swapped arguments | **caught** | missed |
+| undefined name | **caught** | missed |
+
+Three of three against zero of three, with room to grow. That is the next study:
+mutation detection rather than first-attempt correctness. It needs no model runs
+to establish a baseline and it measures the thing that actually differs.
 
 **The instrument is at its ceiling.** Two sound runs at 100% means these twenty
 tasks cannot discriminate between models, and cannot possibly discriminate

@@ -1,0 +1,182 @@
+[
+  {
+    "task": "t01",
+    "file": "t01.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t02",
+    "file": "t02.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t03",
+    "file": "t03.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t04",
+    "file": "t04.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t05",
+    "file": "t05.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t06",
+    "file": "t06.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t07",
+    "file": "t07.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t08",
+    "file": "t08.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t09",
+    "file": "t09.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t10",
+    "file": "t10.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t11",
+    "file": "t11.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t12",
+    "file": "t12.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t13",
+    "file": "t13.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t14",
+    "file": "t14.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t15",
+    "file": "t15.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t16",
+    "file": "t16.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t17",
+    "file": "t17.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t18",
+    "file": "t18.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t19",
+    "file": "t19.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  },
+  {
+    "task": "t20",
+    "file": "t20.py",
+    "language": "python",
+    "parses": true,
+    "checks": null,
+    "correct": true,
+    "error": ""
+  }
+]
