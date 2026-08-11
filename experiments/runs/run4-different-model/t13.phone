@@ -1,0 +1,14 @@
+phonebook 0.1
+
+ext 000-0000001 LONGEST(acc: text, item: text) -> text {
+  200-0000011@[acc] -> l_acc
+  200-0000011@[item] -> l_item
+  600-0000005@[l_acc, l_item] -> item_is_longer
+  100-0000003@[item_is_longer, item, acc] -> longer
+  return longer
+}
+
+500-0000001@["experiments/data/words.txt"] -> text
+200-0000003@[text] -> words
+300-0000004@[words, 000-0000001, ""] -> longest
+100-0000001@[longest]

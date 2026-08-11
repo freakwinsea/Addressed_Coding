@@ -1,0 +1,17 @@
+phonebook 0.1
+
+ext 000-0000001 HAS_HASH(line: text) -> bool {
+  200-0000010@[line, "#"] -> has_hash
+  return has_hash
+}
+
+ext 000-0000002 REDUCE_OR(acc: bool, item: bool) -> bool {
+  600-0000003@[acc, item] -> o
+  return o
+}
+
+500-0000001@["experiments/data/log.txt"] -> text
+200-0000001@[text] -> lines
+300-0000003@[lines, 000-0000001] -> bools
+300-0000004@[bools, 000-0000002, false] -> any_true
+100-0000001@[any_true]

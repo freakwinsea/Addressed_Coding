@@ -1,0 +1,7 @@
+phonebook 0.1
+
+500-0000001@["experiments/data/words.txt"] -> text
+200-0000003@[text] -> words
+300-0000008@[words] -> unique_words
+300-0000009@[unique_words] -> count
+100-0000001@[count]

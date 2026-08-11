@@ -1,0 +1,15 @@
+phonebook 0.1
+
+ext 000-0000001 QTY_GT_10(row: map<text, text>) -> bool {
+  300-0000014@[row, "qty", "0"] -> qty_text
+  400-0000009@[qty_text, 0] -> qty
+  600-0000006@[qty, 10] -> gt_10
+  return gt_10
+}
+
+500-0000003@["experiments/data/inventory.csv"] -> rows
+300-0000002@[rows, 000-0000001] -> filtered
+300-0000001@["name", "qty"] -> columns
+500-0000004@["experiments/out/restock.csv", filtered, columns]
+300-0000009@[filtered] -> count
+100-0000001@[count]

@@ -1,0 +1,18 @@
+phonebook 0.1
+
+ext 000-0000001 IS_ZERO_QTY(row: map<text, text>) -> bool {
+  300-0000014@[row, "qty", ""] -> qty_text
+  400-0000009@[qty_text, -1] -> qty
+  600-0000004@[qty, 0] -> is_zero
+  return is_zero
+}
+
+ext 000-0000002 GET_NAME(row: map<text, text>) -> text {
+  300-0000014@[row, "name", ""] -> name
+  return name
+}
+
+500-0000003@["experiments/data/inventory.csv"] -> rows
+300-0000002@[rows, 000-0000001] -> zeroes
+300-0000003@[zeroes, 000-0000002] -> names
+100-0000002@[names]

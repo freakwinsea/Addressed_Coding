@@ -1,0 +1,14 @@
+phonebook 0.1
+
+ext 000-0000001 HAS_ERROR(line: text) -> bool {
+  200-0000009@[line, "ERROR"] -> has_error
+  return has_error
+}
+
+500-0000001@["experiments/data/log.txt"] -> text
+200-0000001@[text] -> lines
+300-0000002@[lines, 000-0000001] -> errors
+200-0000004@[errors, "\n"] -> out_text
+500-0000002@["experiments/out/errors.txt", out_text]
+300-0000009@[errors] -> count
+100-0000001@[count]

@@ -25,6 +25,22 @@ If it loses, that is worth knowing too, and it is cheap to find out.
 | 1 | full guide, patterns visible | 20/20 | 20/20 | void — the guide solved the tasks |
 | 2 | patterns withheld | — | — | void — no work produced, see run 1 notes |
 | 3 | patterns withheld, task sheet cleaned | 20/20 | **20/20** | sound, with a caveat |
+| 4 | as run 3, different model | 20/20 | **20/20** | sound |
+
+**The instrument is at its ceiling.** Two sound runs at 100% means these twenty
+tasks cannot discriminate between models, and cannot possibly discriminate
+between languages — a competent model would very likely score 20/20 on the
+Python control arm as well, and 20/20 against 20/20 measures nothing.
+
+What run 4 did establish is worth having anyway: it shares **no file** with run
+3, uses `REDUCE` four times where run 3 used it zero, and its `t09` is more
+correct than the reference — it seeds the fold from the data instead of
+hardcoding an initial value that would break on all-negative input. Two models,
+forty programs, no overlap, forty correct results. The address space admits more
+than one route and more than one model can find one.
+
+Neither of those is the claim under test. Before another run of this set, the
+study needs the control arm — which nobody has run — or a harder tier.
 
 Run 3's real finding is not the 20. It planned every program before running
 anything, and that plan scores **19/20**: one address typed with six digits

@@ -1,0 +1,18 @@
+phonebook 0.1
+
+ext 000-0000001 TO_INT(line: text) -> int {
+  400-0000009@[line, 0] -> num
+  return num
+}
+
+ext 000-0000002 REDUCE_MAX(acc: int, item: int) -> int {
+  400-0000007@[acc, item] -> m
+  return m
+}
+
+500-0000001@["experiments/data/numbers.txt"] -> text
+200-0000001@[text] -> lines
+300-0000003@[lines, 000-0000001] -> nums
+300-0000011@[nums, 0] -> first
+300-0000004@[nums, 000-0000002, first] -> largest
+100-0000001@[largest]

@@ -1,0 +1,12 @@
+phonebook 0.1
+
+ext 000-0000001 TO_INT(line: text) -> int {
+  400-0000009@[line, 0] -> num
+  return num
+}
+
+500-0000001@["experiments/data/numbers.txt"] -> text
+200-0000001@[text] -> lines
+300-0000003@[lines, 000-0000001] -> nums
+400-0000008@[nums] -> total
+100-0000001@[total]

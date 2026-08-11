@@ -1,0 +1,11 @@
+phonebook 0.1
+
+ext 000-0000001 TO_UPPER(line: text) -> text {
+  200-0000007@[line] -> upper
+  return upper
+}
+
+500-0000001@["experiments/data/words.txt"] -> text
+200-0000001@[text] -> lines
+300-0000003@[lines, 000-0000001] -> upper_lines
+100-0000002@[upper_lines]

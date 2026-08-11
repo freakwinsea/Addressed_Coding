@@ -1,0 +1,12 @@
+phonebook 0.1
+
+ext 000-0000001 GET_CATEGORY(row: map<text, text>) -> text {
+  300-0000014@[row, "category", ""] -> cat
+  return cat
+}
+
+500-0000003@["experiments/data/inventory.csv"] -> rows
+300-0000003@[rows, 000-0000001] -> categories
+300-0000008@[categories] -> unique_cats
+300-0000005@[unique_cats] -> sorted_cats
+100-0000002@[sorted_cats]

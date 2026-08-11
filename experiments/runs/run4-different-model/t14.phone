@@ -1,0 +1,21 @@
+phonebook 0.1
+
+ext 000-0000001 MORE_THAN_TWICE(entry: pair<text, int>) -> bool {
+  300-0000016@[entry] -> count
+  600-0000006@[count, 2] -> more_than_two
+  return more_than_two
+}
+
+ext 000-0000002 GET_KEY(entry: pair<text, int>) -> text {
+  300-0000015@[entry] -> key
+  return key
+}
+
+500-0000001@["experiments/data/words.txt"] -> text
+200-0000003@[text] -> words
+300-0000012@[words] -> word_counts
+300-0000013@[word_counts] -> entries
+300-0000002@[entries, 000-0000001] -> filtered
+300-0000003@[filtered, 000-0000002] -> names
+300-0000005@[names] -> sorted_names
+100-0000002@[sorted_names]

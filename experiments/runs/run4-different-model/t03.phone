@@ -1,0 +1,6 @@
+phonebook 0.1
+
+500-0000001@["experiments/data/words.txt"] -> text
+200-0000001@[text] -> lines
+300-0000007@[lines] -> reversed
+100-0000002@[reversed]
