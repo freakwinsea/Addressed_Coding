@@ -29,3 +29,7 @@ attempts/
 # committed once, invisible to every ASCII leak scan. Never again.
 brief.md
 *.brief.md
+
+# Mutation study output.
+demo_mutation.md
+mutation_report.md

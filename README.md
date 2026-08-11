@@ -238,13 +238,20 @@ difference — the tasks are inside every model's competence in both languages,
 and Python's standard library was the wrong control for a claim about
 unfamiliar APIs. The null result and two void earlier runs are all written up.
 
-What did differ, in every run, was verification rather than generation. Run 3's
-plan scored 19/20 and its delivery 20/20; `dial check` found the one character
-between them before anything executed, and the Python arm has no equivalent
-step. Mutating a correct program and asking only what each side rejects
-*without running it* — wrong operation, swapped arguments, undefined name —
-gives three caught out of three against zero out of three. That is the next
-study, and a narrower claim than the one this one set out to test.
+What differed, in every run, was verification rather than generation — so
+[the second study](experiments/MUTATION.md) measured that instead. Inject
+single-point errors into known-correct programs, discard the ones that change
+nothing, and ask what each side rejects *before it runs*:
+
+**95% against 31%**, on the mutation classes both languages can express. The
+control arm had ruff and mypy, not a bare syntax check. The gap comes almost
+entirely from swapped arguments (38/47 against 0/22) and wrong operations —
+Python cannot object to `f(b, a)` when both are strings, and `max` where you
+meant `sum` is perfectly well-typed.
+
+An open vocabulary makes wrong code look well-formed; a closed one makes it look
+wrong. That is a much narrower claim than the ideation sessions made, and unlike
+that one it has evidence.
 
 ## What is deliberately not here
 
