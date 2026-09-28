@@ -180,6 +180,27 @@ impl BigInt {
     }
 }
 
+impl BigInt {
+    /// The square root rounded down, by Newton's method on whole numbers. The
+    /// caller has already refused a negative value. Starting at or above the
+    /// root, each step lands closer and never below it, so the first step that
+    /// fails to go lower has found it.
+    pub fn isqrt(&self) -> BigInt {
+        if self.is_zero() {
+            return BigInt::default();
+        }
+        let two = BigInt::from_i64(2);
+        let mut root = BigInt::pow10(self.digit_count().div_ceil(2));
+        loop {
+            let next = root.add(&self.div_rem(&root).0).div_rem(&two).0;
+            if next >= root {
+                return root;
+            }
+            root = next;
+        }
+    }
+}
+
 impl Ord for BigInt {
     fn cmp(&self, other: &BigInt) -> Ordering {
         match (self.negative, other.negative) {

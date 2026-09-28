@@ -2073,6 +2073,351 @@
       "examples": ["400-0000122@[share, 2] -> shown"],
       "status": "active",
       "since": "0.2.0"
+    },
+    {
+      "address": "400-0000140",
+      "name": "SQRT",
+      "summary": "Square root of a float",
+      "description": "Worked out by hand on whole numbers in both runtimes, not with a host sqrt, so the two agree bit for bit by construction.",
+      "keywords": ["sqrt", "square root", "root", "float", "geometry", "distance"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "float" }],
+        "output": { "name": "root", "type": "float" },
+        "effects": [],
+        "errors": ["negative_root"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The exact square root, rounded ONCE to the nearest float, ties to even. This is the correctly rounded root IEEE 754 asks for: SQRT(2.0) is 1.4142135623730951.",
+          "A NEGATIVE INPUT IS A negative_root ERROR, never NaN. -0.0 is zero, and its root is 0.0, never -0.0.",
+          "Never overflows: the root of the largest float is finite, and the root of the smallest is a normal float."
+        ]
+      },
+      "examples": ["400-0000140@[area] -> side"],
+      "conformance": [
+        { "id": "sqrt.exact", "args": [16.0], "expect": 4.0 },
+        { "id": "sqrt.two", "args": [2.0], "expect": 1.4142135623730951 },
+        { "id": "sqrt.quarter", "args": [0.25], "expect": 0.5 },
+        { "id": "sqrt.zero", "args": [0.0], "expect": 0.0 },
+        { "id": "sqrt.smallest", "args": [5e-324], "expect": 2.2227587494850775e-162 },
+        { "id": "sqrt.negative", "args": [-1.0], "expect": null, "raises": "negative_root" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000141",
+      "name": "FLOOR",
+      "summary": "Round a float down to a whole number",
+      "keywords": ["floor", "round down", "whole", "integer part", "float"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "float" }],
+        "output": { "name": "result", "type": "float" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "TOWARD NEGATIVE INFINITY: 2.7 is 2.0 and -2.3 is -3.0.",
+          "The result is a float. Use TO_INT (400-0000020) to get an int. NO NEGATIVE ZERO: -0.0 gives 0.0."
+        ]
+      },
+      "examples": ["400-0000141@[price] -> whole"],
+      "conformance": [
+        { "id": "floor.positive", "args": [2.7], "expect": 2.0 },
+        { "id": "floor.negative", "args": [-2.3], "expect": -3.0 },
+        { "id": "floor.whole", "args": [5.0], "expect": 5.0 },
+        { "id": "floor.no_negative_zero", "args": [-0.0], "expect": 0.0 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000142",
+      "name": "CEIL",
+      "summary": "Round a float up to a whole number",
+      "keywords": ["ceil", "ceiling", "round up", "whole", "float"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "float" }],
+        "output": { "name": "result", "type": "float" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "TOWARD POSITIVE INFINITY: 2.3 is 3.0 and -2.7 is -2.0.",
+          "The result is a float. NO NEGATIVE ZERO: -0.5 gives 0.0, where both hosts' own ceil would give -0.0."
+        ]
+      },
+      "examples": ["400-0000142@[pages] -> sheets"],
+      "conformance": [
+        { "id": "ceil.positive", "args": [2.3], "expect": 3.0 },
+        { "id": "ceil.negative", "args": [-2.7], "expect": -2.0 },
+        { "id": "ceil.whole", "args": [5.0], "expect": 5.0 },
+        { "id": "ceil.no_negative_zero", "args": [-0.5], "expect": 0.0 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000143",
+      "name": "MOD_FLOAT",
+      "summary": "Remainder of dividing one float by another, sign of the dividend",
+      "description": "The float companion of MOD (400-0000005). Python's % takes the sign of the divisor, so a Python backend must not use it.",
+      "keywords": ["mod", "modulo", "remainder", "float", "wrap", "angle"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "float" }, { "name": "b", "type": "float" }],
+        "output": { "name": "result", "type": "float" },
+        "effects": [],
+        "errors": ["division_by_zero"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "a - b x trunc(a / b), worked out EXACTLY, never rounded: the answer is always a float. This is C's fmod.",
+          "SIGN OF THE DIVIDEND: -7.5 mod 2.0 is -1.5, and 7.5 mod -2.0 is 1.5.",
+          "A ZERO DIVISOR IS A division_by_zero ERROR, never NaN. NO NEGATIVE ZERO: -4.0 mod 2.0 is 0.0."
+        ]
+      },
+      "examples": ["400-0000143@[angle, 360.0] -> turned"],
+      "conformance": [
+        { "id": "mod_float.basic", "args": [7.5, 2.0], "expect": 1.5 },
+        { "id": "mod_float.negative_dividend", "args": [-7.5, 2.0], "expect": -1.5 },
+        { "id": "mod_float.negative_divisor", "args": [7.5, -2.0], "expect": 1.5 },
+        { "id": "mod_float.exact", "args": [0.1, 0.03], "expect": 0.010000000000000009 },
+        { "id": "mod_float.no_negative_zero", "args": [-4.0, 2.0], "expect": 0.0 },
+        { "id": "mod_float.by_zero", "args": [1.0, 0.0], "expect": null, "raises": "division_by_zero" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000144",
+      "name": "ISQRT",
+      "summary": "Square root of an int, rounded down",
+      "keywords": ["isqrt", "sqrt", "square root", "root", "integer", "whole"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "int" }],
+        "output": { "name": "root", "type": "int" },
+        "effects": [],
+        "errors": ["negative_root"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "ROUNDED DOWN: the largest r with r x r <= value. ISQRT(17) is 4.",
+          "Worked out on whole numbers, never through a float, so it is exact at every size: ISQRT(9223372036854775807) is 3037000499.",
+          "A negative input is a negative_root error."
+        ]
+      },
+      "examples": ["400-0000144@[n] -> side"],
+      "conformance": [
+        { "id": "isqrt.exact", "args": [16], "expect": 4 },
+        { "id": "isqrt.down", "args": [17], "expect": 4 },
+        { "id": "isqrt.zero", "args": [0], "expect": 0 },
+        { "id": "isqrt.largest", "args": [9223372036854775807], "expect": 3037000499 },
+        { "id": "isqrt.negative", "args": [-1], "expect": null, "raises": "negative_root" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000145",
+      "name": "ISQRT_BIG",
+      "summary": "Square root of a bigint, rounded down",
+      "keywords": ["isqrt", "sqrt", "square root", "root", "bigint", "big"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "bigint" }],
+        "output": { "name": "root", "type": "bigint" },
+        "effects": [],
+        "errors": ["negative_root"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "ROUNDED DOWN: the largest r with r x r <= value. Exact at every size; the root has about half the digits, so it never overflows.",
+          "A negative input is a negative_root error."
+        ]
+      },
+      "examples": ["400-0000145@[n] -> side"],
+      "conformance": [
+        {
+          "id": "isqrt_big.large",
+          "args": [100000000000000000000000000000000000000],
+          "expect": 10000000000000000000
+        },
+        { "id": "isqrt_big.down", "args": [99999999999999999999], "expect": 9999999999 },
+        { "id": "isqrt_big.negative", "args": [-4], "expect": null, "raises": "negative_root" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000146",
+      "name": "SQRT_DEC",
+      "summary": "Square root of a decimal, rounded to a number of places",
+      "description": "Most roots have no exact decimal form, so, like DIV_DEC (400-0000046), this address takes the number of places to keep and rounds once.",
+      "keywords": ["sqrt", "square root", "root", "decimal", "places"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "decimal" }, { "name": "places", "type": "int" }],
+        "output": { "name": "root", "type": "decimal" },
+        "effects": [],
+        "errors": ["invalid_places", "negative_root", "overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The exact square root, rounded ONCE to exactly `places` digits after the point, HALVES AWAY FROM ZERO, as ROUND_DEC: the root of 2.25 to 0 places is 2, and of 0.0025 to 1 place is 0.1.",
+          "The result always has `places` places, even when the root is exact: the root of 4 to 2 places is 2.00.",
+          "`places` must be between 0 and 1000, or it is an invalid_places error. A negative input is a negative_root error.",
+          "A result with more than 4000 digits is an overflow error."
+        ]
+      },
+      "examples": ["400-0000146@[area, 2] -> side"],
+      "conformance": [
+        { "id": "sqrt_dec.two", "args": ["2", 10], "expect": "1.4142135624" },
+        { "id": "sqrt_dec.half_away", "args": ["2.25", 0], "expect": "2" },
+        { "id": "sqrt_dec.half_away_small", "args": ["0.0025", 1], "expect": "0.1" },
+        { "id": "sqrt_dec.pads", "args": ["4", 2], "expect": "2.00" },
+        { "id": "sqrt_dec.negative", "args": ["-1", 2], "expect": null, "raises": "negative_root" },
+        { "id": "sqrt_dec.bad_places", "args": ["2", -1], "expect": null, "raises": "invalid_places" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000147",
+      "name": "FLOOR_DEC",
+      "summary": "Round a decimal down to a whole number",
+      "keywords": ["floor", "round down", "whole", "decimal", "integer part"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "decimal" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "TOWARD NEGATIVE INFINITY: 2.7 is 2 and -2.3 is -3. The result has no places.",
+          "NO NEGATIVE ZERO: -0.5 gives -1, and -0.00 gives 0.",
+          "Only a value near the 4000-digit ceiling can overflow."
+        ]
+      },
+      "examples": ["400-0000147@[amount] -> whole"],
+      "conformance": [
+        { "id": "floor_dec.positive", "args": ["2.7"], "expect": "2" },
+        { "id": "floor_dec.negative", "args": ["-2.3"], "expect": "-3" },
+        { "id": "floor_dec.drops_places", "args": ["5.00"], "expect": "5" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000148",
+      "name": "CEIL_DEC",
+      "summary": "Round a decimal up to a whole number",
+      "keywords": ["ceil", "ceiling", "round up", "whole", "decimal"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "decimal" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "TOWARD POSITIVE INFINITY: 2.3 is 3 and -2.7 is -2. The result has no places.",
+          "NO NEGATIVE ZERO: -0.5 gives 0.",
+          "Rounding up can add a digit (9.1 is 10), so a result with more than 4000 digits is an overflow error."
+        ]
+      },
+      "examples": ["400-0000148@[boxes_needed] -> boxes"],
+      "conformance": [
+        { "id": "ceil_dec.positive", "args": ["2.3"], "expect": "3" },
+        { "id": "ceil_dec.negative", "args": ["-2.7"], "expect": "-2" },
+        { "id": "ceil_dec.no_negative_zero", "args": ["-0.5"], "expect": "0" },
+        { "id": "ceil_dec.drops_places", "args": ["5.00"], "expect": "5" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000149",
+      "name": "MOD_DEC",
+      "summary": "Remainder of dividing one decimal by another, sign of the dividend",
+      "keywords": ["mod", "modulo", "remainder", "decimal", "money", "left over"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "decimal" }, { "name": "b", "type": "decimal" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": ["division_by_zero"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "a - b x trunc(a / b), EXACT. The result has the larger of the two scales, as ADD_DEC: 7.50 mod 2 is 1.50.",
+          "SIGN OF THE DIVIDEND, as MOD (400-0000005): -7.5 mod 2 is -1.5, and 7.5 mod -2.25 is 0.75.",
+          "A ZERO DIVISOR IS A division_by_zero ERROR. The remainder is never larger than either input, so it never overflows."
+        ]
+      },
+      "examples": ["400-0000149@[total, 0.25d] -> odd_cents"],
+      "conformance": [
+        { "id": "mod_dec.basic", "args": ["7.50", "2"], "expect": "1.50" },
+        { "id": "mod_dec.negative_dividend", "args": ["-7.5", "2"], "expect": "-1.5" },
+        { "id": "mod_dec.negative_divisor", "args": ["7.5", "-2.25"], "expect": "0.75" },
+        { "id": "mod_dec.exact", "args": ["0.3", "0.1"], "expect": "0.0" },
+        { "id": "mod_dec.by_zero", "args": ["1", "0.0"], "expect": null, "raises": "division_by_zero" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000150",
+      "name": "CEIL_FRACTION",
+      "summary": "The smallest whole number not below a fraction",
+      "keywords": ["ceil", "ceiling", "round up", "whole", "fraction"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "fraction" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "ROUNDS TOWARD POSITIVE INFINITY: 7/2 gives 4 and -7/2 gives -3. The companion of FLOOR_FRACTION (400-0000090). Never fails: the result is never further from zero than the numerator."
+        ]
+      },
+      "examples": ["400-0000150@[share] -> whole"],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000151",
+      "name": "MOD_FRACTION",
+      "summary": "Remainder of dividing one fraction by another, sign of the dividend",
+      "keywords": ["mod", "modulo", "remainder", "fraction", "exact"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "fraction" }, { "name": "b", "type": "fraction" }],
+        "output": { "name": "result", "type": "fraction" },
+        "effects": [],
+        "errors": ["division_by_zero", "overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "a - b x trunc(a / b), EXACT and in lowest terms: 7/2 mod 1/3 is 1/6.",
+          "SIGN OF THE DIVIDEND, as MOD (400-0000005): -7/2 mod 1/3 is -1/6, and 7/2 mod -1/3 is 1/6.",
+          "A ZERO DIVISOR IS A division_by_zero ERROR. The result's denominator can grow to the product of the two, so one that no longer fits in 64 bits is an overflow error."
+        ]
+      },
+      "examples": ["400-0000151@[position, 1/4] -> offset"],
+      "status": "active",
+      "since": "0.2.0"
     }
   ]
 }

@@ -591,3 +591,91 @@ class TestPrintingAgainstFractions:
         for a, _ in TestDecimalAgainstFractions.operands(5):
             for places in (0, 2, 9):
                 assert numbers_.format_dec(a, places) == numbers_.round_dec(a, places).text()
+class TestRootsAndRemainders:
+    """SQRT and SQRT_DEC are worked out by hand, so each gets an oracle used
+    only here: `math.sqrt` for the float, which IEEE 754 requires to be
+    correctly rounded, and exact `Fraction` bounds for the decimal. The
+    conformance suite then holds Rust to whatever Python prints."""
+
+    def test_sqrt_is_the_correctly_rounded_root(self):
+        import math
+        import random
+        import struct
+
+        from phonebook_rt import numbers_
+
+        rng = random.Random(140)
+        values = [5e-324, 2.2250738585072014e-308, 1.7976931348623157e308, 2.0, 0.5]
+        for _ in range(50_000):
+            (value,) = struct.unpack("<d", struct.pack("<Q", rng.getrandbits(63)))
+            if math.isfinite(value):
+                values.append(value)
+        for value in values:
+            assert numbers_.sqrt_(value) == math.sqrt(value), value
+
+    def test_sqrt_dec_is_the_nearest_at_its_places(self):
+        import random
+        from fractions import Fraction
+
+        from phonebook_rt import numbers_
+
+        rng = random.Random(146)
+        for _ in range(2_000):
+            value = Decimal(rng.choice([rng.randrange(10**30), rng.randrange(1000) ** 2]), rng.randrange(12))
+            places = rng.choice([0, 1, 2, 5, 12])
+            root = numbers_.sqrt_dec(value, places)
+            assert root.scale == places
+            exact, half = Fraction(value.coefficient, 10**value.scale), Fraction(1, 2 * 10**places)
+            middle = Fraction(root.coefficient, 10**places)
+            # Halves away from zero: the root may sit exactly on the lower edge.
+            assert max(middle - half, 0) ** 2 <= exact < (middle + half) ** 2
+
+    def test_remainders_follow_the_dividend(self):
+        import math
+        import random
+        from fractions import Fraction
+
+        from phonebook_rt import numbers_
+
+        def expected(a, b):
+            quotient = a / b
+            return a - b * (math.floor(quotient) if quotient >= 0 else math.ceil(quotient))
+
+        rng = random.Random(149)
+        for _ in range(2_000):
+            a = Decimal(rng.randrange(-(10**12), 10**12), rng.randrange(6))
+            b = Decimal(rng.choice([-1, 1]) * rng.randrange(1, 10**8), rng.randrange(6))
+            result = numbers_.mod_dec(a, b)
+            exact_a, exact_b = (Fraction(x.coefficient, 10**x.scale) for x in (a, b))
+            assert Fraction(result.coefficient, 10**result.scale) == expected(exact_a, exact_b)
+            assert result.scale == max(a.scale, b.scale)
+
+            p, q = rng.randrange(-(10**9), 10**9), rng.randrange(1, 10**9)
+            r, s = rng.choice([-1, 1]) * rng.randrange(1, 10**9), rng.randrange(1, 10**9)
+            got = numbers_.mod_fraction(numbers_.make_fraction(p, q), numbers_.make_fraction(r, s))
+            assert Fraction(got.numerator, got.denominator) == expected(Fraction(p, q), Fraction(r, s))
+            assert numbers_.ceil_fraction(numbers_.make_fraction(p, q)) == math.ceil(Fraction(p, q))
+
+    def test_whole_decimals(self):
+        import math
+        import random
+        from fractions import Fraction
+
+        from phonebook_rt import numbers_
+
+        rng = random.Random(147)
+        for _ in range(2_000):
+            value = Decimal(rng.randrange(-(10**15), 10**15), rng.randrange(8))
+            exact = Fraction(value.coefficient, 10**value.scale)
+            assert numbers_.floor_dec(value).coefficient == math.floor(exact)
+            assert numbers_.ceil_dec(value).coefficient == math.ceil(exact)
+            assert numbers_.floor_dec(value).scale == numbers_.ceil_dec(value).scale == 0
+
+    def test_mod_fraction_overflow_is_a_contract_error(self):
+        from phonebook_rt import numbers_
+
+        a = numbers_.make_fraction(1, 4294967311)  # two large primes: the
+        b = numbers_.make_fraction(1, 4294967357)  # shared denominator is too big
+        with pytest.raises(PhonebookFault) as excinfo:
+            numbers_.mod_fraction(a, b)
+        assert excinfo.value.code == "overflow"

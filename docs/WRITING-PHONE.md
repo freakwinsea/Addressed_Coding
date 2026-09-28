@@ -1186,6 +1186,114 @@ b
              ! `places` must be between 0 and 1000, or it is an
                invalid_places error.
              errors: invalid_places
+
+400-0000140  SQRT(value: float) -> float
+             Square root of a float
+             ! The exact square root, rounded ONCE to the nearest float, ties
+               to even. This is the correctly rounded root IEEE 754 asks for:
+               SQRT(2.0) is 1.4142135623730951.
+             ! A NEGATIVE INPUT IS A negative_root ERROR, never NaN. -0.0 is
+               zero, and its root is 0.0, never -0.0.
+             ! Never overflows: the root of the largest float is finite, and
+               the root of the smallest is a normal float.
+             errors: negative_root
+
+400-0000141  FLOOR(value: float) -> float
+             Round a float down to a whole number
+             ! TOWARD NEGATIVE INFINITY: 2.7 is 2.0 and -2.3 is -3.0.
+             ! The result is a float. Use TO_INT (400-0000020) to get an int.
+               NO NEGATIVE ZERO: -0.0 gives 0.0.
+
+400-0000142  CEIL(value: float) -> float
+             Round a float up to a whole number
+             ! TOWARD POSITIVE INFINITY: 2.3 is 3.0 and -2.7 is -2.0.
+             ! The result is a float. NO NEGATIVE ZERO: -0.5 gives 0.0, where
+               both hosts' own ceil would give -0.0.
+
+400-0000143  MOD_FLOAT(a: float, b: float) -> float
+             Remainder of dividing one float by another, sign of the dividend
+             ! a - b x trunc(a / b), worked out EXACTLY, never rounded: the
+               answer is always a float. This is C's fmod.
+             ! SIGN OF THE DIVIDEND: -7.5 mod 2.0 is -1.5, and 7.5 mod -2.0
+               is 1.5.
+             ! A ZERO DIVISOR IS A division_by_zero ERROR, never NaN. NO
+               NEGATIVE ZERO: -4.0 mod 2.0 is 0.0.
+             errors: division_by_zero
+
+400-0000144  ISQRT(value: int) -> int
+             Square root of an int, rounded down
+             ! ROUNDED DOWN: the largest r with r x r <= value. ISQRT(17) is
+               4.
+             ! Worked out on whole numbers, never through a float, so it is
+               exact at every size: ISQRT(9223372036854775807) is 3037000499.
+             ! A negative input is a negative_root error.
+             errors: negative_root
+
+400-0000145  ISQRT_BIG(value: bigint) -> bigint
+             Square root of a bigint, rounded down
+             ! ROUNDED DOWN: the largest r with r x r <= value. Exact at
+               every size; the root has about half the digits, so it never
+               overflows.
+             ! A negative input is a negative_root error.
+             errors: negative_root
+
+400-0000146  SQRT_DEC(value: decimal, places: int) -> decimal
+             Square root of a decimal, rounded to a number of places
+             ! The exact square root, rounded ONCE to exactly `places` digits
+               after the point, HALVES AWAY FROM ZERO, as ROUND_DEC: the root
+               of 2.25 to 0 places is 2, and of 0.0025 to 1 place is 0.1.
+             ! The result always has `places` places, even when the root is
+               exact: the root of 4 to 2 places is 2.00.
+             ! `places` must be between 0 and 1000, or it is an
+               invalid_places error. A negative input is a negative_root
+               error.
+             ! A result with more than 4000 digits is an overflow error.
+             errors: invalid_places, negative_root, overflow
+
+400-0000147  FLOOR_DEC(value: decimal) -> decimal
+             Round a decimal down to a whole number
+             ! TOWARD NEGATIVE INFINITY: 2.7 is 2 and -2.3 is -3. The result
+               has no places.
+             ! NO NEGATIVE ZERO: -0.5 gives -1, and -0.00 gives 0.
+             ! Only a value near the 4000-digit ceiling can overflow.
+             errors: overflow
+
+400-0000148  CEIL_DEC(value: decimal) -> decimal
+             Round a decimal up to a whole number
+             ! TOWARD POSITIVE INFINITY: 2.3 is 3 and -2.7 is -2. The result
+               has no places.
+             ! NO NEGATIVE ZERO: -0.5 gives 0.
+             ! Rounding up can add a digit (9.1 is 10), so a result with more
+               than 4000 digits is an overflow error.
+             errors: overflow
+
+400-0000149  MOD_DEC(a: decimal, b: decimal) -> decimal
+             Remainder of dividing one decimal by another, sign of the dividend
+             ! a - b x trunc(a / b), EXACT. The result has the larger of the
+               two scales, as ADD_DEC: 7.50 mod 2 is 1.50.
+             ! SIGN OF THE DIVIDEND, as MOD (400-0000005): -7.5 mod 2 is
+               -1.5, and 7.5 mod -2.25 is 0.75.
+             ! A ZERO DIVISOR IS A division_by_zero ERROR. The remainder is
+               never larger than either input, so it never overflows.
+             errors: division_by_zero
+
+400-0000150  CEIL_FRACTION(a: fraction) -> int
+             The smallest whole number not below a fraction
+             ! ROUNDS TOWARD POSITIVE INFINITY: 7/2 gives 4 and -7/2 gives
+               -3. The companion of FLOOR_FRACTION (400-0000090). Never
+               fails: the result is never further from zero than the
+               numerator.
+
+400-0000151  MOD_FRACTION(a: fraction, b: fraction) -> fraction
+             Remainder of dividing one fraction by another, sign of the dividend
+             ! a - b x trunc(a / b), EXACT and in lowest terms: 7/2 mod 1/3
+               is 1/6.
+             ! SIGN OF THE DIVIDEND, as MOD (400-0000005): -7/2 mod 1/3 is
+               -1/6, and 7/2 mod -1/3 is 1/6.
+             ! A ZERO DIVISOR IS A division_by_zero ERROR. The result's
+               denominator can grow to the product of the two, so one that no
+               longer fits in 64 bits is an overflow error.
+             errors: division_by_zero, overflow
 ```
 
 ### 500 — Input / output — the only addresses with effects

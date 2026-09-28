@@ -66,7 +66,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `100` | Core | 6 addresses |
 | `200` | Text | 12 |
 | `300` | Collections | 16 |
-| `400` | Numbers | 75 |
+| `400` | Numbers | 87 |
 | `500` | I/O — the only block that touches the filesystem | 4 |
 | `600` | Logic and comparison | 7 |
 | `700` | Reserved for future shared blocks | empty |
@@ -74,7 +74,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `900` | Rust-native escape hatch | reserved, empty |
 | `999` | Quarantine — unregistered or withdrawn. The checker rejects it. | reserved |
 
-120 global addresses in v0. That is the entire budget; adding one is meant to
+132 global addresses in v0. That is the entire budget; adding one is meant to
 feel expensive (see `CONTRIBUTING.md`).
 
 `000` is the inverse of "dial 9 for an outside line": it is the local
@@ -124,6 +124,8 @@ languages differ, so the contracts pin it:
 | Ordering | Numeric. With no NaN and one zero, the order is total, which is why `float` is `comparable`. |
 | Equality and map keys | `float` is **not** `keyable`: equality on computed floats is a trap (`0.1 + 0.2` is not `0.3`), and Rust's `f64` cannot key a `BTreeMap`. So `EQUALS` does not take floats; `NUMBER_EQUALS` does, and is exact. For a computed float, `CLOSE_TO` asks whether two values are within a tolerance. |
 | Rounding halves | `ROUND` sends halves **away from zero**: 2.5 is 3.0. Python's `round()` would say 2.0. It decides on the exact binary value, so 0.49999999999999994 is 0.0. |
+| Square roots | `SQRT` is the exact root rounded once, to nearest, ties to even; a negative input is a `negative_root` error, never NaN. Neither runtime calls a host `sqrt`: both work the root out on whole numbers, so they agree by construction. `ISQRT`, `ISQRT_BIG` and `SQRT_DEC` give the root of an int, a bigint (both rounded down) and a decimal (to a number of places). |
+| Floor, ceiling, remainder | `FLOOR` and `CEIL` never give `-0.0`. `MOD_FLOAT`, `MOD_DEC` and `MOD_FRACTION` are exact and take the **sign of the dividend**, like `MOD`; Python's `%` would take the divisor's. |
 | To an int | `TO_INT` **truncates toward zero** and is an `overflow` error outside the 64-bit range. Rust's `as i64` would saturate instead. |
 | From an int | `TO_FLOAT` rounds to nearest, ties to even, which only matters past 2^53. |
 | Reading text | `PARSE_FLOAT` accepts `[+-]digits[.digits][(e|E)[+-]digits]` after trimming, and nothing else: not `.5`, `5.`, `1_000`, `nan`, `inf`. Rust's parser would take `.5` and `inf`; Python's would take `1_000`. |
@@ -193,7 +195,7 @@ runtime's `BigInt`.
 |---|---|
 | How big | At most 4000 digits in the coefficient (the bigint ceiling), and at most 1000 of them after the point. Anything past either is an `overflow` error, and a literal past either is a parse error. |
 | Places | Kept, never normalized away: `0.10 + 0.20` prints `0.30`. `ADD_DEC` and `SUB_DEC` give the larger scale of the two, `MUL_DEC` the sum of both. |
-| Rounding | Only `DIV_DEC` and `ROUND_DEC` round, each to a number of places the program gives (0 to 1000, else `invalid_places`), and always **halves away from zero**, the same as `ROUND`. Not Python's `round()` or the `decimal` module's default, which go to even. |
+| Rounding | Only `DIV_DEC`, `ROUND_DEC` and `SQRT_DEC` round, each to a number of places the program gives (0 to 1000, else `invalid_places`), and always **halves away from zero**, the same as `ROUND`. Not Python's `round()` or the `decimal` module's default, which go to even. |
 | Equality and order | By value: `0.3` and `0.30` are equal and sort as ties. That is also why `decimal` is comparable but not keyable: a map could not say which of the two it kept. |
 | Zero | Has one sign: `-0.00d` is `0.00`. |
 | Floats | `DEC_TO_FLOAT` reads the decimal's text the way `PARSE_FLOAT` would. `FLOAT_TO_DEC` takes the float's shortest digits, the ones `TO_TEXT` prints, so `0.1` becomes `0.1` rather than the float's exact binary value. |
@@ -333,7 +335,7 @@ conformance test:
 | Sort stability | `SORT` and `SORT_BY` are **stable** |
 | Dedupe order | `UNIQUE` preserves **first-occurrence** order |
 | Integer division of negatives (Python floors, Rust truncates) | `DIV` **truncates toward zero** |
-| Remainder sign | `MOD` takes the **sign of the dividend** |
+| Remainder sign | `MOD`, `MOD_BIG`, `MOD_FLOAT`, `MOD_DEC` and `MOD_FRACTION` take the **sign of the dividend** |
 | String indexing (bytes vs. chars) | `LENGTH` and `SLICE` count **Unicode scalar values**; `SLICE` clamps out-of-range bounds instead of failing |
 | Boolean rendering (`True` vs. `true`) | `TO_TEXT` renders `true` / `false` |
 | Float rendering (`1.0` vs. `1`, `1e+16` vs. `10000000000000000`) | `TO_TEXT` writes the shortest round-trip digits in Python's `repr` layout (§3.1) |
@@ -423,7 +425,7 @@ compiler0 (Python, this repo)
 ```
 
 That requires a semantic kernel covering parsing, syntax trees, and error
-handling — well beyond the 120 addresses of v0. v0 deliberately does not chase
+handling — well beyond the 132 addresses of v0. v0 deliberately does not chase
 it.
 
 ## 9. Out of scope in v0

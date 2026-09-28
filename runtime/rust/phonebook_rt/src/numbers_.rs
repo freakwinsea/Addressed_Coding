@@ -1104,3 +1104,252 @@ pub fn format_fraction(value: &Fraction, places: &i64) -> String {
         places,
     )
 }
+// roots, floors, ceilings and remainders
+// --------------------------------------------------------------------------
+//
+// Square roots are worked out on whole numbers, never with `f64::sqrt`, so
+// both backends follow one written-down method and agree bit for bit. The
+// Python runtime leans on `math.isqrt` for the whole-number root, which has a
+// single right answer; here it is written out, bit by bit for u128 and by
+// Newton's method for BigInt. The rounding of the float and the decimal is
+// spelled out the same way on both sides.
+
+fn no_negative_root(negative: bool, operation: &str) {
+    if negative {
+        crate::fault(
+            "negative_root",
+            &format!("{operation} of a negative number"),
+        );
+    }
+}
+
+/// The square root of a u128, rounded down: the schoolbook method in base 4,
+/// one result bit per step.
+fn isqrt_u128(mut value: u128) -> u128 {
+    if value == 0 {
+        return 0;
+    }
+    let mut root: u128 = 0;
+    let mut bit: u128 = 1 << ((127 - value.leading_zeros()) & !1);
+    while bit != 0 {
+        if value >= root + bit {
+            value -= root + bit;
+            root = (root >> 1) + bit;
+        } else {
+            root >>= 1;
+        }
+        bit >>= 2;
+    }
+    root
+}
+
+/// 400-0000140 SQRT — the exact square root, rounded once to the nearest
+/// float, ties to even. NOT `f64::sqrt`: the same answer, but written out so
+/// the two runtimes share a method instead of trusting two maths libraries.
+///
+/// value = m x 2^e with m a whole number. Make e even, then scale m up by a
+/// power of four until its root has at least 55 bits. That root, rounded to
+/// 53 bits with the bits it drops and whether it was exact, is the answer.
+pub fn sqrt_(value: &f64) -> f64 {
+    no_negative_root(*value < 0.0, "SQRT");
+    if *value == 0.0 {
+        return 0.0;
+    }
+    let bits = value.to_bits();
+    let field = ((bits >> 52) & 0x7ff) as i64;
+    let low = (bits & ((1u64 << 52) - 1)) as u128;
+    let (mut mantissa, mut exponent) = if field == 0 {
+        (low, -1074i64)
+    } else {
+        (low | (1u128 << 52), field - 1075)
+    };
+    if exponent.rem_euclid(2) == 1 {
+        mantissa <<= 1;
+        exponent -= 1;
+    }
+    let length = 128 - mantissa.leading_zeros() as i64;
+    let shift = ((111 - length) / 2).max(0);
+    let scaled = mantissa << (2 * shift);
+    let root = isqrt_u128(scaled);
+    let inexact = root * root != scaled;
+    let drop = (128 - root.leading_zeros() as i64) - 53;
+    let mut kept = root >> drop;
+    let rest = root & ((1u128 << drop) - 1);
+    let half = 1u128 << (drop - 1);
+    if rest > half || (rest == half && (inexact || kept & 1 == 1)) {
+        kept += 1;
+    }
+    let mut power = exponent / 2 - shift + drop;
+    if kept == 1u128 << 53 {
+        kept >>= 1;
+        power += 1;
+    }
+    // kept x 2^power, with kept in [2^52, 2^53): a root is never subnormal
+    // and never too large, so this is always a normal float.
+    let biased = (power + 52 + 1023) as u64;
+    f64::from_bits((biased << 52) | (kept as u64 - (1u64 << 52)))
+}
+
+/// 400-0000141 FLOOR — the largest whole float not above the value.
+pub fn floor_(value: &f64) -> f64 {
+    finite(value.floor(), "FLOOR")
+}
+
+/// 400-0000142 CEIL — the smallest whole float not below the value. `finite`
+/// turns CEIL(-0.5), which is -0.0, into 0.0.
+pub fn ceil_(value: &f64) -> f64 {
+    finite(value.ceil(), "CEIL")
+}
+
+/// 400-0000143 MOD_FLOAT — sign of the dividend, like MOD. Rust's `%` and
+/// Python's `math.fmod` are both the exact IEEE remainder.
+pub fn mod_float(a: &f64, b: &f64) -> f64 {
+    if *b == 0.0 {
+        crate::fault("division_by_zero", "MOD_FLOAT by zero");
+    }
+    finite(a % b, "MOD_FLOAT")
+}
+
+/// 400-0000144 ISQRT — the square root rounded down.
+pub fn isqrt(value: &i64) -> i64 {
+    no_negative_root(*value < 0, "ISQRT");
+    isqrt_u128(*value as u128) as i64
+}
+
+/// 400-0000145 ISQRT_BIG — the square root rounded down; never grows.
+pub fn isqrt_big(value: &BigInt) -> BigInt {
+    no_negative_root(value.is_negative(), "ISQRT_BIG");
+    value.isqrt()
+}
+
+/// 400-0000146 SQRT_DEC — the exact root, rounded once to `places`, halves
+/// away from zero.
+///
+/// The answer's coefficient is sqrt(c x 10^(2p - s)) rounded, which is
+/// sqrt(top / bottom) with both whole. q = isqrt(top / bottom) is that root
+/// rounded down, and it rounds up when the root is at least q + 1/2, that is
+/// when 4 x top >= bottom x (2q + 1)^2.
+pub fn sqrt_dec(value: &Decimal, places: &i64) -> Decimal {
+    let places = checked_places(*places, "SQRT_DEC");
+    no_negative_root(value.coefficient().is_negative(), "SQRT_DEC");
+    let (top, bottom) = if 2 * places >= value.scale() {
+        (
+            value
+                .coefficient()
+                .mul(&BigInt::pow10(2 * places - value.scale())),
+            BigInt::from_i64(1),
+        )
+    } else {
+        (
+            value.coefficient().clone(),
+            BigInt::pow10(value.scale() - 2 * places),
+        )
+    };
+    let mut root = top.div_rem(&bottom).0.isqrt();
+    let odd = root.add(&root).add(&BigInt::from_i64(1));
+    if top.mul(&BigInt::from_i64(4)) >= bottom.mul(&odd.mul(&odd)) {
+        root = root.add(&BigInt::from_i64(1));
+    }
+    Decimal::new(root, places).checked("SQRT_DEC")
+}
+
+/// The decimal's whole number toward -inf (FLOOR) or +inf (CEIL), 0 places.
+fn whole_dec(value: &Decimal, up: bool, operation: &str) -> Decimal {
+    // div_rem truncates toward zero; a remainder means one step is still
+    // owed in the direction asked for.
+    let (whole, remainder) = value.coefficient().div_rem(&BigInt::pow10(value.scale()));
+    let one = BigInt::from_i64(1);
+    let whole = if remainder.is_zero() {
+        whole
+    } else if up && !remainder.is_negative() {
+        whole.add(&one)
+    } else if !up && remainder.is_negative() {
+        whole.sub(&one)
+    } else {
+        whole
+    };
+    Decimal::new(whole, 0).checked(operation)
+}
+
+/// 400-0000147 FLOOR_DEC — down to a whole number, with no places.
+pub fn floor_dec(value: &Decimal) -> Decimal {
+    whole_dec(value, false, "FLOOR_DEC")
+}
+
+/// 400-0000148 CEIL_DEC — up to a whole number, with no places.
+pub fn ceil_dec(value: &Decimal) -> Decimal {
+    whole_dec(value, true, "CEIL_DEC")
+}
+
+/// 400-0000149 MOD_DEC — exact, sign of the dividend, the larger scale.
+/// `div_rem`'s remainder already takes the dividend's sign.
+pub fn mod_dec(a: &Decimal, b: &Decimal) -> Decimal {
+    if b.coefficient().is_zero() {
+        crate::fault("division_by_zero", "MOD_DEC by zero");
+    }
+    let scale = a.scale().max(b.scale());
+    let remainder = a.rescaled(scale).div_rem(&b.rescaled(scale)).1;
+    Decimal::new(remainder, scale).checked("MOD_DEC")
+}
+
+/// 400-0000150 CEIL_FRACTION — toward positive infinity. The negated
+/// numerator is taken in i128, because -i64::MIN does not fit in i64.
+pub fn ceil_fraction(a: &Fraction) -> i64 {
+    -((-(a.numerator as i128)).div_euclid(a.denominator as i128)) as i64
+}
+
+/// 400-0000151 MOD_FRACTION — exact, sign of the dividend.
+///
+/// Over the shared denominator a.den x b.den, the two numerators are
+/// a.num x b.den and b.num x a.den, and the remainder is theirs. Rust's `%`
+/// already takes the dividend's sign, and every product fits in i128.
+pub fn mod_fraction(a: &Fraction, b: &Fraction) -> Fraction {
+    if b.numerator == 0 {
+        crate::fault("division_by_zero", "MOD_FRACTION by zero");
+    }
+    let left = a.numerator as i128 * b.denominator as i128;
+    let right = b.numerator as i128 * a.denominator as i128;
+    fraction(
+        left % right,
+        a.denominator as i128 * b.denominator as i128,
+        "MOD_FRACTION",
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The hand-written root must be the correctly rounded one, which is what
+    /// IEEE 754 requires of `f64::sqrt`; a seeded sweep over every exponent,
+    /// subnormals included.
+    #[test]
+    fn sqrt_matches_the_correctly_rounded_root() {
+        let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+        for _ in 0..200_000 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let value = f64::from_bits(state >> 1);
+            if value.is_finite() {
+                assert_eq!(sqrt_(&value).to_bits(), value.sqrt().to_bits(), "{value:e}");
+            }
+        }
+        for value in [f64::MIN_POSITIVE, 5e-324, f64::MAX, 2.0, 0.25, 1e-310] {
+            assert_eq!(sqrt_(&value).to_bits(), value.sqrt().to_bits(), "{value:e}");
+        }
+    }
+
+    #[test]
+    fn whole_number_roots_round_down() {
+        for value in [0i64, 1, 2, 3, 4, 15, 16, 17, 99, 100, i64::MAX] {
+            let root = isqrt(&value) as i128;
+            assert!(root * root <= value as i128 && (root + 1) * (root + 1) > value as i128);
+        }
+        let big = BigInt::parse(&"9".repeat(4000)).unwrap();
+        let root = big.isqrt();
+        assert!(root.mul(&root) <= big);
+        let above = root.add(&BigInt::from_i64(1));
+        assert!(above.mul(&above) > big);
+    }
+}
