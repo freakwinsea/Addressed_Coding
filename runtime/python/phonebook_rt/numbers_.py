@@ -147,6 +147,52 @@ def sign(a: int) -> int:
     return 0
 
 
+def _magnitude_gcd(a: int, b: int) -> int:
+    """Euclid on the magnitudes, which may be 2**63: the caller checks the fit."""
+    a = -a if a < 0 else a
+    b = -b if b < 0 else b
+    while b != 0:
+        a, b = b, a % b
+    return a
+
+
+def gcd(a: int, b: int) -> int:
+    """400-0000032 GCD — never negative; 2**63 does not fit and overflows.
+
+    Not `math.gcd`, which would return 2**63 for GCD(INT64_MIN, 0). Written out
+    as Euclid so it reads line for line against the Rust runtime.
+    """
+    return _checked(_magnitude_gcd(a, b))
+
+
+def lcm(a: int, b: int) -> int:
+    """400-0000033 LCM — never negative; divides before multiplying."""
+    if a == 0 or b == 0:
+        return 0
+    divisor = _magnitude_gcd(a, b)
+    a = -a if a < 0 else a
+    b = -b if b < 0 else b
+    return _checked((a // divisor) * b)
+
+
+def product(values: list) -> int:
+    """400-0000034 PRODUCT — left to right; empty is 1; a running overflow faults."""
+    total = 1
+    for value in values:
+        total = _checked(total * value)
+    return total
+
+
+def is_even(a: int) -> bool:
+    """400-0000035 IS_EVEN — the remainder is compared with 0, never with 1."""
+    return a % 2 == 0
+
+
+def is_odd(a: int) -> bool:
+    """400-0000036 IS_ODD — the opposite of IS_EVEN, for negatives too."""
+    return a % 2 != 0
+
+
 # --------------------------------------------------------------------------
 # floats
 # --------------------------------------------------------------------------

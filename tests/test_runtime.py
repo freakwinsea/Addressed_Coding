@@ -154,6 +154,38 @@ class TestContractsThatOverrideTheHostLanguage:
             numbers_.clamp(5, 10, 0)
         assert excinfo.value.code == "invalid_range"
 
+    def test_gcd_and_lcm_agree_with_math_wherever_the_result_fits(self):
+        import math
+
+        from phonebook_rt import numbers_
+
+        edges = [numbers_.INT64_MIN, numbers_.INT64_MIN + 1, -(2**32), -12, -1, 0,
+                 1, 6, 18, 2**32, numbers_.INT64_MAX]
+        for a in edges + list(range(-30, 31)):
+            for b in edges + list(range(-30, 31)):
+                for name, true in (("gcd", math.gcd(a, b)), ("lcm", math.lcm(a, b))):
+                    if true <= numbers_.INT64_MAX:
+                        assert getattr(numbers_, name)(a, b) == true, (name, a, b)
+                    else:
+                        with pytest.raises(PhonebookFault) as excinfo:
+                            getattr(numbers_, name)(a, b)
+                        assert excinfo.value.code == "overflow", (name, a, b)
+
+    def test_product_overflows_before_a_later_zero(self):
+        from phonebook_rt import numbers_
+
+        assert numbers_.product([]) == 1
+        with pytest.raises(PhonebookFault) as excinfo:
+            numbers_.product([numbers_.INT64_MAX, 2, 0])
+        assert excinfo.value.code == "overflow"
+
+    def test_parity_holds_for_negatives(self):
+        from phonebook_rt import numbers_
+
+        for a in list(range(-20, 21)) + [numbers_.INT64_MIN, numbers_.INT64_MAX]:
+            assert numbers_.is_even(a) == (a % 2 == 0), a
+            assert numbers_.is_odd(a) != numbers_.is_even(a), a
+
 
 class TestFloatPromises:
     """Where Python's own float behavior is not the contract."""
