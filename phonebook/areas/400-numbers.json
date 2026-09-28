@@ -597,6 +597,181 @@
       ],
       "status": "active",
       "since": "0.2.0"
+    },
+    {
+      "address": "400-0000060",
+      "name": "NUMBER_EQUALS",
+      "summary": "True when two numbers of the same type are equal",
+      "keywords": ["equals", "equal", "same", "number", "float", "eq", "=="],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
+        "output": { "name": "result", "type": "bool" },
+        "constraints": { "T": "numeric" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Both arguments have the same type: an int is never compared with a float.",
+          "EXACT. For floats this is equality of the binary value, so 0.1 + 0.2 does not equal 0.3. Use CLOSE_TO (400-0000065) for computed floats.",
+          "There is one zero and no NaN, so every float equals itself and nothing else is equal to it."
+        ]
+      },
+      "examples": ["400-0000060@[count, 0] -> none_left"],
+      "conformance": [
+        { "id": "number_equals.ints", "args": [3, 3], "expect": true },
+        { "id": "number_equals.ints_differ", "args": [3, -3], "expect": false },
+        { "id": "number_equals.floats", "args": [0.5, 0.5], "expect": true },
+        { "id": "number_equals.floats_differ", "args": [0.30000000000000004, 0.3], "expect": false }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000061",
+      "name": "NUMBER_NOT_EQUALS",
+      "summary": "True when two numbers of the same type are different",
+      "keywords": ["not equal", "different", "differs", "number", "ne", "!="],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
+        "output": { "name": "result", "type": "bool" },
+        "constraints": { "T": "numeric" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Exactly the opposite of NUMBER_EQUALS (400-0000060), with the same exactness for floats."]
+      },
+      "examples": ["400-0000061@[remainder, 0] -> uneven"],
+      "conformance": [
+        { "id": "number_not_equals.ints", "args": [3, 4], "expect": true },
+        { "id": "number_not_equals.same", "args": [3, 3], "expect": false },
+        { "id": "number_not_equals.floats", "args": [0.30000000000000004, 0.3], "expect": true }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000062",
+      "name": "LESS_OR_EQUAL",
+      "summary": "True when the first number is less than or equal to the second",
+      "keywords": ["less or equal", "at most", "no more than", "le", "<=", "up to"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
+        "output": { "name": "result", "type": "bool" },
+        "constraints": { "T": "numeric" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Numeric order, the same order as LESS_THAN (600-0000005). Both arguments have the same type.",
+          "True exactly when LESS_THAN(a, b) or NUMBER_EQUALS(a, b) is true."
+        ]
+      },
+      "examples": ["400-0000062@[age, 12] -> child_price"],
+      "conformance": [
+        { "id": "less_or_equal.less", "args": [1, 2], "expect": true },
+        { "id": "less_or_equal.equal", "args": [2, 2], "expect": true },
+        { "id": "less_or_equal.greater", "args": [3, 2], "expect": false },
+        { "id": "less_or_equal.floats", "args": [-0.5, -0.25], "expect": true }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000063",
+      "name": "GREATER_OR_EQUAL",
+      "summary": "True when the first number is greater than or equal to the second",
+      "keywords": ["greater or equal", "at least", "no less than", "ge", ">=", "not below"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
+        "output": { "name": "result", "type": "bool" },
+        "constraints": { "T": "numeric" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Numeric order, the same order as GREATER_THAN (600-0000006). Both arguments have the same type.",
+          "True exactly when GREATER_THAN(a, b) or NUMBER_EQUALS(a, b) is true."
+        ]
+      },
+      "examples": ["400-0000063@[age, 18] -> is_adult"],
+      "conformance": [
+        { "id": "greater_or_equal.greater", "args": [3, 2], "expect": true },
+        { "id": "greater_or_equal.equal", "args": [2, 2], "expect": true },
+        { "id": "greater_or_equal.less", "args": [1, 2], "expect": false },
+        { "id": "greater_or_equal.floats", "args": [1e16, 1e15], "expect": true }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000064",
+      "name": "COMPARE",
+      "summary": "Compare two numbers: -1 if the first is smaller, 0 if equal, 1 if larger",
+      "keywords": ["compare", "cmp", "order", "three way", "spaceship", "which is bigger"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
+        "output": { "name": "result", "type": "int" },
+        "constraints": { "T": "numeric" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Returns exactly -1, 0, or 1, never another negative or positive number. Never fails.",
+          "Numeric order, the same order as LESS_THAN (600-0000005). 0 means NUMBER_EQUALS (400-0000060) is true.",
+          "Python has no cmp() and Rust's cmp returns an Ordering, not a number; the contract picks the integers."
+        ]
+      },
+      "examples": ["400-0000064@[score, target] -> direction"],
+      "conformance": [
+        { "id": "compare.less", "args": [-5, 7], "expect": -1 },
+        { "id": "compare.equal", "args": [7, 7], "expect": 0 },
+        { "id": "compare.greater", "args": [9223372036854775807, -9223372036854775808], "expect": 1 },
+        { "id": "compare.floats", "args": [0.1, 0.10000000000000002], "expect": -1 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000065",
+      "name": "CLOSE_TO",
+      "summary": "True when two floats are within a tolerance of each other",
+      "keywords": ["close", "near", "approximately", "almost equal", "within", "tolerance", "isclose"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "float" }, { "name": "b", "type": "float" }, { "name": "tolerance", "type": "float" }],
+        "output": { "name": "result", "type": "bool" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "ABSOLUTE tolerance: true when |a - b| <= tolerance, with a - b rounded to the nearest float. Not Python's math.isclose, which is relative by default.",
+          "The tolerance is included, so a tolerance of 0.0 is exact equality.",
+          "A negative tolerance is never met: the result is false. Never fails.",
+          "When a - b is too large to be finite the two are not close: the result is false, not an overflow error."
+        ]
+      },
+      "examples": ["400-0000065@[total, 0.3, 1e-9] -> about_right"],
+      "conformance": [
+        { "id": "close_to.rounding", "args": [0.30000000000000004, 0.3, 1e-9], "expect": true },
+        { "id": "close_to.far", "args": [1.0, 1.5, 0.25], "expect": false },
+        { "id": "close_to.edge_included", "args": [1.0, 1.5, 0.5], "expect": true },
+        { "id": "close_to.zero_tolerance", "args": [0.1, 0.1, 0.0], "expect": true },
+        { "id": "close_to.negative_tolerance", "args": [0.1, 0.1, -1.0], "expect": false },
+        { "id": "close_to.huge_gap", "args": [1.7976931348623157e308, -1.7976931348623157e308, 1e308], "expect": false }
+      ],
+      "status": "active",
+      "since": "0.2.0"
     }
   ]
 }

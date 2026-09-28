@@ -95,9 +95,11 @@ binding, which is how `PRINT` and `TO_TEXT` accept every value. `bytes` is a
 reserved name with no v0 addresses.
 
 Some contracts constrain a generic: `comparable` (orderable by `SORT` and
-`LESS_THAN`) and `keyable` (usable as a map key or by `UNIQUE`). `comparable` is
-`int`, `float`, `text`, `bool`; `keyable` is `int`, `text`, `bool`. The
-constraint is checked once the variable resolves to a concrete type.
+`LESS_THAN`), `keyable` (usable as a map key or by `UNIQUE`), and `numeric`
+(accepted by the number comparisons in area 400). `comparable` is `int`,
+`float`, `text`, `bool`; `keyable` is `int`, `text`, `bool`; `numeric` is `int`,
+`float`. The constraint is checked once the variable resolves to a concrete
+type.
 
 `int` and `float` never mix. There is no implicit conversion: `ADD` takes two
 `int`s, `ADD_FLOAT` takes two `float`s, and `TO_FLOAT` / `TO_INT` cross between
@@ -115,7 +117,7 @@ languages differ, so the contracts pin it:
 | NaN and infinity | **They never exist.** A result too large to be finite is an `overflow` error. Dividing by zero, `0.0 / 0.0` included, is a `division_by_zero` error. `PARSE_FLOAT` rejects `nan`, `inf`, and anything too large, returning its fallback. A literal too large to be finite is a parse error. |
 | Negative zero | **Zero has one sign.** Any result that would be `-0.0` is `0.0`, so it can never print as `-0.0` or behave differently from `0.0`. |
 | Ordering | Numeric. With no NaN and one zero, the order is total, which is why `float` is `comparable`. |
-| Equality and map keys | `float` is **not** `keyable`: equality on computed floats is a trap (`0.1 + 0.2` is not `0.3`), and Rust's `f64` cannot key a `BTreeMap`. Compare with `LESS_THAN` / `GREATER_THAN`. |
+| Equality and map keys | `float` is **not** `keyable`: equality on computed floats is a trap (`0.1 + 0.2` is not `0.3`), and Rust's `f64` cannot key a `BTreeMap`. So `EQUALS` does not take floats; `NUMBER_EQUALS` does, and is exact. For a computed float, `CLOSE_TO` asks whether two values are within a tolerance. |
 | Rounding halves | `ROUND` sends halves **away from zero**: 2.5 is 3.0. Python's `round()` would say 2.0. It decides on the exact binary value, so 0.49999999999999994 is 0.0. |
 | To an int | `TO_INT` **truncates toward zero** and is an `overflow` error outside the 64-bit range. Rust's `as i64` would saturate instead. |
 | From an int | `TO_FLOAT` rounds to nearest, ties to even, which only matters past 2^53. |

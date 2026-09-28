@@ -254,3 +254,47 @@ def _layout(digits: str, exponent: int) -> str:
     mantissa = digits[0] + ("." + digits[1:] if len(digits) > 1 else "")
     sign = "+" if exponent >= 0 else "-"
     return f"{mantissa}e{sign}{abs(exponent):02d}"
+
+
+# --------------------------------------------------------------------------
+# comparisons
+# --------------------------------------------------------------------------
+
+
+def number_equals(a, b) -> bool:
+    """400-0000060 NUMBER_EQUALS — exact, floats included."""
+    return a == b
+
+
+def number_not_equals(a, b) -> bool:
+    """400-0000061 NUMBER_NOT_EQUALS."""
+    return a != b
+
+
+def less_or_equal(a, b) -> bool:
+    """400-0000062 LESS_OR_EQUAL."""
+    return a <= b
+
+
+def greater_or_equal(a, b) -> bool:
+    """400-0000063 GREATER_OR_EQUAL."""
+    return a >= b
+
+
+def compare(a, b) -> int:
+    """400-0000064 COMPARE — exactly -1, 0, or 1."""
+    if a < b:
+        return -1
+    if a > b:
+        return 1
+    return 0
+
+
+def close_to(a: float, b: float, tolerance: float) -> bool:
+    """400-0000065 CLOSE_TO — absolute tolerance, edge included.
+
+    A difference too large to be finite comes out as infinity, which no
+    tolerance reaches, and a negative tolerance is below every difference.
+    Neither needs its own branch.
+    """
+    return abs(a - b) <= tolerance

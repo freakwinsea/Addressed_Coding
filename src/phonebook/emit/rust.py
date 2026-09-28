@@ -9,7 +9,7 @@ Two rules keep the borrow checker out of the contracts:
 
 The result clones more than hand-written Rust would. That is the honest cost of
 a registry that describes values rather than memory, and it is the reason the
-same 67 addresses can drive a garbage-collected backend and a borrow-checked
+same 73 addresses can drive a garbage-collected backend and a borrow-checked
 one without either leaking into the other.
 """
 
@@ -179,8 +179,13 @@ class _Emitter:
                 # reads it the same way; the suffix keeps `1e+16` from being
                 # left to inference.
                 rendered = f"{arg.value!r}f64"
-            else:
+            elif -(2**31) <= arg.value < 2**31:
                 rendered = str(arg.value)
+            else:
+                # A generic call whose arguments are all literals leaves Rust
+                # to infer the integer type, and it picks i32. That is harmless
+                # inside the i32 range and a compile error outside it.
+                rendered = f"{arg.value}i64"
         elif isinstance(arg, Ref):
             rendered = names[arg.name]
             if clone:

@@ -386,3 +386,50 @@ fn layout(digits: &str, exponent: i32) -> String {
     let sign = if exponent >= 0 { '+' } else { '-' };
     format!("{mantissa}e{sign}{:02}", exponent.abs())
 }
+
+// --------------------------------------------------------------------------
+// comparisons
+// --------------------------------------------------------------------------
+
+/// 400-0000060 NUMBER_EQUALS — exact, floats included.
+pub fn number_equals<T: PartialEq>(a: &T, b: &T) -> bool {
+    a == b
+}
+
+/// 400-0000061 NUMBER_NOT_EQUALS
+pub fn number_not_equals<T: PartialEq>(a: &T, b: &T) -> bool {
+    a != b
+}
+
+/// 400-0000062 LESS_OR_EQUAL
+pub fn less_or_equal<T: PartialOrd>(a: &T, b: &T) -> bool {
+    a <= b
+}
+
+/// 400-0000063 GREATER_OR_EQUAL
+pub fn greater_or_equal<T: PartialOrd>(a: &T, b: &T) -> bool {
+    a >= b
+}
+
+/// 400-0000064 COMPARE — exactly -1, 0, or 1.
+///
+/// Written with `<` and `>` rather than `partial_cmp`, which returns an
+/// `Option` for floats; with no NaN there is always an answer.
+pub fn compare<T: PartialOrd>(a: &T, b: &T) -> i64 {
+    if a < b {
+        -1
+    } else if a > b {
+        1
+    } else {
+        0
+    }
+}
+
+/// 400-0000065 CLOSE_TO — absolute tolerance, edge included.
+///
+/// A difference too large to be finite comes out as infinity, which no
+/// tolerance reaches, and a negative tolerance is below every difference.
+/// Neither needs its own branch.
+pub fn close_to(a: &f64, b: &f64, tolerance: &f64) -> bool {
+    (a - b).abs() <= *tolerance
+}
