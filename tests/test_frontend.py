@@ -92,6 +92,16 @@ def test_type_mismatch(registry):
     fails("200-0000005@[42] -> x\n100-0000001@[x]\n", registry, "expected text, got int")
 
 
+def test_int_literals_must_fit_in_64_bits(registry):
+    fails("100-0000005@[9223372036854775808] -> t\n100-0000001@[t]\n", registry, "64-bit")
+    fails("100-0000005@[-9223372036854775809] -> t\n100-0000001@[t]\n", registry, "64-bit")
+
+
+def test_int_literals_at_the_64_bit_limits_are_accepted(registry):
+    build("100-0000005@[9223372036854775807] -> t\n100-0000001@[t]\n", registry)
+    build("100-0000005@[-9223372036854775808] -> t\n100-0000001@[t]\n", registry)
+
+
 def test_unbound_reference(registry):
     fails("100-0000001@[nope]\n", registry, "not bound")
 
