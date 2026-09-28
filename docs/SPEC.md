@@ -98,7 +98,7 @@ Some contracts constrain a generic: `comparable` (orderable by `SORT` and
 `LESS_THAN`), `keyable` (usable as a map key or by `UNIQUE`), and `numeric`
 (accepted by the number comparisons in area 400). `comparable` is `int`,
 `bigint`, `float`, `decimal`, `fraction`, `text`, `bool`; `keyable` is `int`,
-`bigint`, `fraction`, `text`, `bool`; `numeric` is `int`, `float`. The
+`bigint`, `fraction`, `text`, `bool`; `numeric` is `int`, `bigint`, `float`, `decimal`, `fraction`. The
 constraint is checked once the variable resolves to a concrete type.
 
 `int` and `float` never mix. There is no implicit conversion: `ADD` takes two
