@@ -152,6 +152,13 @@ RUST_FAULTS = {
     ),
     "pow_negative_exponent": ("400-0000012@[2, -1] -> a\n100-0000001@[a]\n", "negative_exponent"),
     "clamp_reversed": ("400-0000013@[5, 10, 0] -> a\n100-0000001@[a]\n", "invalid_range"),
+    "gcd_min_zero": ("400-0000002@[-9223372036854775807, 1] -> a\n"
+                     "400-0000032@[a, 0] -> b\n100-0000001@[b]\n", "overflow"),
+    "lcm_overflow": ("400-0000033@[9223372036854775807, 2] -> a\n100-0000001@[a]\n", "overflow"),
+    "product_overflow_before_zero": (
+        "300-0000001@[9223372036854775807, 2, 0] -> xs\n400-0000034@[xs] -> a\n100-0000001@[a]\n",
+        "overflow",
+    ),
 }
 
 

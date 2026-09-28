@@ -175,6 +175,65 @@ pub fn sign(a: &i64) -> i64 {
     }
 }
 
+/// Euclid on the magnitudes, which may be 2^63: the caller checks the fit.
+/// `unsigned_abs` is what lets the smallest i64 in without overflowing.
+fn magnitude_gcd(a: &i64, b: &i64) -> u64 {
+    let mut a = a.unsigned_abs();
+    let mut b = b.unsigned_abs();
+    while b != 0 {
+        let rest = a % b;
+        a = b;
+        b = rest;
+    }
+    a
+}
+
+/// 400-0000032 GCD — never negative; 2^63 does not fit and overflows.
+pub fn gcd(a: &i64, b: &i64) -> i64 {
+    match i64::try_from(magnitude_gcd(a, b)) {
+        Ok(value) => value,
+        Err(_) => crate::fault("overflow", "GCD overflowed a 64-bit signed integer"),
+    }
+}
+
+/// 400-0000033 LCM — never negative; divides before multiplying.
+pub fn lcm(a: &i64, b: &i64) -> i64 {
+    if *a == 0 || *b == 0 {
+        return 0;
+    }
+    let divisor = magnitude_gcd(a, b);
+    let result = (a.unsigned_abs() / divisor)
+        .checked_mul(b.unsigned_abs())
+        .and_then(|value| i64::try_from(value).ok());
+    match result {
+        Some(value) => value,
+        None => crate::fault("overflow", "LCM overflowed a 64-bit signed integer"),
+    }
+}
+
+/// 400-0000034 PRODUCT — left to right; empty is 1; a running overflow faults.
+pub fn product(values: &[i64]) -> i64 {
+    let mut total: i64 = 1;
+    for value in values {
+        total = match total.checked_mul(*value) {
+            Some(next) => next,
+            None => crate::fault("overflow", "PRODUCT overflowed a 64-bit signed integer"),
+        };
+    }
+    total
+}
+
+/// 400-0000035 IS_EVEN — the remainder is compared with 0, never with 1.
+pub fn is_even(a: &i64) -> bool {
+    a % 2 == 0
+}
+
+/// 400-0000036 IS_ODD — the opposite of IS_EVEN, for negatives too.
+/// Not `a % 2 == 1`: Rust's -3 % 2 is -1.
+pub fn is_odd(a: &i64) -> bool {
+    a % 2 != 0
+}
+
 // --------------------------------------------------------------------------
 // floats
 // --------------------------------------------------------------------------

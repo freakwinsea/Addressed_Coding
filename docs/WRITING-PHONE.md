@@ -647,6 +647,52 @@ b
                even, however many digits it has.
              ! A value too large to be finite returns the fallback. A value
                too small to represent is 0.0. '-0' is 0.0.
+
+400-0000032  GCD(a: int, b: int) -> int
+             The greatest common divisor of two integers
+             ! The result is never negative: GCD(-12, 18) is 6. Signs of the
+               inputs do not matter.
+             ! GCD(a, 0) is the absolute value of a, and GCD(0, 0) is 0.
+             ! When the true answer is 9223372036854775808 it does not fit,
+               so it is an overflow error. That happens only when one input
+               is the smallest 64-bit integer and the other is 0 or that same
+               number. Python's math.gcd would return the bigger number;
+               Rust's unsigned_abs would hold it but not convert back.
+             errors: overflow
+
+400-0000033  LCM(a: int, b: int) -> int
+             The least common multiple of two integers
+             ! The result is never negative: LCM(-4, 6) is 12. Signs of the
+               inputs do not matter.
+             ! LCM(a, 0) is 0 for every a, including LCM(0, 0).
+             ! Overflow is an error whenever the true answer does not fit in
+               64 bits. A backend must divide by the GCD before multiplying,
+               so it never builds a product bigger than the answer.
+             errors: overflow
+
+400-0000034  PRODUCT(values: list<int>) -> int
+             Multiply together a list of integers
+             ! An empty list multiplies to 1.
+             ! Multiplied left to right, like SUM (400-0000008). Overflow is
+               an error the moment a running product does not fit, even when
+               a later 0 would have brought the answer back:
+               PRODUCT([9223372036854775807, 2, 0]) is an overflow error, not
+               0.
+             errors: overflow
+
+400-0000035  IS_EVEN(a: int) -> bool
+             Whether an integer is even
+             ! Negative numbers follow the same rule: -4 is even and -3 is
+               not. Zero is even.
+             ! Never fails, including on the smallest 64-bit integer, which
+               is even.
+
+400-0000036  IS_ODD(a: int) -> bool
+             Whether an integer is odd
+             ! Negative numbers follow the same rule: -3 is odd. A backend
+               must not test the remainder against 1, because Rust's -3 % 2
+               is -1.
+             ! Always the opposite of IS_EVEN (400-0000035). Never fails.
 ```
 
 ### 500 — Input / output — the only addresses with effects
