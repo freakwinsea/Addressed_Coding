@@ -211,6 +211,156 @@
       ],
       "status": "active",
       "since": "0.1.0"
+    },
+    {
+      "address": "400-0000010",
+      "name": "ABS",
+      "summary": "The distance of an integer from zero",
+      "keywords": ["abs", "absolute", "magnitude", "distance", "unsigned"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The absolute value of the smallest 64-bit integer does not fit, so ABS(-9223372036854775808) is an overflow error. Python's abs would quietly return a bigger number; Rust's abs would panic or wrap by build profile."
+        ]
+      },
+      "examples": ["400-0000010@[delta] -> distance"],
+      "conformance": [
+        { "id": "abs.positive", "args": [5], "expect": 5 },
+        { "id": "abs.negative", "args": [-5], "expect": 5 },
+        { "id": "abs.zero", "args": [0], "expect": 0 },
+        { "id": "abs.max", "args": [9223372036854775807], "expect": 9223372036854775807 },
+        { "id": "abs.min_overflows", "args": [-9223372036854775808], "expect": null, "raises": "overflow" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000011",
+      "name": "NEGATE",
+      "summary": "Flip the sign of an integer",
+      "keywords": ["negate", "negative", "minus", "opposite", "flip sign", "invert"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "NEGATE(-9223372036854775808) is an overflow error, for the same reason as ABS (400-0000010).",
+          "NEGATE(0) is 0; there is no negative zero."
+        ]
+      },
+      "examples": ["400-0000011@[balance] -> owed"],
+      "conformance": [
+        { "id": "negate.positive", "args": [5], "expect": -5 },
+        { "id": "negate.negative", "args": [-5], "expect": 5 },
+        { "id": "negate.zero", "args": [0], "expect": 0 },
+        { "id": "negate.max", "args": [9223372036854775807], "expect": -9223372036854775807 },
+        { "id": "negate.min_overflows", "args": [-9223372036854775808], "expect": null, "raises": "overflow" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000012",
+      "name": "POW",
+      "summary": "Raise an integer to a whole-number power",
+      "keywords": ["pow", "power", "exponent", "raise", "squared", "cubed"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "base", "type": "int" }, { "name": "exponent", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["negative_exponent", "overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "POW(x, 0) is 1 for every x, including POW(0, 0).",
+          "A negative exponent is an error, not a fraction: v0 has no floating point.",
+          "Overflow is an error whenever the true result does not fit in 64 bits. POW(-2, 63) is -9223372036854775808 and fits; POW(2, 63) does not.",
+          "A backend must not raise overflow for a result that fits, and must not build a huge intermediate before noticing one that does not."
+        ]
+      },
+      "examples": ["400-0000012@[side, 2] -> area"],
+      "conformance": [
+        { "id": "pow.basic", "args": [2, 10], "expect": 1024 },
+        { "id": "pow.zero_exponent", "args": [7, 0], "expect": 1 },
+        { "id": "pow.zero_zero", "args": [0, 0], "expect": 1 },
+        { "id": "pow.negative_base_odd", "args": [-3, 3], "expect": -27 },
+        { "id": "pow.negative_base_even", "args": [-3, 4], "expect": 81 },
+        { "id": "pow.min_fits", "args": [-2, 63], "expect": -9223372036854775808 },
+        { "id": "pow.one_huge", "args": [-1, 9223372036854775807], "expect": -1 },
+        { "id": "pow.overflows", "args": [2, 63], "expect": null, "raises": "overflow" },
+        { "id": "pow.negative_exponent", "args": [2, -1], "expect": null, "raises": "negative_exponent" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000013",
+      "name": "CLAMP",
+      "summary": "Hold an integer inside a range, both ends included",
+      "keywords": ["clamp", "limit", "bound", "restrict", "range", "between"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "int" }, { "name": "low", "type": "int" }, { "name": "high", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["invalid_range"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Arguments are value, low, high, in that order.",
+          "Both ends are included: CLAMP(value, low, high) is low when value < low, high when value > high, and value otherwise.",
+          "low greater than high is an invalid_range error. low equal to high is allowed and always returns that number. Rust's clamp would panic here; Python has no clamp."
+        ]
+      },
+      "examples": ["400-0000013@[score, 0, 100] -> percent"],
+      "conformance": [
+        { "id": "clamp.inside", "args": [5, 0, 10], "expect": 5 },
+        { "id": "clamp.below", "args": [-5, 0, 10], "expect": 0 },
+        { "id": "clamp.above", "args": [15, 0, 10], "expect": 10 },
+        { "id": "clamp.at_edges", "args": [10, 0, 10], "expect": 10 },
+        { "id": "clamp.single_point", "args": [3, 7, 7], "expect": 7 },
+        { "id": "clamp.reversed_range", "args": [5, 10, 0], "expect": null, "raises": "invalid_range" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000014",
+      "name": "SIGN",
+      "summary": "Whether an integer is negative, zero, or positive",
+      "keywords": ["sign", "signum", "positive", "negative", "direction"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Returns exactly -1, 0, or 1. Never fails."
+        ]
+      },
+      "examples": ["400-0000014@[change] -> direction"],
+      "conformance": [
+        { "id": "sign.negative", "args": [-42], "expect": -1 },
+        { "id": "sign.zero", "args": [0], "expect": 0 },
+        { "id": "sign.positive", "args": [42], "expect": 1 },
+        { "id": "sign.min", "args": [-9223372036854775808], "expect": -1 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
     }
   ]
 }
