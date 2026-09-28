@@ -1,0 +1,99 @@
+phonebook 0.1
+
+# Printing a number with a set number of places: FORMAT_FLOAT, FORMAT_DEC and
+# FORMAT_FRACTION. Neither backend uses its own formatter (Python's format()
+# and Rust's {:.N} round the binary value half to even, and would give 2.67
+# for 2.675); both round the shown digits, halves away from zero, by hand.
+
+# Floats. 2.675 and -0.125 are where format() and {:.N} would disagree.
+400-0000120@[3.14159, 2] -> pi
+100-0000001@[pi]
+400-0000120@[2.675, 2] -> seen
+100-0000001@[seen]
+400-0000120@[-0.125, 2] -> neg_half
+100-0000001@[neg_half]
+400-0000120@[0.125, 2] -> pos_half
+100-0000001@[pos_half]
+400-0000120@[2.5, 0] -> no_point
+100-0000001@[no_point]
+400-0000120@[-2.5, 0] -> neg_no_point
+100-0000001@[neg_no_point]
+400-0000120@[0.49999999999999994, 0] -> under_half      # below one half
+100-0000001@[under_half]
+400-0000120@[3.0, 3] -> pads
+100-0000001@[pads]
+400-0000120@[9.999, 2] -> carries
+100-0000001@[carries]
+400-0000120@[-0.001, 2] -> no_neg_zero
+100-0000001@[no_neg_zero]
+400-0000120@[-0.0, 1] -> neg_zero_in
+100-0000001@[neg_zero_in]
+400-0000120@[1e20, 1] -> big_plain                       # never an exponent
+100-0000001@[big_plain]
+400-0000120@[1.5e-5, 8] -> small_plain
+100-0000001@[small_plain]
+400-0000120@[1.5e-5, 4] -> small_to_zero
+100-0000001@[small_to_zero]
+400-0000120@[635057293855503.25, 1] -> even_tie         # TO_TEXT's own tie-break
+100-0000001@[even_tie]
+400-0000120@[1.7976931348623157e308, 2] -> largest
+100-0000001@[largest]
+400-0000120@[5e-324, 330] -> smallest
+100-0000001@[smallest]
+
+# Arithmetic results print from the digits TO_TEXT shows.
+400-0000015@[0.1, 0.2] -> sum                            # 0.30000000000000004
+400-0000120@[sum, 2] -> sum_2
+100-0000001@[sum_2]
+400-0000120@[sum, 20] -> sum_20
+100-0000001@[sum_20]
+400-0000018@[2.0, 3.0] -> two_thirds
+400-0000120@[two_thirds, 4] -> two_thirds_4
+100-0000001@[two_thirds_4]
+
+# Decimals: ROUND_DEC's rule, printed.
+400-0000121@[19.999d, 2] -> money
+100-0000001@[money]
+400-0000121@[2.345d, 2] -> dec_half
+100-0000001@[dec_half]
+400-0000121@[-2.345d, 2] -> dec_neg_half
+100-0000001@[dec_neg_half]
+400-0000121@[5d, 2] -> dec_pads
+100-0000001@[dec_pads]
+400-0000121@[0.30d, 0] -> dec_whole
+100-0000001@[dec_whole]
+400-0000121@[-0.004d, 2] -> dec_no_neg_zero
+100-0000001@[dec_no_neg_zero]
+400-0000121@[123456789.123456789d, 5] -> dec_long
+100-0000001@[dec_long]
+
+# Fractions: the exact value, rounded once.
+400-0000080@[1, 3] -> third
+400-0000122@[third, 2] -> third_2
+100-0000001@[third_2]
+400-0000122@[third, 30] -> third_30
+100-0000001@[third_30]
+400-0000080@[2, 3] -> frac_two_thirds
+400-0000122@[frac_two_thirds, 4] -> frac_two_thirds_4
+100-0000001@[frac_two_thirds_4]
+400-0000080@[1, 8] -> eighth
+400-0000122@[eighth, 2] -> eighth_2
+100-0000001@[eighth_2]
+400-0000080@[-1, 8] -> neg_eighth
+400-0000122@[neg_eighth, 2] -> neg_eighth_2
+100-0000001@[neg_eighth_2]
+400-0000080@[5, 2] -> five_halves
+400-0000122@[five_halves, 0] -> five_halves_0
+100-0000001@[five_halves_0]
+400-0000080@[-1, 1000] -> tiny_neg
+400-0000122@[tiny_neg, 2] -> tiny_neg_2
+100-0000001@[tiny_neg_2]
+400-0000080@[7, 1] -> seven
+400-0000122@[seven, 3] -> seven_3
+100-0000001@[seven_3]
+400-0000080@[-9223372036854775808, 9223372036854775807] -> edge
+400-0000122@[edge, 25] -> edge_25
+100-0000001@[edge_25]
+400-0000080@[1, 7] -> seventh
+400-0000122@[seventh, 1000] -> seventh_1000
+100-0000001@[seventh_1000]

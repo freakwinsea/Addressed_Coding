@@ -66,7 +66,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `100` | Core | 6 addresses |
 | `200` | Text | 12 |
 | `300` | Collections | 16 |
-| `400` | Numbers | 66 |
+| `400` | Numbers | 75 |
 | `500` | I/O — the only block that touches the filesystem | 4 |
 | `600` | Logic and comparison | 7 |
 | `700` | Reserved for future shared blocks | empty |
@@ -74,7 +74,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `900` | Rust-native escape hatch | reserved, empty |
 | `999` | Quarantine — unregistered or withdrawn. The checker rejects it. | reserved |
 
-111 global addresses in v0. That is the entire budget; adding one is meant to
+120 global addresses in v0. That is the entire budget; adding one is meant to
 feel expensive (see `CONTRIBUTING.md`).
 
 `000` is the inverse of "dial 9 for an outside line": it is the local
@@ -224,6 +224,20 @@ runtimes write the same small algorithm by hand, with no library.
 | Printing | `TO_TEXT` writes `n/d` in lowest terms (`-1/3`), or just `n` when the denominator is 1 (`4/2` prints `2`). `PARSE_FRACTION` reads every such string back to the same fraction. |
 
 There is no fraction literal; build one with `MAKE_FRACTION` or `PARSE_FRACTION`.
+
+### 3.5 Printing with places
+
+`FORMAT_FLOAT`, `FORMAT_DEC` and `FORMAT_FRACTION` print a number as text with
+exactly `places` digits after the point (0 to 1000; no point at all when it is
+0). All three round halves away from zero, as `ROUND` and `ROUND_DEC` do, and
+none uses the host's formatter.
+
+| | Rule |
+|---|---|
+| Floats | The digits `TO_TEXT` shows are rounded, never the binary value: `2.675` to 2 places is `2.68`. Python's `format()` and Rust's `{:.2}` both round the binary value half to even and give `2.67`. |
+| Decimals | `ROUND_DEC` then `TO_TEXT`, without the 4000-digit ceiling. |
+| Fractions | The exact value, rounded once, never via a float: `1/3` to 30 places is thirty `3`s. |
+| Layout | Plain digits, never an exponent (`1e+20` to 1 place is `100000000000000000000.0`), and never a negative zero (`-0.001` to 2 places is `0.00`). |
 
 Backend representations:
 
@@ -409,7 +423,7 @@ compiler0 (Python, this repo)
 ```
 
 That requires a semantic kernel covering parsing, syntax trees, and error
-handling — well beyond the 111 addresses of v0. v0 deliberately does not chase
+handling — well beyond the 120 addresses of v0. v0 deliberately does not chase
 it.
 
 ## 9. Out of scope in v0
