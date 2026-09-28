@@ -89,7 +89,7 @@ A wheel built from a clean checkout, installed into an empty virtualenv, run
 from a directory that is not the repository:
 
 ```bash
-dial registry list          # 98 addresses
+dial registry list          # 111 addresses
 dial show FILTER            # the entry, with both backends
 dial brief                  # the writing guide
 dial check some.phone       # contracts validate

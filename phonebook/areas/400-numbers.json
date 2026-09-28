@@ -1,7 +1,7 @@
 {
   "area": "400",
   "title": "Numbers",
-  "description": "Integer and floating-point arithmetic. int is 64-bit signed; bigint is exact up to 4000 decimal digits; float is IEEE 754 binary64, always finite, with no negative zero. DIV and MOD pin the two places Python and Rust disagree about negative operands; ROUND pins where they disagree about halves; TO_TEXT pins how a float prints.",
+  "description": "Integer, floating-point, bigint, decimal and fraction arithmetic. int is 64-bit signed; bigint is exact up to 4000 decimal digits; float is IEEE 754 binary64, always finite, with no negative zero; decimal is exact base 10; fraction is an exact ratio of two 64-bit integers, always in lowest terms. DIV and MOD pin the two places Python and Rust disagree about negative operands; ROUND pins where they disagree about halves; TO_TEXT pins how a float prints.",
   "entries": [
     {
       "address": "400-0000001",
@@ -1492,6 +1492,293 @@
         { "id": "close_to.negative_tolerance", "args": [0.1, 0.1, -1.0], "expect": false },
         { "id": "close_to.huge_gap", "args": [1.7976931348623157e308, -1.7976931348623157e308, 1e308], "expect": false }
       ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000080",
+      "name": "MAKE_FRACTION",
+      "summary": "Build an exact fraction from a numerator and a denominator",
+      "description": "The way into the fraction type. A fraction is an exact ratio of two 64-bit integers that never rounds: 1/3 stays 1/3.",
+      "keywords": ["fraction", "ratio", "rational", "exact", "divide", "make", "numerator", "denominator"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "numerator", "type": "int" },
+          { "name": "denominator", "type": "int" }
+        ],
+        "output": { "name": "result", "type": "fraction" },
+        "effects": [],
+        "errors": ["division_by_zero", "overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "EVERY FRACTION IS KEPT IN LOWEST TERMS WITH A POSITIVE DENOMINATOR. 2/4 becomes 1/2, 3/-6 becomes -1/2, and 0/5 becomes 0/1, so each value has exactly one form.",
+          "A zero denominator is a division_by_zero error.",
+          "The numerator and denominator of the lowest-terms form must each fit in a 64-bit signed integer, or it is an overflow error: -9223372036854775808 / -1 overflows.",
+          "This applies to every fraction address: the working is exact, and only the lowest-terms result has to fit."
+        ]
+      },
+      "examples": ["400-0000080@[1, 3] -> third"],
+      "conformance": [
+        { "id": "make_fraction.zero_denominator", "args": [1, 0], "expect": null, "raises": "division_by_zero" },
+        { "id": "make_fraction.overflow", "args": [-9223372036854775808, -1], "expect": null, "raises": "overflow" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000081",
+      "name": "ADD_FRACTION",
+      "summary": "Add two fractions exactly",
+      "keywords": ["add", "plus", "sum", "fraction", "exact", "rational"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "a", "type": "fraction" },
+          { "name": "b", "type": "fraction" }
+        ],
+        "output": { "name": "result", "type": "fraction" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Exact: 1/10 + 2/10 is 3/10. The result is in lowest terms and is an overflow error if that does not fit in 64 bits, as MAKE_FRACTION (400-0000080) says."]
+      },
+      "examples": ["400-0000081@[share, bonus] -> total"],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000082",
+      "name": "SUB_FRACTION",
+      "summary": "Subtract one fraction from another exactly",
+      "keywords": ["subtract", "minus", "difference", "fraction", "exact", "rational"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "a", "type": "fraction" },
+          { "name": "b", "type": "fraction" }
+        ],
+        "output": { "name": "result", "type": "fraction" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["a - b, exact. The result is in lowest terms and is an overflow error if that does not fit in 64 bits, as MAKE_FRACTION (400-0000080) says."]
+      },
+      "examples": ["400-0000082@[whole, eaten] -> left"],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000083",
+      "name": "MUL_FRACTION",
+      "summary": "Multiply two fractions exactly",
+      "keywords": ["multiply", "times", "product", "fraction", "exact", "rational", "scale"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "a", "type": "fraction" },
+          { "name": "b", "type": "fraction" }
+        ],
+        "output": { "name": "result", "type": "fraction" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Exact. The result is in lowest terms and is an overflow error if that does not fit in 64 bits, as MAKE_FRACTION (400-0000080) says."]
+      },
+      "examples": ["400-0000083@[price, share] -> cost"],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000084",
+      "name": "DIV_FRACTION",
+      "summary": "Divide one fraction by another exactly",
+      "keywords": ["divide", "division", "quotient", "ratio", "fraction", "exact", "rational"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "a", "type": "fraction" },
+          { "name": "b", "type": "fraction" }
+        ],
+        "output": { "name": "result", "type": "fraction" },
+        "effects": [],
+        "errors": ["division_by_zero", "overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "a / b, exact: nothing is truncated or rounded. 1/1 divided by 3/1 is 1/3.",
+          "Dividing by a zero fraction is a division_by_zero error.",
+          "The result is in lowest terms and is an overflow error if that does not fit in 64 bits, as MAKE_FRACTION (400-0000080) says."
+        ]
+      },
+      "examples": ["400-0000084@[total, parts] -> each"],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000085",
+      "name": "NEGATE_FRACTION",
+      "summary": "Flip the sign of a fraction",
+      "keywords": ["negate", "negative", "minus", "opposite", "flip sign", "fraction"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "fraction" }],
+        "output": { "name": "result", "type": "fraction" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["A fraction whose numerator is -9223372036854775808 has no positive twin in 64 bits, so negating it is an overflow error, as NEGATE (400-0000011) is for int."]
+      },
+      "examples": ["400-0000085@[change] -> reversed"],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000086",
+      "name": "ABS_FRACTION",
+      "summary": "The distance of a fraction from zero",
+      "keywords": ["abs", "absolute", "magnitude", "distance", "fraction"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "fraction" }],
+        "output": { "name": "result", "type": "fraction" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["A fraction whose numerator is -9223372036854775808 has no positive twin in 64 bits, so its absolute value is an overflow error, as ABS (400-0000010) is for int."]
+      },
+      "examples": ["400-0000086@[change] -> size"],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000087",
+      "name": "NUMERATOR",
+      "summary": "The top number of a fraction in lowest terms",
+      "keywords": ["numerator", "top", "fraction", "part", "rational"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "fraction" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Of the lowest-terms form, and it carries the sign: the numerator of MAKE_FRACTION(2, -4) is -1."]
+      },
+      "examples": ["400-0000087@[share] -> top"],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000088",
+      "name": "DENOMINATOR",
+      "summary": "The bottom number of a fraction in lowest terms",
+      "keywords": ["denominator", "bottom", "fraction", "part", "rational"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "fraction" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Of the lowest-terms form, so it is always at least 1: the denominator of MAKE_FRACTION(2, -4) is 2, and of a whole number it is 1."]
+      },
+      "examples": ["400-0000088@[share] -> bottom"],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000089",
+      "name": "FRACTION_TO_FLOAT",
+      "summary": "The float nearest to a fraction",
+      "keywords": ["float", "convert", "decimal", "approximate", "fraction", "to float"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "fraction" }],
+        "output": { "name": "result", "type": "float" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The exact value numerator / denominator, rounded once to the nearest float, ties to even. NOT float(numerator) / float(denominator), which rounds up to three times and can be one step off when either part is past 2^53.",
+          "Never fails: every fraction is between -2^63 and 2^63, so the float is finite. Zero is 0.0, never -0.0."
+        ]
+      },
+      "examples": ["400-0000089@[share] -> approx"],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000090",
+      "name": "FLOOR_FRACTION",
+      "summary": "The largest whole number not above a fraction",
+      "keywords": ["floor", "round down", "whole", "integer part", "fraction", "to int"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "fraction" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["ROUNDS TOWARD NEGATIVE INFINITY, not toward zero: 7/2 gives 3 and -7/2 gives -4. That is Python's //, and NOT Rust's /, which truncates. Never fails: the result is never further from zero than the numerator."]
+      },
+      "examples": ["400-0000090@[share] -> whole"],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000091",
+      "name": "ROUND_FRACTION",
+      "summary": "Round a fraction to the nearest whole number",
+      "keywords": ["round", "nearest", "whole", "integer", "fraction", "to int"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "fraction" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["HALVES GO AWAY FROM ZERO, as in ROUND (400-0000021): 5/2 gives 3 and -5/2 gives -3. Python's round() would give 2 and -2. Never fails: the result is never further from zero than the numerator."]
+      },
+      "examples": ["400-0000091@[share] -> nearest"],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000092",
+      "name": "PARSE_FRACTION",
+      "summary": "Read a fraction from text, or a fallback when it is not one",
+      "keywords": ["parse", "fraction", "ratio", "rational", "convert", "read number"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "value", "type": "text" },
+          { "name": "fallback", "type": "fraction" }
+        ],
+        "output": { "name": "parsed", "type": "fraction" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Never fails; unparseable text returns the fallback.",
+          "Accepts, after trimming surrounding whitespace: an optional '+' or '-', one or more ASCII digits, and optionally '/' followed by one or more ASCII digits. So '3', '-1/3' and '2/4' parse; '1 / 3', '1/-3', '1.5', '/3' and '1/' do not.",
+          "The numerator as written and the denominator as written must each fit in a 64-bit signed integer, and the denominator must not be zero; otherwise the fallback is returned.",
+          "The result is in lowest terms: '2/4' reads as 1/2. Whatever TO_TEXT (100-0000005) prints for a fraction reads back as the same fraction."
+        ]
+      },
+      "examples": ["400-0000092@[cell, zero] -> share"],
       "status": "active",
       "since": "0.2.0"
     }

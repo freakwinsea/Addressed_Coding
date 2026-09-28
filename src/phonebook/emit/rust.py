@@ -9,7 +9,7 @@ Two rules keep the borrow checker out of the contracts:
 
 The result clones more than hand-written Rust would. That is the honest cost of
 a registry that describes values rather than memory, and it is the reason the
-same 98 addresses can drive a garbage-collected backend and a borrow-checked
+same 111 addresses can drive a garbage-collected backend and a borrow-checked
 one without either leaking into the other.
 """
 
@@ -51,6 +51,8 @@ def rust_type(t: Type) -> str:
         return "rt::Decimal"
     if t.name == "float":
         return "f64"
+    if t.name == "fraction":
+        return "rt::numbers_::Fraction"
     if t.name == "bool":
         return "bool"
     if t.name == "unit":

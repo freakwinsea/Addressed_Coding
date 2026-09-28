@@ -103,7 +103,7 @@
       "description": "Produces the canonical text form of a value. This is the single rendering rule for the whole language; PRINT and PRINT_LINES defer to it.",
       "keywords": ["text", "string", "render", "convert", "stringify", "format", "to string"],
       "contract": {
-        "version": 4,
+        "version": 5,
         "inputs": [{ "name": "value", "type": "any" }],
         "output": { "name": "rendered", "type": "text" },
         "effects": [],
@@ -119,7 +119,8 @@
           "float renders as the shortest decimal digit string that reads back as the same float. If several strings of that length do, it is the closest to the float's exact value, and if two are equally close, the one whose last digit is even: 635057293855503.25 renders as '635057293855503.2'. With those digits d1 d2 ... dn and exponent E, so that the value is d1.d2...dn x 10^E: when -4 <= E < 16 it is written positionally with at least one digit after the point ('1.0', '0.0001', '123.45'); otherwise as d1, then '.' and the remaining digits if any, then 'e', a sign, and at least two exponent digits ('1e+16', '1.5e-05').",
           "That is exactly Python's repr() for a finite float, and NOT Rust's Display, which writes 1e16 as '10000000000000000' and 1.0 as '1'. There is no '-0.0', 'nan' or 'inf' to render: floats are finite and zero has one sign.",
           "bigint renders exactly as int does: base 10 with a leading '-' for negatives, and no suffix, so 12n renders as '12'.",
-          "decimal renders every digit it has, with the point as many digits from the right as its places and at least one digit before it, and no suffix: 0.30d renders as '0.30', -0.05d as '-0.05', and 12d as '12'. Never an exponent, and never '-0'."
+          "decimal renders every digit it has, with the point as many digits from the right as its places and at least one digit before it, and no suffix: 0.30d renders as '0.30', -0.05d as '-0.05', and 12d as '12'. Never an exponent, and never '-0'.",
+          "fraction renders in lowest terms as numerator, '/', denominator, with any '-' on the numerator: '1/3', '-5/2'. A whole fraction renders as its numerator alone: 4/2 renders as '2'."
         ]
       },
       "examples": ["100-0000005@[count] -> label"],

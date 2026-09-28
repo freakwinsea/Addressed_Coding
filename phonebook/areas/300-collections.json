@@ -98,7 +98,7 @@
       "summary": "Sort a list into ascending order",
       "keywords": ["sort", "order", "ascending", "arrange", "rank"],
       "contract": {
-        "version": 4,
+        "version": 5,
         "inputs": [{ "name": "sequence", "type": "list<T>" }],
         "output": { "name": "sorted", "type": "list<T>" },
         "constraints": { "T": "comparable" },
@@ -112,7 +112,8 @@
           "bool sorts false before true.",
           "float sorts numerically. Every float is finite and there is no negative zero, so the order is total.",
           "bigint sorts numerically.",
-          "decimal sorts numerically, by value: 0.3 and 0.30 are equal, so they keep their original order."
+          "decimal sorts numerically, by value: 0.3 and 0.30 are equal, so they keep their original order.",
+          "fraction sorts numerically by exact value: 1/3 before 1/2."
         ]
       },
       "examples": ["300-0000005@[names] -> ordered"],

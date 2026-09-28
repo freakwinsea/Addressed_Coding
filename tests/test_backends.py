@@ -55,6 +55,7 @@ def _latest():
         ("map<bigint,int>", "BTreeMap<rt::BigInt, i64>"),
         ("decimal", "rt::Decimal"),
         ("list<decimal>", "Vec<rt::Decimal>"),
+        ("fraction", "rt::numbers_::Fraction"),
         ("list<text>", "Vec<String>"),
         ("map<text,int>", "BTreeMap<String, i64>"),
         ("pair<text,int>", "(String, i64)"),
