@@ -843,6 +843,162 @@
       ],
       "status": "active",
       "since": "0.2.0"
+    },
+    {
+      "address": "400-0000032",
+      "name": "GCD",
+      "summary": "The greatest common divisor of two integers",
+      "keywords": ["gcd", "greatest common divisor", "common factor", "highest common factor", "hcf", "simplify", "reduce fraction"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }, { "name": "b", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The result is never negative: GCD(-12, 18) is 6. Signs of the inputs do not matter.",
+          "GCD(a, 0) is the absolute value of a, and GCD(0, 0) is 0.",
+          "When the true answer is 9223372036854775808 it does not fit, so it is an overflow error. That happens only when one input is the smallest 64-bit integer and the other is 0 or that same number. Python's math.gcd would return the bigger number; Rust's unsigned_abs would hold it but not convert back."
+        ]
+      },
+      "examples": ["400-0000032@[width, height] -> step"],
+      "conformance": [
+        { "id": "gcd.basic", "args": [12, 18], "expect": 6 },
+        { "id": "gcd.negative", "args": [-12, 18], "expect": 6 },
+        { "id": "gcd.both_negative", "args": [-12, -18], "expect": 6 },
+        { "id": "gcd.coprime", "args": [17, 5], "expect": 1 },
+        { "id": "gcd.with_zero", "args": [0, -7], "expect": 7 },
+        { "id": "gcd.zero_zero", "args": [0, 0], "expect": 0 },
+        { "id": "gcd.min_and_two", "args": [-9223372036854775808, 2], "expect": 2 },
+        { "id": "gcd.min_and_zero_overflows", "args": [-9223372036854775808, 0], "expect": null, "raises": "overflow" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000033",
+      "name": "LCM",
+      "summary": "The least common multiple of two integers",
+      "keywords": ["lcm", "least common multiple", "lowest common multiple", "common denominator", "multiple"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }, { "name": "b", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The result is never negative: LCM(-4, 6) is 12. Signs of the inputs do not matter.",
+          "LCM(a, 0) is 0 for every a, including LCM(0, 0).",
+          "Overflow is an error whenever the true answer does not fit in 64 bits. A backend must divide by the GCD before multiplying, so it never builds a product bigger than the answer."
+        ]
+      },
+      "examples": ["400-0000033@[every_a, every_b] -> together"],
+      "conformance": [
+        { "id": "lcm.basic", "args": [4, 6], "expect": 12 },
+        { "id": "lcm.negative", "args": [-4, 6], "expect": 12 },
+        { "id": "lcm.coprime", "args": [7, 5], "expect": 35 },
+        { "id": "lcm.with_zero", "args": [0, 9], "expect": 0 },
+        { "id": "lcm.zero_zero", "args": [0, 0], "expect": 0 },
+        { "id": "lcm.max_and_one", "args": [9223372036854775807, 1], "expect": 9223372036854775807 },
+        { "id": "lcm.overflows", "args": [9223372036854775807, 2], "expect": null, "raises": "overflow" },
+        { "id": "lcm.min_overflows", "args": [-9223372036854775808, 1], "expect": null, "raises": "overflow" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000034",
+      "name": "PRODUCT",
+      "summary": "Multiply together a list of integers",
+      "keywords": ["product", "multiply all", "times together", "factorial", "total product"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "values", "type": "list<int>" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "An empty list multiplies to 1.",
+          "Multiplied left to right, like SUM (400-0000008). Overflow is an error the moment a running product does not fit, even when a later 0 would have brought the answer back: PRODUCT([9223372036854775807, 2, 0]) is an overflow error, not 0."
+        ]
+      },
+      "examples": ["400-0000034@[factors] -> total"],
+      "conformance": [
+        { "id": "product.basic", "args": [[2, 3, 4]], "expect": 24 },
+        { "id": "product.empty", "args": [[]], "expect": 1 },
+        { "id": "product.negative", "args": [[-2, 3]], "expect": -6 },
+        { "id": "product.zero", "args": [[5, 0, 7]], "expect": 0 },
+        { "id": "product.overflows", "args": [[9223372036854775807, 2]], "expect": null, "raises": "overflow" },
+        { "id": "product.overflow_before_zero", "args": [[9223372036854775807, 2, 0]], "expect": null, "raises": "overflow" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000035",
+      "name": "IS_EVEN",
+      "summary": "Whether an integer is even",
+      "keywords": ["even", "is even", "divisible by two", "parity", "pairs"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }],
+        "output": { "name": "result", "type": "bool" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Negative numbers follow the same rule: -4 is even and -3 is not. Zero is even.",
+          "Never fails, including on the smallest 64-bit integer, which is even."
+        ]
+      },
+      "examples": ["400-0000035@[count] -> paired"],
+      "conformance": [
+        { "id": "is_even.even", "args": [4], "expect": true },
+        { "id": "is_even.odd", "args": [7], "expect": false },
+        { "id": "is_even.zero", "args": [0], "expect": true },
+        { "id": "is_even.negative_even", "args": [-4], "expect": true },
+        { "id": "is_even.negative_odd", "args": [-3], "expect": false },
+        { "id": "is_even.min", "args": [-9223372036854775808], "expect": true }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000036",
+      "name": "IS_ODD",
+      "summary": "Whether an integer is odd",
+      "keywords": ["odd", "is odd", "not divisible by two", "parity", "leftover"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }],
+        "output": { "name": "result", "type": "bool" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Negative numbers follow the same rule: -3 is odd. A backend must not test the remainder against 1, because Rust's -3 % 2 is -1.",
+          "Always the opposite of IS_EVEN (400-0000035). Never fails."
+        ]
+      },
+      "examples": ["400-0000036@[row] -> shaded"],
+      "conformance": [
+        { "id": "is_odd.odd", "args": [7], "expect": true },
+        { "id": "is_odd.even", "args": [4], "expect": false },
+        { "id": "is_odd.zero", "args": [0], "expect": false },
+        { "id": "is_odd.negative_odd", "args": [-3], "expect": true },
+        { "id": "is_odd.negative_even", "args": [-4], "expect": false },
+        { "id": "is_odd.max", "args": [9223372036854775807], "expect": true }
+      ],
+      "status": "active",
+      "since": "0.2.0"
     }
   ]
 }
