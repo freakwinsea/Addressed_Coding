@@ -20,14 +20,18 @@
 //!    already said how, and the code string here is the one from
 //!    `contract.errors`.
 
+pub mod bigint;
 pub mod collections_;
 pub mod core;
+pub mod decimal;
 pub mod io_;
 pub mod logic_;
 pub mod numbers_;
 pub mod text;
 
+pub use crate::bigint::BigInt;
 pub use crate::core::PbText;
+pub use crate::decimal::Decimal;
 
 /// Stop with a contracted failure.
 ///

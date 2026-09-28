@@ -23,7 +23,7 @@ from .nodes import (
     Ref,
     Selector,
 )
-from .types import BOOL, FLOAT, INT, TEXT, parse_type
+from .types import BIGINT, BOOL, DECIMAL, FLOAT, INT, TEXT, parse_type
 
 ADDRESS = r"[0-9]{3}-[0-9]{7}"
 SELECTOR = r"@(?:latest|contract:[0-9]+|impl:[0-9]+)"
@@ -40,6 +40,10 @@ PIN_RE = re.compile(rf"^pin\s+(?P<address>{ADDRESS})\s+(?P<selector>{SELECTOR})\
 HEADER_RE = re.compile(r"^phonebook\s+(?P<version>[0-9]+\.[0-9]+)\s*$")
 RETURN_RE = re.compile(r"^return\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*$")
 INT_RE = re.compile(r"^-?[0-9]+$")
+#: A bigint literal is an integer with an `n` suffix, as in JavaScript: `12n`.
+BIGINT_RE = re.compile(r"^-?[0-9]+n$")
+#: A decimal literal is digits, an optional fraction, and a `d` suffix: `0.10d`.
+DECIMAL_RE = re.compile(r"^-?[0-9]+(?:\.[0-9]+)?d$")
 #: Checked after INT_RE, so a float literal is a digit string with a fraction,
 #: an exponent, or both. The same shape PARSE_FLOAT accepts, minus the "+".
 FLOAT_RE = re.compile(r"^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$")
@@ -49,6 +53,12 @@ ADDRESS_RE = re.compile(rf"^{ADDRESS}$")
 # `int` is a 64-bit signed integer on every backend (SPEC: Rust `i64`).
 INT64_MIN = -(2**63)
 INT64_MAX = 2**63 - 1
+# `bigint` has no fixed width, but it does have a ceiling: at most 4000 decimal
+# digits (SPEC §3.2). The same ceiling every bigint address enforces.
+BIGINT_MAX_DIGITS = 4000
+# `decimal` shares that ceiling for its digits, and has at most 1000 of them
+# after the point (SPEC §3.3).
+DECIMAL_MAX_SCALE = 1000
 
 
 def parse_file(path: Path | str) -> Program:
@@ -74,6 +84,32 @@ class _Parser:
 
     def fail(self, message: str, line_no: int) -> None:
         raise ParseError(message, self.span(line_no))
+
+    def decimal_literal(self, text: str, line_no: int) -> str:
+        """Check a decimal literal (without its `d`) against the ceilings and
+        return it in canonical form: no leading zeros, and no sign on zero.
+
+        The value stays text. Each backend builds its own decimal from it, so
+        the toolchain never needs one of its own.
+        """
+        negative = text.startswith("-")
+        whole, _, fraction = text.lstrip("-").partition(".")
+        digits = (whole + fraction).lstrip("0")
+        if len(digits) > BIGINT_MAX_DIGITS:
+            self.fail(
+                f"decimal literal has {len(digits)} digits; "
+                f"the most a decimal can have is {BIGINT_MAX_DIGITS}",
+                line_no,
+            )
+        if len(fraction) > DECIMAL_MAX_SCALE:
+            self.fail(
+                f"decimal literal has {len(fraction)} digits after the point; "
+                f"the most a decimal can have is {DECIMAL_MAX_SCALE}",
+                line_no,
+            )
+        whole = whole.lstrip("0") or "0"
+        sign = "-" if negative and digits else ""
+        return sign + whole + ("." + fraction if fraction else "")
 
     # -- driver ----------------------------------------------------------
 
@@ -250,6 +286,19 @@ class _Parser:
                     line_no,
                 )
             return Literal(value, INT, label)
+        if BIGINT_RE.match(text):
+            digits = text[:-1].lstrip("-").lstrip("0")
+            if len(digits) > BIGINT_MAX_DIGITS:
+                self.fail(
+                    f"bigint literal has {len(digits)} digits; "
+                    f"the most a bigint can have is {BIGINT_MAX_DIGITS}",
+                    line_no,
+                )
+            value = int(text[:-1])
+            # Zero has one sign here too: -0n is 0n.
+            return Literal(value, BIGINT, label)
+        if DECIMAL_RE.match(text):
+            return Literal(self.decimal_literal(text[:-1], line_no), DECIMAL, label)
         if FLOAT_RE.match(text):
             value = float(text)
             if not math.isfinite(value):

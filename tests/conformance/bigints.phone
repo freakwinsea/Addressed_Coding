@@ -1,0 +1,104 @@
+phonebook 0.1
+
+# bigint is an exact whole number of up to 4000 decimal digits. Python's int
+# already is one; Rust has none, so the Rust runtime carries its own. This
+# file is where the two have to agree: carries across limb boundaries, the
+# signs of DIV_BIG and MOD_BIG, the edges of int, and the ceiling itself.
+
+ext 000-0000001 TIMES (acc: bigint, n: int) -> bigint {
+  400-0000023@[n]         -> wide
+  400-0000027@[acc, wide] -> next
+  return next
+}
+
+# Literals carry an n suffix and print without it.
+100-0000001@[0n]
+100-0000001@[-0n]                                  # zero has one sign
+100-0000001@[123456789012345678901234567890n]
+100-0000001@[-999999999999999999999999999999n]
+
+# Past the ends of int, where ADD would have been an overflow error.
+400-0000023@[9223372036854775807] -> top          # TO_BIG
+400-0000025@[top, 1n] -> past_top                  # ADD_BIG
+100-0000001@[past_top]
+400-0000023@[-9223372036854775808] -> bottom
+400-0000026@[bottom, 1n] -> past_bottom            # SUB_BIG
+100-0000001@[past_bottom]
+400-0000027@[top, top] -> top_squared              # MUL_BIG
+100-0000001@[top_squared]
+400-0000024@[bottom] -> back                       # BIG_TO_INT, fits exactly
+100-0000001@[back]
+
+# Carries and borrows across the 10^9 limbs the Rust runtime uses.
+400-0000025@[999999999999999999n, 1n] -> carry
+100-0000001@[carry]
+400-0000026@[1000000000000000000n, 1n] -> borrow
+100-0000001@[borrow]
+400-0000026@[5n, 12345678901234567890n] -> flips
+100-0000001@[flips]
+400-0000025@[-12345678901234567890n, 12345678901234567890n] -> cancels
+100-0000001@[cancels]
+
+# DIV_BIG truncates toward zero and MOD_BIG takes the dividend's sign, the
+# same as DIV and MOD. Python's // and % would disagree on every negative row.
+400-0000028@[-7n, 2n] -> q1
+100-0000001@[q1]
+400-0000029@[-7n, 2n] -> r1
+100-0000001@[r1]
+400-0000028@[7n, -2n] -> q2
+100-0000001@[q2]
+400-0000029@[7n, -2n] -> r2
+100-0000001@[r2]
+400-0000028@[-123456789012345678901234567890n, 987654321987654321n] -> q3
+100-0000001@[q3]
+400-0000029@[-123456789012345678901234567890n, 987654321987654321n] -> r3
+100-0000001@[r3]
+400-0000027@[q3, 987654321987654321n] -> q3b
+400-0000025@[q3b, r3] -> rebuilt                   # a == q*b + r
+100-0000001@[rebuilt]
+400-0000028@[3n, 5n] -> q4                         # smaller dividend -> 0
+100-0000001@[q4]
+
+# POW_BIG, and a factorial built with REDUCE.
+400-0000030@[2n, 100] -> two_100
+100-0000001@[two_100]
+400-0000030@[-3n, 41] -> odd_power
+100-0000001@[odd_power]
+400-0000030@[1n, 9223372036854775807] -> one
+100-0000001@[one]
+300-0000001@[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30] -> ns
+300-0000004@[ns, 000-0000001, 1n] -> factorial_30
+100-0000001@[factorial_30]
+
+# The ceiling: 10^3999 has exactly 4000 digits and is allowed.
+400-0000030@[10n, 3999] -> ceiling
+400-0000026@[ceiling, 1n] -> nines                 # 3999 nines
+400-0000028@[ceiling, nines] -> just_one
+100-0000001@[just_one]
+100-0000005@[ceiling] -> ceiling_text
+200-0000011@[ceiling_text] -> ceiling_digits       # LENGTH
+100-0000001@[ceiling_digits]
+
+# PARSE_BIG: the PARSE_INT grammar, with leading zeros not counting.
+400-0000031@["  -42 ", 0n] -> p1
+100-0000001@[p1]
+400-0000031@["+000000000000000000000000000000000012", 0n] -> p2
+100-0000001@[p2]
+400-0000031@["1_000", -1n] -> p3
+100-0000001@[p3]
+400-0000031@[ceiling_text, 0n] -> p4              # all 4000 digits
+600-0000004@[p4, ceiling] -> same                  # EQUALS
+100-0000001@[same]
+
+# bigint is comparable and keyable: it sorts, compares and counts like int.
+300-0000001@[5n, -123456789012345678901n, 0n, 123456789012345678901n, -1n] -> mixed
+300-0000005@[mixed] -> sorted                      # SORT
+100-0000001@[sorted]
+600-0000005@[-123456789012345678902n, -123456789012345678901n] -> less
+100-0000001@[less]
+600-0000006@[1000000000n, 999999999n] -> greater
+100-0000001@[greater]
+300-0000001@[past_top, 1n, past_top, carry, 1n, past_top] -> repeats
+300-0000012@[repeats] -> tallies                   # COUNT_OCCURRENCES
+300-0000013@[tallies] -> pairs                     # ENTRIES, sorted by key
+100-0000001@[pairs]

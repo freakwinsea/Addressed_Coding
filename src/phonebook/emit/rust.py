@@ -9,7 +9,7 @@ Two rules keep the borrow checker out of the contracts:
 
 The result clones more than hand-written Rust would. That is the honest cost of
 a registry that describes values rather than memory, and it is the reason the
-same 72 addresses can drive a garbage-collected backend and a borrow-checked
+same 111 addresses can drive a garbage-collected backend and a borrow-checked
 one without either leaking into the other.
 """
 
@@ -45,6 +45,10 @@ def rust_type(t: Type) -> str:
         return "String"
     if t.name == "int":
         return "i64"
+    if t.name == "bigint":
+        return "rt::BigInt"
+    if t.name == "decimal":
+        return "rt::Decimal"
     if t.name == "float":
         return "f64"
     if t.name == "fraction":
@@ -172,7 +176,11 @@ class _Emitter:
             return f"rt::{implementation.runtime}"
 
         if isinstance(arg, Literal):
-            if isinstance(arg.value, bool):
+            if arg.type.name == "decimal":
+                # Read from its digits, as a bigint is. The parser already
+                # checked them against both ceilings.
+                rendered = f'rt::Decimal::literal("{arg.value}")'
+            elif isinstance(arg.value, bool):
                 rendered = "true" if arg.value else "false"
             elif isinstance(arg.value, str):
                 rendered = json.dumps(arg.value, ensure_ascii=False) + ".to_string()"
@@ -181,8 +189,17 @@ class _Emitter:
                 # reads it the same way; the suffix keeps `1e+16` from being
                 # left to inference.
                 rendered = f"{arg.value!r}f64"
-            else:
+            elif arg.type.name == "bigint":
+                # Rust has no literal wider than i128, so a bigint is read from
+                # its digits. The parser already checked they fit the ceiling.
+                rendered = f'rt::BigInt::literal("{arg.value}")'
+            elif -(2**31) <= arg.value < 2**31:
                 rendered = str(arg.value)
+            else:
+                # A generic call whose arguments are all literals leaves Rust
+                # to infer the integer type, and it picks i32. That is harmless
+                # inside the i32 range and a compile error outside it.
+                rendered = f"{arg.value}i64"
         elif isinstance(arg, Ref):
             rendered = names[arg.name]
             if clone:

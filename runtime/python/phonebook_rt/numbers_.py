@@ -1,4 +1,4 @@
-"""Area 400 — integer, floating-point and fraction arithmetic.
+"""Area 400 — integer, floating-point, bigint, decimal and fraction arithmetic.
 
 Two functions here exist purely to override Python's defaults. `DIV` must
 truncate toward zero, so it cannot use `//`; `MOD` must take the sign of the
@@ -18,6 +18,7 @@ from __future__ import annotations
 import math
 import re
 
+from .decimal_ import MAX_SCALE, Decimal, divide_rounded
 from .faults import PhonebookFault
 
 INT64_MIN = -(2**63)
@@ -300,6 +301,269 @@ def _layout(digits: str, exponent: int) -> str:
     mantissa = digits[0] + ("." + digits[1:] if len(digits) > 1 else "")
     sign = "+" if exponent >= 0 else "-"
     return f"{mantissa}e{sign}{abs(exponent):02d}"
+
+
+# --------------------------------------------------------------------------
+# bigints
+# --------------------------------------------------------------------------
+#
+# A bigint is a Python int, so the arithmetic is the host's own and exact. What
+# the contract adds is the ceiling: at most BIGINT_MAX_DIGITS decimal digits.
+# The ceiling is compared against a power of ten, never by counting the digits
+# of a string, because Python refuses to turn an int of more than 4300 digits
+# into text at all.
+
+BIGINT_MAX_DIGITS = 4000
+_BIGINT_LIMIT = 10**BIGINT_MAX_DIGITS
+
+
+def _checked_big(value: int, operation: str) -> int:
+    """Every bigint result passes through here."""
+    if -_BIGINT_LIMIT < value < _BIGINT_LIMIT:
+        return value
+    raise PhonebookFault(
+        "overflow", f"{operation} result has more than {BIGINT_MAX_DIGITS} digits"
+    )
+
+
+def to_big(value: int) -> int:
+    """400-0000023 TO_BIG — every int is a bigint; this never fails."""
+    return value
+
+
+def big_to_int(value: int) -> int:
+    """400-0000024 BIG_TO_INT — overflow outside the 64-bit range, never wraps."""
+    if value < INT64_MIN or value > INT64_MAX:
+        raise PhonebookFault("overflow", "BIG_TO_INT value does not fit in a 64-bit signed integer")
+    return value
+
+
+def add_big(a: int, b: int) -> int:
+    """400-0000025 ADD_BIG."""
+    return _checked_big(a + b, "ADD_BIG")
+
+
+def sub_big(a: int, b: int) -> int:
+    """400-0000026 SUB_BIG."""
+    return _checked_big(a - b, "SUB_BIG")
+
+
+def mul_big(a: int, b: int) -> int:
+    """400-0000027 MUL_BIG."""
+    return _checked_big(a * b, "MUL_BIG")
+
+
+def div_big(a: int, b: int) -> int:
+    """400-0000028 DIV_BIG — truncates toward zero, as DIV does. NOT `//`."""
+    if b == 0:
+        raise PhonebookFault("division_by_zero", "DIV_BIG by zero")
+    quotient = abs(a) // abs(b)
+    return -quotient if (a < 0) != (b < 0) else quotient
+
+
+def mod_big(a: int, b: int) -> int:
+    """400-0000029 MOD_BIG — sign of the dividend, as MOD does. NOT `%`."""
+    if b == 0:
+        raise PhonebookFault("division_by_zero", "MOD_BIG by zero")
+    remainder = abs(a) % abs(b)
+    return -remainder if a < 0 else remainder
+
+
+def pow_big(base: int, exponent: int) -> int:
+    """400-0000030 POW_BIG — the same square-and-multiply as POW.
+
+    NOT `**`, which would build a number of any size before anything checked
+    it. Here every step is checked against the ceiling, so no intermediate is
+    ever more than twice the ceiling's digits.
+    """
+    if exponent < 0:
+        raise PhonebookFault("negative_exponent", f"POW_BIG exponent {exponent} is negative")
+    result = 1
+    while exponent > 0:
+        if exponent & 1:
+            result = _checked_big(result * base, "POW_BIG")
+        exponent >>= 1
+        if exponent > 0:
+            base = _checked_big(base * base, "POW_BIG")
+    return result
+
+
+def parse_big(value: str, fallback: int) -> int:
+    """400-0000031 PARSE_BIG — never fails; unparseable text yields the fallback.
+
+    Leading zeros are dropped before the digits are counted or converted, so
+    "000...0001" is 1 however many zeros it has, and `int()` never sees more
+    digits than the ceiling (it would refuse past 4300).
+    """
+    candidate = value.strip(WHITESPACE)
+    if not _INT.match(candidate):
+        return fallback
+    negative = candidate[0] == "-"
+    digits = candidate.lstrip("+-").lstrip("0")
+    if len(digits) > BIGINT_MAX_DIGITS:
+        return fallback
+    parsed = int(digits) if digits else 0
+    return -parsed if negative else parsed
+
+
+# --------------------------------------------------------------------------
+# decimals
+# --------------------------------------------------------------------------
+#
+# The type itself is in decimal_.py. What the functions below add is the
+# contract around it: which scale a result has, the one rounding rule (halves
+# away from zero, as ROUND), and the ceilings, which every result that can grow
+# passes through `Decimal.checked` to meet.
+
+
+def _checked_places(places: int, operation: str) -> int:
+    if places < 0 or places > MAX_SCALE:
+        raise PhonebookFault(
+            "invalid_places", f"{operation} places {places} is not between 0 and {MAX_SCALE}"
+        )
+    return places
+
+
+def to_dec(value: int) -> Decimal:
+    """400-0000040 TO_DEC — an int as a decimal with no places; never fails."""
+    return Decimal(value, 0)
+
+
+def big_to_dec(value: int) -> Decimal:
+    """400-0000041 BIG_TO_DEC — a bigint as a decimal with no places; never fails."""
+    return Decimal(value, 0)
+
+
+def dec_to_int(value: Decimal) -> int:
+    """400-0000042 DEC_TO_INT — truncates toward zero, as TO_INT does."""
+    whole = abs(value.coefficient) // 10**value.scale
+    whole = -whole if value.coefficient < 0 else whole
+    if whole < INT64_MIN or whole > INT64_MAX:
+        raise PhonebookFault("overflow", "DEC_TO_INT value does not fit in a 64-bit signed integer")
+    return whole
+
+
+def add_dec(a: Decimal, b: Decimal) -> Decimal:
+    """400-0000043 ADD_DEC — the result has the larger of the two scales."""
+    scale = max(a.scale, b.scale)
+    return Decimal(a.rescaled(scale) + b.rescaled(scale), scale).checked("ADD_DEC")
+
+
+def sub_dec(a: Decimal, b: Decimal) -> Decimal:
+    """400-0000044 SUB_DEC — the result has the larger of the two scales."""
+    scale = max(a.scale, b.scale)
+    return Decimal(a.rescaled(scale) - b.rescaled(scale), scale).checked("SUB_DEC")
+
+
+def mul_dec(a: Decimal, b: Decimal) -> Decimal:
+    """400-0000045 MUL_DEC — exact; the scales add, so 1.5 x 0.25 is 0.375."""
+    return Decimal(a.coefficient * b.coefficient, a.scale + b.scale).checked("MUL_DEC")
+
+
+def div_dec(a: Decimal, b: Decimal, places: int) -> Decimal:
+    """400-0000046 DIV_DEC — the exact quotient, rounded once to `places`.
+
+    a / b = (ca / 10^sa) / (cb / 10^sb), so the quotient at `places` places is
+    ca * 10^(sb + places) / (cb * 10^sa), rounded to a whole number. Both
+    exponents are never negative, so nothing is rounded before that division.
+    """
+    _checked_places(places, "DIV_DEC")
+    if b.coefficient == 0:
+        raise PhonebookFault("division_by_zero", "DIV_DEC by zero")
+    numerator = a.coefficient * 10 ** (b.scale + places)
+    denominator = b.coefficient * 10**a.scale
+    if denominator < 0:
+        numerator, denominator = -numerator, -denominator
+    return Decimal(divide_rounded(numerator, denominator), places).checked("DIV_DEC")
+
+
+def round_dec(value: Decimal, places: int) -> Decimal:
+    """400-0000047 ROUND_DEC — to exactly `places` places, halves away from zero.
+
+    Fewer places than the value has rounds; more pads with zeros, so
+    ROUND_DEC(5, 2) is 5.00. NOT `round()`, which sends halves to even.
+    """
+    _checked_places(places, "ROUND_DEC")
+    return Decimal(value.rescaled(places), places).checked("ROUND_DEC")
+
+
+def parse_dec(value: str, fallback: Decimal) -> Decimal:
+    """400-0000048 PARSE_DEC — never fails; unparseable text yields the fallback."""
+    parsed = Decimal.parse(value.strip(WHITESPACE))
+    return fallback if parsed is None else parsed
+
+
+def dec_to_float(value: Decimal) -> float:
+    """400-0000049 DEC_TO_FLOAT — the nearest float, ties to even.
+
+    `float()` of the decimal's own text is correctly rounded however many
+    digits it has, as Rust's `str::parse::<f64>` is, so both backends read the
+    same digits the same way.
+    """
+    return _finite(float(value.text()), "DEC_TO_FLOAT")
+
+
+def float_to_dec(value: float) -> Decimal:
+    """400-0000050 FLOAT_TO_DEC — the float's shortest digits, as TO_TEXT
+    prints them, never its exact binary value: 0.1 is 0.1, not
+    0.1000000000000000055511151231257827021181583404541015625.
+
+    With digits d1...dn and exponent E, the value is d1...dn x 10^(E-n+1).
+    A float has at most 17 significant digits and E is between -324 and 308,
+    so the result is always inside both ceilings.
+    """
+    digits, exponent = _shortest_digits(abs(value))
+    power = exponent - len(digits) + 1
+    coefficient = int(digits)
+    if value < 0:
+        coefficient = -coefficient
+    if power >= 0:
+        return Decimal(coefficient * 10**power, 0)
+    return Decimal(coefficient, -power)
+
+
+# --------------------------------------------------------------------------
+# comparisons
+# --------------------------------------------------------------------------
+
+
+def number_equals(a, b) -> bool:
+    """400-0000060 NUMBER_EQUALS — exact, floats included."""
+    return a == b
+
+
+def number_not_equals(a, b) -> bool:
+    """400-0000061 NUMBER_NOT_EQUALS."""
+    return a != b
+
+
+def less_or_equal(a, b) -> bool:
+    """400-0000062 LESS_OR_EQUAL."""
+    return a <= b
+
+
+def greater_or_equal(a, b) -> bool:
+    """400-0000063 GREATER_OR_EQUAL."""
+    return a >= b
+
+
+def compare(a, b) -> int:
+    """400-0000064 COMPARE — exactly -1, 0, or 1."""
+    if a < b:
+        return -1
+    if a > b:
+        return 1
+    return 0
+
+
+def close_to(a: float, b: float, tolerance: float) -> bool:
+    """400-0000065 CLOSE_TO — absolute tolerance, edge included.
+
+    A difference too large to be finite comes out as infinity, which no
+    tolerance reaches, and a negative tolerance is below every difference.
+    Neither needs its own branch.
+    """
+    return abs(a - b) <= tolerance
 
 
 # --------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 {
   "area": "400",
   "title": "Numbers",
-  "description": "Integer, floating-point and fraction arithmetic. int is 64-bit signed; float is IEEE 754 binary64, always finite, with no negative zero; fraction is an exact ratio of two 64-bit integers, always in lowest terms. DIV and MOD pin the two places Python and Rust disagree about negative operands; ROUND pins where they disagree about halves; TO_TEXT pins how a float prints.",
+  "description": "Integer, floating-point, bigint, decimal and fraction arithmetic. int is 64-bit signed; bigint is exact up to 4000 decimal digits; float is IEEE 754 binary64, always finite, with no negative zero; decimal is exact base 10; fraction is an exact ratio of two 64-bit integers, always in lowest terms. DIV and MOD pin the two places Python and Rust disagree about negative operands; ROUND pins where they disagree about halves; TO_TEXT pins how a float prints.",
   "entries": [
     {
       "address": "400-0000001",
@@ -599,6 +599,252 @@
       "since": "0.2.0"
     },
     {
+      "address": "400-0000023",
+      "name": "TO_BIG",
+      "summary": "Widen an int to a bigint",
+      "keywords": ["bigint", "big", "widen", "convert", "promote", "arbitrary precision"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "int" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Every int is a bigint, so this never fails and never changes the value.",
+          "int and bigint never mix: ADD takes two ints and ADD_BIG takes two bigints. This is how an int crosses over."
+        ]
+      },
+      "examples": ["400-0000023@[count] -> big_count"],
+      "conformance": [
+        { "id": "to_big.positive", "args": [42], "expect": 42 },
+        { "id": "to_big.min", "args": [-9223372036854775808], "expect": -9223372036854775808 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000024",
+      "name": "BIG_TO_INT",
+      "summary": "Narrow a bigint to an int",
+      "keywords": ["bigint", "int", "narrow", "convert", "fit"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "bigint" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "A value outside the 64-bit signed range is an overflow error. It never wraps or saturates."
+        ]
+      },
+      "examples": ["400-0000024@[total] -> small_total"],
+      "conformance": [
+        { "id": "big_to_int.fits", "args": [-9223372036854775808], "expect": -9223372036854775808 },
+        { "id": "big_to_int.too_big", "args": [9223372036854775808], "expect": null, "raises": "overflow" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000025",
+      "name": "ADD_BIG",
+      "summary": "Add two bigints",
+      "keywords": ["add", "plus", "sum", "bigint", "big", "arbitrary precision"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "bigint" }, { "name": "b", "type": "bigint" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "bigint is an exact whole number of up to 4000 decimal digits. There is no rounding and no wrapping.",
+          "A result with more than 4000 decimal digits is an overflow error. Every bigint address that can grow checks this, so Python and Rust fail at exactly the same place."
+        ]
+      },
+      "examples": ["400-0000025@[a, b] -> total"],
+      "conformance": [
+        { "id": "add_big.past_int64", "args": [9223372036854775807, 1], "expect": 9223372036854775808 },
+        { "id": "add_big.opposite_signs", "args": [-5, 3], "expect": -2 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000026",
+      "name": "SUB_BIG",
+      "summary": "Subtract the second bigint from the first",
+      "keywords": ["subtract", "minus", "difference", "bigint", "big"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "bigint" }, { "name": "b", "type": "bigint" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "A result with more than 4000 decimal digits is an overflow error. Every bigint address that can grow checks this, so Python and Rust fail at exactly the same place.",
+          "Zero has one sign: 5 - 5 is 0, never -0."
+        ]
+      },
+      "examples": ["400-0000026@[a, b] -> difference"],
+      "conformance": [
+        { "id": "sub_big.below_int64", "args": [-9223372036854775808, 1], "expect": -9223372036854775809 },
+        { "id": "sub_big.to_zero", "args": [5, 5], "expect": 0 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000027",
+      "name": "MUL_BIG",
+      "summary": "Multiply two bigints",
+      "keywords": ["multiply", "times", "product", "bigint", "big"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "bigint" }, { "name": "b", "type": "bigint" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "A result with more than 4000 decimal digits is an overflow error. Every bigint address that can grow checks this, so Python and Rust fail at exactly the same place."
+        ]
+      },
+      "examples": ["400-0000027@[a, b] -> product"],
+      "conformance": [
+        { "id": "mul_big.past_int64", "args": [4294967296, 4294967296], "expect": 18446744073709551616 },
+        { "id": "mul_big.signs", "args": [-3, 7], "expect": -21 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000028",
+      "name": "DIV_BIG",
+      "summary": "Divide one bigint by another, truncating toward zero",
+      "keywords": ["divide", "quotient", "bigint", "big"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "bigint" }, { "name": "b", "type": "bigint" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": ["division_by_zero"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "TRUNCATES TOWARD ZERO, exactly as DIV (400-0000004) does: -7 / 2 is -3, not -4. A Python backend must NOT use //.",
+          "The quotient is never larger than the dividend, so this cannot overflow."
+        ]
+      },
+      "examples": ["400-0000028@[total, parts] -> share"],
+      "conformance": [
+        { "id": "div_big.truncates", "args": [-7, 2], "expect": -3 },
+        { "id": "div_big.large", "args": [1000000000000000000000000000000, 1000000000000], "expect": 1000000000000000000 },
+        { "id": "div_big.by_zero", "args": [1, 0], "expect": null, "raises": "division_by_zero" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000029",
+      "name": "MOD_BIG",
+      "summary": "Remainder of dividing one bigint by another",
+      "keywords": ["modulo", "remainder", "mod", "bigint", "big"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "bigint" }, { "name": "b", "type": "bigint" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": ["division_by_zero"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "SIGN OF THE DIVIDEND, exactly as MOD (400-0000005) does: -7 mod 2 is -1, not 1. A Python backend must NOT use %.",
+          "Consistent with DIV_BIG (400-0000028) so that a == DIV_BIG(a,b)*b + MOD_BIG(a,b)."
+        ]
+      },
+      "examples": ["400-0000029@[total, parts] -> left_over"],
+      "conformance": [
+        { "id": "mod_big.dividend_sign", "args": [-7, 2], "expect": -1 },
+        { "id": "mod_big.large", "args": [1000000000000000000000000000007, 1000000000000], "expect": 7 },
+        { "id": "mod_big.by_zero", "args": [1, 0], "expect": null, "raises": "division_by_zero" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000030",
+      "name": "POW_BIG",
+      "summary": "Raise a bigint to a whole-number power",
+      "keywords": ["pow", "power", "exponent", "raise", "bigint", "big", "factorial"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "base", "type": "bigint" }, { "name": "exponent", "type": "int" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": ["negative_exponent", "overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "POW_BIG(x, 0) is 1 for every x, including POW_BIG(0, 0).",
+          "A negative exponent is an error, not a fraction.",
+          "Overflow is an error exactly when the true result has more than 4000 decimal digits. POW_BIG(10, 3999) fits; POW_BIG(10, 4000) does not.",
+          "A backend must not build an intermediate of more than 8000 digits before noticing an overflow: the exponent is an int, and 2 to the power 2^62 would never finish."
+        ]
+      },
+      "examples": ["400-0000030@[base, 100] -> huge"],
+      "conformance": [
+        { "id": "pow_big.past_int64", "args": [2, 64], "expect": 18446744073709551616 },
+        { "id": "pow_big.zero_zero", "args": [0, 0], "expect": 1 },
+        { "id": "pow_big.negative_base", "args": [-3, 3], "expect": -27 },
+        { "id": "pow_big.ceiling_overflows", "args": [10, 4000], "expect": null, "raises": "overflow" },
+        { "id": "pow_big.one_huge_exponent", "args": [1, 9223372036854775807], "expect": 1 },
+        { "id": "pow_big.two_huge_exponent", "args": [2, 9223372036854775807], "expect": null, "raises": "overflow" },
+        { "id": "pow_big.negative_exponent", "args": [2, -1], "expect": null, "raises": "negative_exponent" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000031",
+      "name": "PARSE_BIG",
+      "summary": "Read a bigint from text, with a fallback",
+      "keywords": ["parse", "read", "convert", "text to number", "bigint", "big"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }, { "name": "fallback", "type": "bigint" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Never fails; unparseable text returns the fallback.",
+          "The same grammar as PARSE_INT (400-0000009): optional leading '-' or '+' then ASCII digits, with surrounding whitespace trimmed first. Underscores, other digit systems, and other bases are rejected.",
+          "Leading zeros do not count toward the 4000-digit ceiling. More than 4000 digits after them returns the fallback."
+        ]
+      },
+      "examples": ["400-0000031@[cell, 0n] -> amount"],
+      "conformance": [
+        { "id": "parse_big.past_int64", "args": [" 123456789012345678901234567890 ", 0], "expect": 123456789012345678901234567890 },
+        { "id": "parse_big.negative", "args": ["-42", 0], "expect": -42 },
+        { "id": "parse_big.plus", "args": ["+7", 0], "expect": 7 },
+        { "id": "parse_big.leading_zeros", "args": ["000000000000000000000000000001", 0], "expect": 1 },
+        { "id": "parse_big.junk", "args": ["12x", -1], "expect": -1 },
+        { "id": "parse_big.underscores", "args": ["1_000", -1], "expect": -1 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
       "address": "400-0000032",
       "name": "GCD",
       "summary": "The greatest common divisor of two integers",
@@ -750,6 +996,501 @@
         { "id": "is_odd.negative_odd", "args": [-3], "expect": true },
         { "id": "is_odd.negative_even", "args": [-4], "expect": false },
         { "id": "is_odd.max", "args": [9223372036854775807], "expect": true }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000040",
+      "name": "TO_DEC",
+      "summary": "Widen an int to a decimal",
+      "keywords": ["decimal", "dec", "widen", "convert", "money", "exact"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "int" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The result has no places: 12 becomes 12, not 12.0. ROUND_DEC (400-0000047) gives it places.",
+          "Never fails and never changes the value.",
+          "int and decimal never mix: ADD takes two ints and ADD_DEC takes two decimals. This is how an int crosses over."
+        ]
+      },
+      "examples": ["400-0000040@[count] -> amount"],
+      "conformance": [
+        { "id": "to_dec.positive", "args": [42], "expect": "42" },
+        { "id": "to_dec.min", "args": [-9223372036854775808], "expect": "-9223372036854775808" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000041",
+      "name": "BIG_TO_DEC",
+      "summary": "Widen a bigint to a decimal",
+      "keywords": ["decimal", "dec", "bigint", "big", "widen", "convert"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "bigint" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The result has no places. Never fails: a bigint has at most 4000 digits, and so may a decimal."
+        ]
+      },
+      "examples": ["400-0000041@[total] -> amount"],
+      "conformance": [
+        { "id": "big_to_dec.past_int64", "args": [123456789012345678901234567890], "expect": "123456789012345678901234567890" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000042",
+      "name": "DEC_TO_INT",
+      "summary": "Drop a decimal's fractional part to get an int",
+      "keywords": ["decimal", "int", "integer", "truncate", "convert", "whole"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "decimal" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "TRUNCATES TOWARD ZERO, as TO_INT (400-0000020) does: 2.9 is 2 and -2.9 is -2. Use ROUND_DEC with 0 places first for nearest.",
+          "A value whose truncation does not fit a 64-bit signed integer is an overflow error. It never wraps or saturates."
+        ]
+      },
+      "examples": ["400-0000042@[price] -> whole"],
+      "conformance": [
+        { "id": "dec_to_int.truncates", "args": ["2.99"], "expect": 2 },
+        { "id": "dec_to_int.negative_truncates", "args": ["-2.99"], "expect": -2 },
+        { "id": "dec_to_int.overflow", "args": ["9223372036854775808.5"], "expect": null, "raises": "overflow" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000043",
+      "name": "ADD_DEC",
+      "summary": "Add two decimals exactly",
+      "keywords": ["add", "plus", "sum", "decimal", "money", "exact", "currency"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "decimal" }, { "name": "b", "type": "decimal" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "decimal is an exact base-10 number: a whole-number coefficient and a scale, the count of digits after the point. 0.10 + 0.20 is exactly 0.30.",
+          "The result's scale is the larger of the two: 1.5 + 0.25 is 1.75, and 0.10 + 0.20 is 0.30, never 0.3.",
+          "A result with more than 4000 digits, or more than 1000 of them after the point, is an overflow error. Every decimal address that can grow checks this."
+        ]
+      },
+      "examples": ["400-0000043@[price, tax] -> total"],
+      "conformance": [
+        { "id": "add_dec.exact", "args": ["0.10", "0.20"], "expect": "0.30" },
+        { "id": "add_dec.scales", "args": ["1.5", "0.25"], "expect": "1.75" },
+        { "id": "add_dec.to_zero", "args": ["-1.50", "1.5"], "expect": "0.00" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000044",
+      "name": "SUB_DEC",
+      "summary": "Subtract the second decimal from the first, exactly",
+      "keywords": ["subtract", "minus", "difference", "decimal", "money", "change"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "decimal" }, { "name": "b", "type": "decimal" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The result's scale is the larger of the two: 1 - 0.01 is 0.99.",
+          "A result with more than 4000 digits, or more than 1000 of them after the point, is an overflow error.",
+          "Zero has one sign: 0.5 - 0.5 is 0.0, never -0.0."
+        ]
+      },
+      "examples": ["400-0000044@[paid, price] -> change"],
+      "conformance": [
+        { "id": "sub_dec.borrow", "args": ["1", "0.01"], "expect": "0.99" },
+        { "id": "sub_dec.no_negative_zero", "args": ["0.5", "0.5"], "expect": "0.0" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000045",
+      "name": "MUL_DEC",
+      "summary": "Multiply two decimals exactly",
+      "keywords": ["multiply", "times", "product", "decimal", "money", "exact"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "decimal" }, { "name": "b", "type": "decimal" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "EXACT: nothing is rounded. The scales add, so 1.5 x 0.25 is 0.375 and 19.99 x 3 is 59.97. Use ROUND_DEC (400-0000047) to get back to a number of places.",
+          "A result with more than 4000 digits, or more than 1000 of them after the point, is an overflow error."
+        ]
+      },
+      "examples": ["400-0000045@[price, quantity] -> line_total"],
+      "conformance": [
+        { "id": "mul_dec.scales_add", "args": ["1.5", "0.25"], "expect": "0.375" },
+        { "id": "mul_dec.money", "args": ["19.99", "3"], "expect": "59.97" },
+        { "id": "mul_dec.signs", "args": ["-0.5", "-0.5"], "expect": "0.25" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000046",
+      "name": "DIV_DEC",
+      "summary": "Divide two decimals, rounded to a number of places",
+      "description": "Most quotients have no exact decimal form (1 / 3), so this address takes the number of places to keep and rounds once, halves away from zero, as ROUND does.",
+      "keywords": ["divide", "division", "quotient", "decimal", "money", "split", "share"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "a", "type": "decimal" },
+          { "name": "b", "type": "decimal" },
+          { "name": "places", "type": "int" }
+        ],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": ["division_by_zero", "invalid_places", "overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The exact quotient a / b, rounded ONCE to exactly `places` digits after the point. HALVES AWAY FROM ZERO: 1 / 8 to 2 places is 0.13, and -1 / 8 is -0.13.",
+          "The result always has `places` places, even when the quotient is exact: 1 / 4 to 3 places is 0.250.",
+          "`places` must be between 0 and 1000, or it is an invalid_places error. A zero divisor is a division_by_zero error.",
+          "A result with more than 4000 digits is an overflow error."
+        ]
+      },
+      "examples": ["400-0000046@[bill, people, 2] -> each"],
+      "conformance": [
+        { "id": "div_dec.third", "args": ["1", "3", 4], "expect": "0.3333" },
+        { "id": "div_dec.half_away", "args": ["1", "8", 2], "expect": "0.13" },
+        { "id": "div_dec.half_away_negative", "args": ["-1", "8", 2], "expect": "-0.13" },
+        { "id": "div_dec.pads", "args": ["1", "4", 3], "expect": "0.250" },
+        { "id": "div_dec.scales", "args": ["10.00", "0.4", 1], "expect": "25.0" },
+        { "id": "div_dec.by_zero", "args": ["1", "0.00", 2], "expect": null, "raises": "division_by_zero" },
+        { "id": "div_dec.negative_places", "args": ["1", "3", -1], "expect": null, "raises": "invalid_places" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000047",
+      "name": "ROUND_DEC",
+      "summary": "Round a decimal to a number of places, halves away from zero",
+      "description": "Sets a decimal's places: fewer rounds, more pads with zeros. Rounding is pinned to halves away from zero, the same as ROUND (400-0000021), NOT Python's round() or decimal default, which send halves to even.",
+      "keywords": ["round", "places", "decimal", "money", "cents", "precision", "scale"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "decimal" }, { "name": "places", "type": "int" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": ["invalid_places", "overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The result has exactly `places` digits after the point. HALVES AWAY FROM ZERO: 2.345 to 2 places is 2.35, -2.345 is -2.35, and 2.5 to 0 places is 3.",
+          "More places than the value has pads with zeros, exactly: 5 to 2 places is 5.00.",
+          "`places` must be between 0 and 1000, or it is an invalid_places error.",
+          "Rounding can add a digit (9.99 to 1 place is 10.0), so a result with more than 4000 digits is an overflow error.",
+          "NO NEGATIVE ZERO: -0.004 to 2 places is 0.00."
+        ]
+      },
+      "examples": ["400-0000047@[total, 2] -> cents"],
+      "conformance": [
+        { "id": "round_dec.half_away", "args": ["2.345", 2], "expect": "2.35" },
+        { "id": "round_dec.half_away_negative", "args": ["-2.345", 2], "expect": "-2.35" },
+        { "id": "round_dec.not_to_even", "args": ["2.5", 0], "expect": "3" },
+        { "id": "round_dec.pads", "args": ["5", 2], "expect": "5.00" },
+        { "id": "round_dec.carries", "args": ["9.99", 1], "expect": "10.0" },
+        { "id": "round_dec.no_negative_zero", "args": ["-0.004", 2], "expect": "0.00" },
+        { "id": "round_dec.too_many_places", "args": ["1", 1001], "expect": null, "raises": "invalid_places" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000048",
+      "name": "PARSE_DEC",
+      "summary": "Read a decimal from text, with a fallback",
+      "keywords": ["parse", "read", "convert", "text to number", "decimal", "money", "price"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }, { "name": "fallback", "type": "decimal" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Never fails; unparseable text returns the fallback.",
+          "Grammar: optional leading '-' or '+', ASCII digits, then optionally '.' and more ASCII digits, with surrounding whitespace trimmed first. '.5', '5.', exponents, underscores and thousands separators are rejected.",
+          "The places are kept as written: '1.50' is 1.50, not 1.5.",
+          "Leading zeros do not count toward the 4000-digit ceiling. More than 4000 digits after them, or more than 1000 after the point, returns the fallback."
+        ]
+      },
+      "examples": ["400-0000048@[cell, 0.00d] -> price"],
+      "conformance": [
+        { "id": "parse_dec.keeps_places", "args": [" 1.50 ", "0"], "expect": "1.50" },
+        { "id": "parse_dec.negative", "args": ["-0.05", "0"], "expect": "-0.05" },
+        { "id": "parse_dec.plus_and_zeros", "args": ["+007", "0"], "expect": "7" },
+        { "id": "parse_dec.bare_point", "args": [".5", "-1"], "expect": "-1" },
+        { "id": "parse_dec.exponent", "args": ["1e5", "-1"], "expect": "-1" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000049",
+      "name": "DEC_TO_FLOAT",
+      "summary": "Convert a decimal to the nearest float",
+      "keywords": ["decimal", "float", "convert", "approximate"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "decimal" }],
+        "output": { "name": "result", "type": "float" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The float nearest the decimal's exact value, ties to even, the way PARSE_FLOAT reads its digits. 0.1 becomes the float that prints as 0.1.",
+          "A value too large to be a finite float is an overflow error. A value too small becomes 0.0, never -0.0."
+        ]
+      },
+      "examples": ["400-0000049@[price] -> approximate"],
+      "conformance": [
+        { "id": "dec_to_float.tenth", "args": ["0.1"], "expect": 0.1 },
+        { "id": "dec_to_float.places", "args": ["2.50"], "expect": 2.5 },
+        { "id": "dec_to_float.no_negative_zero", "args": ["-0.00"], "expect": 0.0 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000050",
+      "name": "FLOAT_TO_DEC",
+      "summary": "Convert a float to the decimal it prints as",
+      "keywords": ["float", "decimal", "convert", "exact"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "float" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The result is the float's SHORTEST DIGITS, the ones TO_TEXT prints, never its exact binary value: 0.1 becomes 0.1, not 0.1000000000000000055511151231257827021181583404541015625.",
+          "With those digits d1...dn and exponent E, the result is d1...dn x 10^(E-n+1), with no places when that power is not negative: 2.5 is 2.5, 100.0 is 100, and 1e+16 is 10000000000000000.",
+          "Never fails: a float has at most 17 significant digits and E is between -324 and 308, inside both decimal ceilings."
+        ]
+      },
+      "examples": ["400-0000050@[measured] -> exact"],
+      "conformance": [
+        { "id": "float_to_dec.tenth", "args": [0.1], "expect": "0.1" },
+        { "id": "float_to_dec.whole", "args": [100.0], "expect": "100" },
+        { "id": "float_to_dec.negative", "args": [-1.5e-05], "expect": "-0.000015" },
+        { "id": "float_to_dec.large", "args": [1e16], "expect": "10000000000000000" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000060",
+      "name": "NUMBER_EQUALS",
+      "summary": "True when two numbers of the same type are equal",
+      "keywords": ["equals", "equal", "same", "number", "float", "eq", "=="],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
+        "output": { "name": "result", "type": "bool" },
+        "constraints": { "T": "numeric" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Both arguments have the same type: an int is never compared with a float.",
+          "EXACT. For floats this is equality of the binary value, so 0.1 + 0.2 does not equal 0.3. Use CLOSE_TO (400-0000065) for computed floats.",
+          "There is one zero and no NaN, so every float equals itself and nothing else is equal to it."
+        ]
+      },
+      "examples": ["400-0000060@[count, 0] -> none_left"],
+      "conformance": [
+        { "id": "number_equals.ints", "args": [3, 3], "expect": true },
+        { "id": "number_equals.ints_differ", "args": [3, -3], "expect": false },
+        { "id": "number_equals.floats", "args": [0.5, 0.5], "expect": true },
+        { "id": "number_equals.floats_differ", "args": [0.30000000000000004, 0.3], "expect": false }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000061",
+      "name": "NUMBER_NOT_EQUALS",
+      "summary": "True when two numbers of the same type are different",
+      "keywords": ["not equal", "different", "differs", "number", "ne", "!="],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
+        "output": { "name": "result", "type": "bool" },
+        "constraints": { "T": "numeric" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": ["Exactly the opposite of NUMBER_EQUALS (400-0000060), with the same exactness for floats."]
+      },
+      "examples": ["400-0000061@[remainder, 0] -> uneven"],
+      "conformance": [
+        { "id": "number_not_equals.ints", "args": [3, 4], "expect": true },
+        { "id": "number_not_equals.same", "args": [3, 3], "expect": false },
+        { "id": "number_not_equals.floats", "args": [0.30000000000000004, 0.3], "expect": true }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000062",
+      "name": "LESS_OR_EQUAL",
+      "summary": "True when the first number is less than or equal to the second",
+      "keywords": ["less or equal", "at most", "no more than", "le", "<=", "up to"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
+        "output": { "name": "result", "type": "bool" },
+        "constraints": { "T": "numeric" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Numeric order, the same order as LESS_THAN (600-0000005). Both arguments have the same type.",
+          "True exactly when LESS_THAN(a, b) or NUMBER_EQUALS(a, b) is true."
+        ]
+      },
+      "examples": ["400-0000062@[age, 12] -> child_price"],
+      "conformance": [
+        { "id": "less_or_equal.less", "args": [1, 2], "expect": true },
+        { "id": "less_or_equal.equal", "args": [2, 2], "expect": true },
+        { "id": "less_or_equal.greater", "args": [3, 2], "expect": false },
+        { "id": "less_or_equal.floats", "args": [-0.5, -0.25], "expect": true }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000063",
+      "name": "GREATER_OR_EQUAL",
+      "summary": "True when the first number is greater than or equal to the second",
+      "keywords": ["greater or equal", "at least", "no less than", "ge", ">=", "not below"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
+        "output": { "name": "result", "type": "bool" },
+        "constraints": { "T": "numeric" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Numeric order, the same order as GREATER_THAN (600-0000006). Both arguments have the same type.",
+          "True exactly when GREATER_THAN(a, b) or NUMBER_EQUALS(a, b) is true."
+        ]
+      },
+      "examples": ["400-0000063@[age, 18] -> is_adult"],
+      "conformance": [
+        { "id": "greater_or_equal.greater", "args": [3, 2], "expect": true },
+        { "id": "greater_or_equal.equal", "args": [2, 2], "expect": true },
+        { "id": "greater_or_equal.less", "args": [1, 2], "expect": false },
+        { "id": "greater_or_equal.floats", "args": [1e16, 1e15], "expect": true }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000064",
+      "name": "COMPARE",
+      "summary": "Compare two numbers: -1 if the first is smaller, 0 if equal, 1 if larger",
+      "keywords": ["compare", "cmp", "order", "three way", "spaceship", "which is bigger"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
+        "output": { "name": "result", "type": "int" },
+        "constraints": { "T": "numeric" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Returns exactly -1, 0, or 1, never another negative or positive number. Never fails.",
+          "Numeric order, the same order as LESS_THAN (600-0000005). 0 means NUMBER_EQUALS (400-0000060) is true.",
+          "Python has no cmp() and Rust's cmp returns an Ordering, not a number; the contract picks the integers."
+        ]
+      },
+      "examples": ["400-0000064@[score, target] -> direction"],
+      "conformance": [
+        { "id": "compare.less", "args": [-5, 7], "expect": -1 },
+        { "id": "compare.equal", "args": [7, 7], "expect": 0 },
+        { "id": "compare.greater", "args": [9223372036854775807, -9223372036854775808], "expect": 1 },
+        { "id": "compare.floats", "args": [0.1, 0.10000000000000002], "expect": -1 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000065",
+      "name": "CLOSE_TO",
+      "summary": "True when two floats are within a tolerance of each other",
+      "keywords": ["close", "near", "approximately", "almost equal", "within", "tolerance", "isclose"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "float" }, { "name": "b", "type": "float" }, { "name": "tolerance", "type": "float" }],
+        "output": { "name": "result", "type": "bool" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "ABSOLUTE tolerance: true when |a - b| <= tolerance, with a - b rounded to the nearest float. Not Python's math.isclose, which is relative by default.",
+          "The tolerance is included, so a tolerance of 0.0 is exact equality.",
+          "A negative tolerance is never met: the result is false. Never fails.",
+          "When a - b is too large to be finite the two are not close: the result is false, not an overflow error."
+        ]
+      },
+      "examples": ["400-0000065@[total, 0.3, 1e-9] -> about_right"],
+      "conformance": [
+        { "id": "close_to.rounding", "args": [0.30000000000000004, 0.3, 1e-9], "expect": true },
+        { "id": "close_to.far", "args": [1.0, 1.5, 0.25], "expect": false },
+        { "id": "close_to.edge_included", "args": [1.0, 1.5, 0.5], "expect": true },
+        { "id": "close_to.zero_tolerance", "args": [0.1, 0.1, 0.0], "expect": true },
+        { "id": "close_to.negative_tolerance", "args": [0.1, 0.1, -1.0], "expect": false },
+        { "id": "close_to.huge_gap", "args": [1.7976931348623157e308, -1.7976931348623157e308, 1e308], "expect": false }
       ],
       "status": "active",
       "since": "0.2.0"

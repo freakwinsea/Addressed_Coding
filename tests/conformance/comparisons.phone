@@ -1,0 +1,49 @@
+phonebook 0.1
+
+# Number comparisons, for int and float. Python and Rust agree on the hardware
+# answer; what this file pins is the edges: the smallest and largest int64,
+# float equality being exact, COMPARE returning exactly -1/0/1, and CLOSE_TO's
+# tolerance being absolute with the edge included.
+
+# NUMBER_EQUALS and NUMBER_NOT_EQUALS. 0.1 + 0.2 is not 0.3, and both
+# backends must say so.
+400-0000015@[0.1, 0.2] -> sum
+400-0000060@[sum, 0.3] -> exact
+100-0000001@[exact]
+400-0000061@[sum, 0.3] -> differs
+100-0000001@[differs]
+400-0000060@[-9223372036854775808, -9223372036854775808] -> same_min
+100-0000001@[same_min]
+400-0000060@[0.0, -0.0] -> zeros                # zero has one sign
+100-0000001@[zeros]
+
+# LESS_OR_EQUAL and GREATER_OR_EQUAL include the edge.
+400-0000062@[5, 5] -> le_equal
+100-0000001@[le_equal]
+400-0000062@[9223372036854775807, -9223372036854775808] -> le_extremes
+100-0000001@[le_extremes]
+400-0000063@[-1.5, -1.5] -> ge_equal
+100-0000001@[ge_equal]
+400-0000063@[1e-300, 0.0] -> ge_tiny
+100-0000001@[ge_tiny]
+
+# COMPARE is exactly -1, 0 or 1, however far apart the two are.
+400-0000064@[-9223372036854775808, 9223372036854775807] -> c1
+100-0000001@[c1]
+400-0000064@[42, 42] -> c2
+100-0000001@[c2]
+400-0000064@[1.7976931348623157e308, -1.7976931348623157e308] -> c3
+100-0000001@[c3]
+400-0000064@[sum, 0.3] -> c4
+100-0000001@[c4]
+
+# CLOSE_TO: absolute tolerance, edge included, negative never met, and a
+# difference too large to be finite is not close rather than an error.
+400-0000065@[sum, 0.3, 1e-9] -> near
+100-0000001@[near]
+400-0000065@[1.0, 1.5, 0.5] -> edge
+100-0000001@[edge]
+400-0000065@[1.0, 1.0, -1.0] -> negative
+100-0000001@[negative]
+400-0000065@[1.7976931348623157e308, -1.7976931348623157e308, 1.7976931348623157e308] -> huge
+100-0000001@[huge]

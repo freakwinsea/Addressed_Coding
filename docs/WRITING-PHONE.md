@@ -110,6 +110,7 @@ match what the address wants:
 |---|---|---|
 | `FILTER` | `callable(T)->bool` | one param, returns `bool` |
 | `MAP` | `callable(T)->R` | one param, returns anything |
+| `SORT_BY` | `callable(T)->K` | one param, returns `int`/`bigint`/`float`/`decimal`/`text`/`bool` |
 | `SORT_BY` | `callable(T)->K` | one param, returns `int`/`float`/`fraction`/`text`/`bool` |
 | `REDUCE` | `callable(A,T)->A` | **two** params: accumulator first, item second |
 
@@ -120,6 +121,7 @@ is the normal answer.
 ## 4. Types
 
 ```
+int   bigint   float   decimal   bool   text   unit
 int   float   fraction   bool   text   unit
 list<T>   map<K,V>   pair<K,V>   callable(T,...)->R   any
 ```
@@ -129,6 +131,9 @@ list<T>   map<K,V>   pair<K,V>   callable(T,...)->R   any
 - `map<K,V>` comes from `READ_CSV` (one map per row) and `COUNT_OCCURRENCES`.
 - Generic variables (`T`, `K`, `V`, `A`, `R`) are resolved from your arguments.
 - Some addresses require a *comparable* or *keyable* type. Comparable is `int`,
+  `bigint`, `float`, `decimal`, `text`, or `bool`; keyable is the same without
+  `float` and `decimal`. You cannot sort a list of lists, and you cannot use a
+  float or a decimal as a map key or in `EQUALS`.
   `float`, `fraction`, `text`, or `bool`; keyable is the same without `float`.
   You cannot sort a list of lists, and you cannot use a float as a map key or
   in `EQUALS`.
@@ -136,6 +141,16 @@ list<T>   map<K,V>   pair<K,V>   callable(T,...)->R   any
   write `2.0`, not `2`, where a float is wanted. Cross with `TO_FLOAT` and
   `TO_INT` (which truncates; use `ROUND` first for nearest).
 - Floats are always finite. Dividing by zero is an error, not infinity.
+- **`bigint` is for whole numbers too big for `int`** (past about 9.2e18), up
+  to 4000 digits. Write it with an `n`: `12n`. It has its own addresses
+  (`ADD_BIG`, `MUL_BIG`, `POW_BIG`, ...) and never mixes with `int`; cross with
+  `TO_BIG` and `BIG_TO_INT`.
+- **`decimal` is for exact amounts with a point**, such as money: `0.10d` plus
+  `0.20d` is exactly `0.30`. Write it with a `d`: `19.99d`, `-0.05d`, `3d`. It
+  keeps its places (`0.30`, not `0.3`) and has its own addresses (`ADD_DEC`,
+  `MUL_DEC`, `ROUND_DEC`, ...). `DIV_DEC` and `ROUND_DEC` take the number of
+  places to keep and round halves away from zero. Cross with `TO_DEC`,
+  `BIG_TO_DEC`, `DEC_TO_INT`, `DEC_TO_FLOAT` and `FLOAT_TO_DEC`.
   For money, whole cents in an `int` are still the exact choice.
 - **`fraction` is exact**: `1/3` stays `1/3`. There is no fraction literal;
   build one with `MAKE_FRACTION@[1, 3]` or `PARSE_FRACTION`. It is its own
@@ -238,6 +253,8 @@ ext 000-0000006 TALLY_OF (entry: pair<text,int>) -> int {
 | Using `IS_EMPTY` on a list | it takes `text`; use `COUNT` and compare to 0 |
 | Expecting `PARSE_INT` to fail | it takes a fallback and always succeeds |
 | Mixing `int` and `float` | convert with `TO_FLOAT` / `TO_INT` |
+| Mixing `int` and `bigint` | convert with `TO_BIG` / `BIG_TO_INT`; write big literals as `12n` |
+| Money as `float` | use `decimal`: write `19.99d`, add with `ADD_DEC`, round with `ROUND_DEC` |
 | Writing `1/3` as a literal | `MAKE_FRACTION@[1, 3] -> third` |
 | Comparing floats with `EQUALS` | not allowed; use `LESS_THAN` / `GREATER_THAN` |
 | An `ext` you never call | delete it, or use it |
@@ -314,6 +331,12 @@ backend languages would otherwise disagree. Read those.
                Rust's Display, which writes 1e16 as '10000000000000000' and
                1.0 as '1'. There is no '-0.0', 'nan' or 'inf' to render:
                floats are finite and zero has one sign.
+             ! bigint renders exactly as int does: base 10 with a leading '-'
+               for negatives, and no suffix, so 12n renders as '12'.
+             ! decimal renders every digit it has, with the point as many
+               digits from the right as its places and at least one digit
+               before it, and no suffix: 0.30d renders as '0.30', -0.05d as
+               '-0.05', and 12d as '12'. Never an exponent, and never '-0'.
              ! fraction renders in lowest terms as numerator, '/',
                denominator, with any '-' on the numerator: '1/3', '-5/2'. A
                whole fraction renders as its numerator alone: 4/2 renders as
@@ -441,6 +464,9 @@ b
              ! bool sorts false before true.
              ! float sorts numerically. Every float is finite and there is no
                negative zero, so the order is total.
+             ! bigint sorts numerically.
+             ! decimal sorts numerically, by value: 0.3 and 0.30 are equal,
+               so they keep their original order.
              ! fraction sorts numerically by exact value: 1/3 before 1/2.
 
 300-0000006  SORT_BY(sequence: list<T>, key: callable(T)->K, descending: bool) -> list<T>
@@ -660,6 +686,81 @@ b
              ! A value too large to be finite returns the fallback. A value
                too small to represent is 0.0. '-0' is 0.0.
 
+400-0000023  TO_BIG(value: int) -> bigint
+             Widen an int to a bigint
+             ! Every int is a bigint, so this never fails and never changes
+               the value.
+             ! int and bigint never mix: ADD takes two ints and ADD_BIG takes
+               two bigints. This is how an int crosses over.
+
+400-0000024  BIG_TO_INT(value: bigint) -> int
+             Narrow a bigint to an int
+             ! A value outside the 64-bit signed range is an overflow error.
+               It never wraps or saturates.
+             errors: overflow
+
+400-0000025  ADD_BIG(a: bigint, b: bigint) -> bigint
+             Add two bigints
+             ! bigint is an exact whole number of up to 4000 decimal digits.
+               There is no rounding and no wrapping.
+             ! A result with more than 4000 decimal digits is an overflow
+               error. Every bigint address that can grow checks this, so
+               Python and Rust fail at exactly the same place.
+             errors: overflow
+
+400-0000026  SUB_BIG(a: bigint, b: bigint) -> bigint
+             Subtract the second bigint from the first
+             ! A result with more than 4000 decimal digits is an overflow
+               error. Every bigint address that can grow checks this, so
+               Python and Rust fail at exactly the same place.
+             ! Zero has one sign: 5 - 5 is 0, never -0.
+             errors: overflow
+
+400-0000027  MUL_BIG(a: bigint, b: bigint) -> bigint
+             Multiply two bigints
+             ! A result with more than 4000 decimal digits is an overflow
+               error. Every bigint address that can grow checks this, so
+               Python and Rust fail at exactly the same place.
+             errors: overflow
+
+400-0000028  DIV_BIG(a: bigint, b: bigint) -> bigint
+             Divide one bigint by another, truncating toward zero
+             ! TRUNCATES TOWARD ZERO, exactly as DIV (400-0000004) does: -7 /
+               2 is -3, not -4. A Python backend must NOT use //.
+             ! The quotient is never larger than the dividend, so this cannot
+               overflow.
+             errors: division_by_zero
+
+400-0000029  MOD_BIG(a: bigint, b: bigint) -> bigint
+             Remainder of dividing one bigint by another
+             ! SIGN OF THE DIVIDEND, exactly as MOD (400-0000005) does: -7
+               mod 2 is -1, not 1. A Python backend must NOT use %.
+             ! Consistent with DIV_BIG (400-0000028) so that a ==
+               DIV_BIG(a,b)*b + MOD_BIG(a,b).
+             errors: division_by_zero
+
+400-0000030  POW_BIG(base: bigint, exponent: int) -> bigint
+             Raise a bigint to a whole-number power
+             ! POW_BIG(x, 0) is 1 for every x, including POW_BIG(0, 0).
+             ! A negative exponent is an error, not a fraction.
+             ! Overflow is an error exactly when the true result has more
+               than 4000 decimal digits. POW_BIG(10, 3999) fits; POW_BIG(10,
+               4000) does not.
+             ! A backend must not build an intermediate of more than 8000
+               digits before noticing an overflow: the exponent is an int,
+               and 2 to the power 2^62 would never finish.
+             errors: negative_exponent, overflow
+
+400-0000031  PARSE_BIG(value: text, fallback: bigint) -> bigint
+             Read a bigint from text, with a fallback
+             ! Never fails; unparseable text returns the fallback.
+             ! The same grammar as PARSE_INT (400-0000009): optional leading
+               '-' or '+' then ASCII digits, with surrounding whitespace
+               trimmed first. Underscores, other digit systems, and other
+               bases are rejected.
+             ! Leading zeros do not count toward the 4000-digit ceiling. More
+               than 4000 digits after them returns the fallback.
+
 400-0000032  GCD(a: int, b: int) -> int
              The greatest common divisor of two integers
              ! The result is never negative: GCD(-12, 18) is 6. Signs of the
@@ -705,6 +806,166 @@ b
                must not test the remainder against 1, because Rust's -3 % 2
                is -1.
              ! Always the opposite of IS_EVEN (400-0000035). Never fails.
+
+400-0000040  TO_DEC(value: int) -> decimal
+             Widen an int to a decimal
+             ! The result has no places: 12 becomes 12, not 12.0. ROUND_DEC
+               (400-0000047) gives it places.
+             ! Never fails and never changes the value.
+             ! int and decimal never mix: ADD takes two ints and ADD_DEC
+               takes two decimals. This is how an int crosses over.
+
+400-0000041  BIG_TO_DEC(value: bigint) -> decimal
+             Widen a bigint to a decimal
+             ! The result has no places. Never fails: a bigint has at most
+               4000 digits, and so may a decimal.
+
+400-0000042  DEC_TO_INT(value: decimal) -> int
+             Drop a decimal's fractional part to get an int
+             ! TRUNCATES TOWARD ZERO, as TO_INT (400-0000020) does: 2.9 is 2
+               and -2.9 is -2. Use ROUND_DEC with 0 places first for nearest.
+             ! A value whose truncation does not fit a 64-bit signed integer
+               is an overflow error. It never wraps or saturates.
+             errors: overflow
+
+400-0000043  ADD_DEC(a: decimal, b: decimal) -> decimal
+             Add two decimals exactly
+             ! decimal is an exact base-10 number: a whole-number coefficient
+               and a scale, the count of digits after the point. 0.10 + 0.20
+               is exactly 0.30.
+             ! The result's scale is the larger of the two: 1.5 + 0.25 is
+               1.75, and 0.10 + 0.20 is 0.30, never 0.3.
+             ! A result with more than 4000 digits, or more than 1000 of them
+               after the point, is an overflow error. Every decimal address
+               that can grow checks this.
+             errors: overflow
+
+400-0000044  SUB_DEC(a: decimal, b: decimal) -> decimal
+             Subtract the second decimal from the first, exactly
+             ! The result's scale is the larger of the two: 1 - 0.01 is 0.99.
+             ! A result with more than 4000 digits, or more than 1000 of them
+               after the point, is an overflow error.
+             ! Zero has one sign: 0.5 - 0.5 is 0.0, never -0.0.
+             errors: overflow
+
+400-0000045  MUL_DEC(a: decimal, b: decimal) -> decimal
+             Multiply two decimals exactly
+             ! EXACT: nothing is rounded. The scales add, so 1.5 x 0.25 is
+               0.375 and 19.99 x 3 is 59.97. Use ROUND_DEC (400-0000047) to
+               get back to a number of places.
+             ! A result with more than 4000 digits, or more than 1000 of them
+               after the point, is an overflow error.
+             errors: overflow
+
+400-0000046  DIV_DEC(a: decimal, b: decimal, places: int) -> decimal
+             Divide two decimals, rounded to a number of places
+             ! The exact quotient a / b, rounded ONCE to exactly `places`
+               digits after the point. HALVES AWAY FROM ZERO: 1 / 8 to 2
+               places is 0.13, and -1 / 8 is -0.13.
+             ! The result always has `places` places, even when the quotient
+               is exact: 1 / 4 to 3 places is 0.250.
+             ! `places` must be between 0 and 1000, or it is an
+               invalid_places error. A zero divisor is a division_by_zero
+               error.
+             ! A result with more than 4000 digits is an overflow error.
+             errors: division_by_zero, invalid_places, overflow
+
+400-0000047  ROUND_DEC(value: decimal, places: int) -> decimal
+             Round a decimal to a number of places, halves away from zero
+             ! The result has exactly `places` digits after the point. HALVES
+               AWAY FROM ZERO: 2.345 to 2 places is 2.35, -2.345 is -2.35,
+               and 2.5 to 0 places is 3.
+             ! More places than the value has pads with zeros, exactly: 5 to
+               2 places is 5.00.
+             ! `places` must be between 0 and 1000, or it is an
+               invalid_places error.
+             ! Rounding can add a digit (9.99 to 1 place is 10.0), so a
+               result with more than 4000 digits is an overflow error.
+             ! NO NEGATIVE ZERO: -0.004 to 2 places is 0.00.
+             errors: invalid_places, overflow
+
+400-0000048  PARSE_DEC(value: text, fallback: decimal) -> decimal
+             Read a decimal from text, with a fallback
+             ! Never fails; unparseable text returns the fallback.
+             ! Grammar: optional leading '-' or '+', ASCII digits, then
+               optionally '.' and more ASCII digits, with surrounding
+               whitespace trimmed first. '.5', '5.', exponents, underscores
+               and thousands separators are rejected.
+             ! The places are kept as written: '1.50' is 1.50, not 1.5.
+             ! Leading zeros do not count toward the 4000-digit ceiling. More
+               than 4000 digits after them, or more than 1000 after the
+               point, returns the fallback.
+
+400-0000049  DEC_TO_FLOAT(value: decimal) -> float
+             Convert a decimal to the nearest float
+             ! The float nearest the decimal's exact value, ties to even, the
+               way PARSE_FLOAT reads its digits. 0.1 becomes the float that
+               prints as 0.1.
+             ! A value too large to be a finite float is an overflow error. A
+               value too small becomes 0.0, never -0.0.
+             errors: overflow
+
+400-0000050  FLOAT_TO_DEC(value: float) -> decimal
+             Convert a float to the decimal it prints as
+             ! The result is the float's SHORTEST DIGITS, the ones TO_TEXT
+               prints, never its exact binary value: 0.1 becomes 0.1, not
+               0.1000000000000000055511151231257827021181583404541015625.
+             ! With those digits d1...dn and exponent E, the result is
+               d1...dn x 10^(E-n+1), with no places when that power is not
+               negative: 2.5 is 2.5, 100.0 is 100, and 1e+16 is
+               10000000000000000.
+             ! Never fails: a float has at most 17 significant digits and E
+               is between -324 and 308, inside both decimal ceilings.
+
+400-0000060  NUMBER_EQUALS(a: T, b: T) -> bool
+             True when two numbers of the same type are equal
+             ! Both arguments have the same type: an int is never compared
+               with a float.
+             ! EXACT. For floats this is equality of the binary value, so 0.1
+               + 0.2 does not equal 0.3. Use CLOSE_TO (400-0000065) for
+               computed floats.
+             ! There is one zero and no NaN, so every float equals itself and
+               nothing else is equal to it.
+
+400-0000061  NUMBER_NOT_EQUALS(a: T, b: T) -> bool
+             True when two numbers of the same type are different
+             ! Exactly the opposite of NUMBER_EQUALS (400-0000060), with the
+               same exactness for floats.
+
+400-0000062  LESS_OR_EQUAL(a: T, b: T) -> bool
+             True when the first number is less than or equal to the second
+             ! Numeric order, the same order as LESS_THAN (600-0000005). Both
+               arguments have the same type.
+             ! True exactly when LESS_THAN(a, b) or NUMBER_EQUALS(a, b) is
+               true.
+
+400-0000063  GREATER_OR_EQUAL(a: T, b: T) -> bool
+             True when the first number is greater than or equal to the second
+             ! Numeric order, the same order as GREATER_THAN (600-0000006).
+               Both arguments have the same type.
+             ! True exactly when GREATER_THAN(a, b) or NUMBER_EQUALS(a, b) is
+               true.
+
+400-0000064  COMPARE(a: T, b: T) -> int
+             Compare two numbers: -1 if the first is smaller, 0 if equal, 1 if larger
+             ! Returns exactly -1, 0, or 1, never another negative or
+               positive number. Never fails.
+             ! Numeric order, the same order as LESS_THAN (600-0000005). 0
+               means NUMBER_EQUALS (400-0000060) is true.
+             ! Python has no cmp() and Rust's cmp returns an Ordering, not a
+               number; the contract picks the integers.
+
+400-0000065  CLOSE_TO(a: float, b: float, tolerance: float) -> bool
+             True when two floats are within a tolerance of each other
+             ! ABSOLUTE tolerance: true when |a - b| <= tolerance, with a - b
+               rounded to the nearest float. Not Python's math.isclose, which
+               is relative by default.
+             ! The tolerance is included, so a tolerance of 0.0 is exact
+               equality.
+             ! A negative tolerance is never met: the result is false. Never
+               fails.
+             ! When a - b is too large to be finite the two are not close:
+               the result is false, not an overflow error.
 
 400-0000080  MAKE_FRACTION(numerator: int, denominator: int) -> fraction
              Build an exact fraction from a numerator and a denominator
@@ -885,6 +1146,10 @@ b
                scalar value for text, false before true for bool.
              ! float compares numerically, and an int is never compared with
                a float: both arguments have the same type.
+             ! bigint compares numerically, and an int is never compared with
+               a bigint either.
+             ! decimal compares numerically, by value: 0.3 is not less than
+               0.30.
              ! fraction compares by exact value, never through a float: 1/3
                is less than 1/2.
 

@@ -235,6 +235,79 @@ def test_floats_are_comparable_but_not_keyable(registry):
     )
 
 
+def test_bigint_literals(registry):
+    checked = build(
+        "400-0000025@[123456789012345678901234567890n, -0n] -> total\n100-0000001@[total]\n",
+        registry,
+    )
+    args = checked.body[0].call.args
+    assert [arg.value for arg in args] == [123456789012345678901234567890, 0]
+    assert all(arg.type.name == "bigint" for arg in args)
+
+
+def test_bigint_literal_has_a_ceiling(registry):
+    build(f"400-0000025@[{'9' * 4000}n, 1n] -> total\n100-0000001@[total]\n", registry)
+    build(f"400-0000025@[-{'0' * 50}{'9' * 4000}n, 1n] -> total\n100-0000001@[total]\n", registry)
+    fails(
+        f"400-0000025@[1{'0' * 4000}n, 1n] -> total\n100-0000001@[total]\n",
+        registry,
+        "4001 digits",
+    )
+
+
+def test_int_and_bigint_do_not_mix(registry):
+    fails("400-0000025@[1, 2n] -> total\n100-0000001@[total]\n", registry, "expected bigint, got int")
+    fails("400-0000001@[1, 2n] -> total\n100-0000001@[total]\n", registry, "expected int, got bigint")
+
+
+def test_bigints_are_comparable_and_keyable(registry):
+    build("300-0000001@[2n, 1n] -> xs\n300-0000005@[xs] -> ys\n100-0000001@[ys]\n", registry)
+    build("300-0000001@[2n, 1n] -> xs\n300-0000008@[xs] -> ys\n100-0000001@[ys]\n", registry)
+    build("600-0000004@[2n, 1n] -> same\n100-0000001@[same]\n", registry)
+
+
+def test_decimal_literals(registry):
+    checked = build(
+        "400-0000043@[0.10d, -0.00d] -> a\n400-0000043@[007.50d, -3d] -> b\n"
+        "100-0000001@[a]\n100-0000001@[b]\n",
+        registry,
+    )
+    args = checked.body[0].call.args + checked.body[1].call.args
+    # Kept as canonical digits: places stay, leading zeros and the sign of zero go.
+    assert [arg.value for arg in args] == ["0.10", "0.00", "7.50", "-3"]
+    assert all(arg.type.name == "decimal" for arg in args)
+
+
+def test_decimal_literal_has_ceilings(registry):
+    build(f"400-0000043@[{'9' * 3000}.{'9' * 1000}d, 1d] -> a\n100-0000001@[a]\n", registry)
+    fails(f"400-0000043@[{'9' * 3001}.{'9' * 1000}d, 1d] -> a\n100-0000001@[a]\n", registry,
+          "4001 digits")
+    fails(f"400-0000043@[0.{'0' * 1001}d, 1d] -> a\n100-0000001@[a]\n", registry,
+          "1001 digits after the point")
+
+
+def test_decimal_does_not_mix(registry):
+    fails("400-0000043@[1d, 2] -> a\n100-0000001@[a]\n", registry, "expected decimal, got int")
+    fails("400-0000043@[1d, 2.0] -> a\n100-0000001@[a]\n", registry, "expected decimal, got float")
+    fails("400-0000015@[1.0, 2.0d] -> a\n100-0000001@[a]\n", registry, "expected float, got decimal")
+
+
+def test_decimals_are_comparable_but_not_keyable(registry):
+    build("300-0000001@[0.2d, 0.1d] -> xs\n300-0000005@[xs] -> ys\n100-0000001@[ys]\n", registry)
+    build("600-0000005@[0.2d, 0.1d] -> less\n100-0000001@[less]\n", registry)
+    fails("600-0000004@[0.2d, 0.20d] -> same\n100-0000001@[same]\n", registry, "keyable")
+    fails("300-0000001@[0.2d, 0.1d] -> xs\n300-0000008@[xs] -> ys\n100-0000001@[ys]\n",
+          registry, "keyable")
+
+
+def test_number_comparisons_take_numbers_only(registry):
+    """NUMBER_EQUALS takes ints and floats, never text, and never one of each."""
+    build("400-0000060@[0.5, 0.5] -> same\n100-0000001@[same]\n", registry)
+    build("400-0000064@[1, 2] -> order\n100-0000001@[order]\n", registry)
+    fails('400-0000062@["a", "b"] -> le\n100-0000001@[le]\n', registry, "not numeric")
+    fails("400-0000060@[1, 1.0] -> same\n100-0000001@[same]\n", registry, "expected int, got float")
+
+
 def test_fractions_are_their_own_type(registry):
     build("400-0000080@[1, 3] -> third\n400-0000081@[third, third] -> both\n100-0000001@[both]\n", registry)
     fails("400-0000080@[1, 3] -> third\n400-0000001@[third, 1] -> x\n100-0000001@[x]\n", registry, "expected int, got fraction")
@@ -260,7 +333,7 @@ def test_contract_version_mismatch(registry):
 
 
 @pytest.mark.parametrize(
-    "name", ["line_count", "word_freq", "records", "audit_demo"]
+    "name", ["line_count", "word_freq", "records", "audit_demo", "big_numbers", "money"]
 )
 def test_examples_check(name, registry, root):
     from phonebook.parser import parse_file

@@ -56,7 +56,7 @@
         },
         "constraints": {
           "type": "object",
-          "additionalProperties": { "enum": ["comparable", "keyable"] },
+          "additionalProperties": { "enum": ["comparable", "keyable", "numeric"] },
           "description": "Generic variable -> requirement enforced once the variable resolves."
         },
         "effects": {

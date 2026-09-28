@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 
 from .faults import PhonebookFault
+from .decimal_ import Decimal
 from .numbers_ import Fraction, float_text, fraction_text
 
 
@@ -23,6 +24,8 @@ def to_text(value: object) -> str:
         return str(value)
     if isinstance(value, float):
         return float_text(value)
+    if isinstance(value, Decimal):
+        return value.text()
     if isinstance(value, Fraction):
         return fraction_text(value)
     if isinstance(value, tuple):

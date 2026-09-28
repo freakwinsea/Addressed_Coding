@@ -66,7 +66,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `100` | Core | 6 addresses |
 | `200` | Text | 12 |
 | `300` | Collections | 16 |
-| `400` | Numbers | 27 |
+| `400` | Numbers | 66 |
 | `500` | I/O — the only block that touches the filesystem | 4 |
 | `600` | Logic and comparison | 7 |
 | `700` | Reserved for future shared blocks | empty |
@@ -74,7 +74,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `900` | Rust-native escape hatch | reserved, empty |
 | `999` | Quarantine — unregistered or withdrawn. The checker rejects it. | reserved |
 
-85 global addresses in v0. That is the entire budget; adding one is meant to
+111 global addresses in v0. That is the entire budget; adding one is meant to
 feel expensive (see `CONTRIBUTING.md`).
 
 `000` is the inverse of "dial 9 for an outside line": it is the local
@@ -85,7 +85,7 @@ auditing tractable — see §7.
 ## 3. Types
 
 ```
-int  float  fraction  bool  text  unit  list<T>  map<K,V>  pair<K,V>  callable(T,...)->R  any
+int  bigint  float  decimal  fraction  bool  text  unit  list<T>  map<K,V>  pair<K,V>  callable(T,...)->R  any
 ```
 
 Generic variables `T`, `K`, `V`, `A`, `R` are unified at check time. `unit` is
@@ -95,16 +95,20 @@ binding, which is how `PRINT` and `TO_TEXT` accept every value. `bytes` is a
 reserved name with no v0 addresses.
 
 Some contracts constrain a generic: `comparable` (orderable by `SORT` and
-`LESS_THAN`) and `keyable` (usable as a map key or by `UNIQUE`). `comparable` is
-`int`, `float`, `fraction`, `text`, `bool`; `keyable` is `int`, `fraction`,
-`text`, `bool`. The
+`LESS_THAN`), `keyable` (usable as a map key or by `UNIQUE`), and `numeric`
+(accepted by the number comparisons in area 400). `comparable` is `int`,
+`bigint`, `float`, `decimal`, `fraction`, `text`, `bool`; `keyable` is `int`,
+`bigint`, `fraction`, `text`, `bool`; `numeric` is `int`, `float`. The
 constraint is checked once the variable resolves to a concrete type.
 
 `int` and `float` never mix. There is no implicit conversion: `ADD` takes two
 `int`s, `ADD_FLOAT` takes two `float`s, and `TO_FLOAT` / `TO_INT` cross between
-them. `fraction` is its own type too: `ADD_FRACTION` takes two fractions,
-`MAKE_FRACTION` builds one from two ints, and `FRACTION_TO_FLOAT`,
-`FLOOR_FRACTION` and `ROUND_FRACTION` leave it.
+them. `bigint` is the same: `ADD_BIG` takes two `bigint`s, and `TO_BIG` /
+`BIG_TO_INT` cross to and from `int`. `decimal` too: `ADD_DEC` takes two
+`decimal`s, and `TO_DEC`, `BIG_TO_DEC`, `DEC_TO_INT`, `DEC_TO_FLOAT` and
+`FLOAT_TO_DEC` cross over. `fraction` is its own type too: `ADD_FRACTION` takes
+two fractions, `MAKE_FRACTION` builds one from two ints, and
+`FRACTION_TO_FLOAT`, `FLOOR_FRACTION` and `ROUND_FRACTION` leave it.
 
 ### 3.1 Floats
 
@@ -118,7 +122,7 @@ languages differ, so the contracts pin it:
 | NaN and infinity | **They never exist.** A result too large to be finite is an `overflow` error. Dividing by zero, `0.0 / 0.0` included, is a `division_by_zero` error. `PARSE_FLOAT` rejects `nan`, `inf`, and anything too large, returning its fallback. A literal too large to be finite is a parse error. |
 | Negative zero | **Zero has one sign.** Any result that would be `-0.0` is `0.0`, so it can never print as `-0.0` or behave differently from `0.0`. |
 | Ordering | Numeric. With no NaN and one zero, the order is total, which is why `float` is `comparable`. |
-| Equality and map keys | `float` is **not** `keyable`: equality on computed floats is a trap (`0.1 + 0.2` is not `0.3`), and Rust's `f64` cannot key a `BTreeMap`. Compare with `LESS_THAN` / `GREATER_THAN`. |
+| Equality and map keys | `float` is **not** `keyable`: equality on computed floats is a trap (`0.1 + 0.2` is not `0.3`), and Rust's `f64` cannot key a `BTreeMap`. So `EQUALS` does not take floats; `NUMBER_EQUALS` does, and is exact. For a computed float, `CLOSE_TO` asks whether two values are within a tolerance. |
 | Rounding halves | `ROUND` sends halves **away from zero**: 2.5 is 3.0. Python's `round()` would say 2.0. It decides on the exact binary value, so 0.49999999999999994 is 0.0. |
 | To an int | `TO_INT` **truncates toward zero** and is an `overflow` error outside the 64-bit range. Rust's `as i64` would saturate instead. |
 | From an int | `TO_FLOAT` rounds to nearest, ties to even, which only matters past 2^53. |
@@ -147,7 +151,61 @@ where the hosts would otherwise disagree.
 A float literal in a program is written the same way `PARSE_FLOAT` reads one,
 without the leading `+`: `1.5`, `-0.25`, `2e10`, `6.02e23`.
 
-### 3.2 Fractions
+### 3.2 Bigints
+
+A `bigint` is an exact whole number of **at most 4000 decimal digits**. It never
+rounds and never wraps. Python's `int` already is one. Rust's standard library
+has nothing like it, so the Rust runtime carries its own, `phonebook_rt::BigInt`
+(`runtime/rust/phonebook_rt/src/bigint.rs`): sign and magnitude, base-10^9
+limbs, schoolbook algorithms, no dependencies.
+
+| Question | Contract |
+|---|---|
+| How big | At most 4000 digits. Any result with more is an `overflow` error, and a literal with more is a parse error. Leading zeros do not count. |
+| Why a ceiling at all | Without one, `POW_BIG(2, 2^62)` never finishes, and Python refuses to print an int of more than 4300 digits. 4000 is under that, so neither backend needs special settings. |
+| Division | `DIV_BIG` truncates toward zero and `MOD_BIG` takes the dividend's sign, exactly as `DIV` and `MOD` do. |
+| Powers | `POW_BIG` takes an `int` exponent and checks every step, so no intermediate grows past 8000 digits before an overflow is noticed. |
+| Reading text | `PARSE_BIG` uses the `PARSE_INT` grammar: `[+-]?digits` after trimming. |
+| Printing | Base 10, a leading `-` for negatives, no suffix: the same as `int`. |
+
+A bigint literal is an integer with an `n` suffix, as in JavaScript: `12n`,
+`-123456789012345678901234567890n`. `-0n` is `0n`.
+`tests/conformance/bigint_random.phone` (written by
+`scripts/gen_bigint_random.py`) holds seeded random operands for all five
+arithmetic operations, so the Rust arithmetic is checked against Python's.
+
+### 3.3 Decimals
+
+A `decimal` is an exact base-10 number: a whole-number **coefficient** and a
+**scale**, the count of digits after the point. `0.30` is (30, 2). It is for
+amounts that must add up exactly, such as money: `0.10 + 0.20` is `0.30`, where
+a float gives `0.30000000000000004`.
+
+Neither backend uses a library for it. Python's `decimal` module rounds to a
+context precision, has signed zeros, NaN and infinity, and prints in its own
+layout, so pinning it to match Rust would be harder than writing the type out.
+Each runtime carries its own, written side by side:
+`runtime/python/phonebook_rt/decimal_.py` holds the coefficient in a Python
+`int`, and `runtime/rust/phonebook_rt/src/decimal.rs` holds it in the Rust
+runtime's `BigInt`.
+
+| Question | Contract |
+|---|---|
+| How big | At most 4000 digits in the coefficient (the bigint ceiling), and at most 1000 of them after the point. Anything past either is an `overflow` error, and a literal past either is a parse error. |
+| Places | Kept, never normalized away: `0.10 + 0.20` prints `0.30`. `ADD_DEC` and `SUB_DEC` give the larger scale of the two, `MUL_DEC` the sum of both. |
+| Rounding | Only `DIV_DEC` and `ROUND_DEC` round, each to a number of places the program gives (0 to 1000, else `invalid_places`), and always **halves away from zero**, the same as `ROUND`. Not Python's `round()` or the `decimal` module's default, which go to even. |
+| Equality and order | By value: `0.3` and `0.30` are equal and sort as ties. That is also why `decimal` is comparable but not keyable: a map could not say which of the two it kept. |
+| Zero | Has one sign: `-0.00d` is `0.00`. |
+| Floats | `DEC_TO_FLOAT` reads the decimal's text the way `PARSE_FLOAT` would. `FLOAT_TO_DEC` takes the float's shortest digits, the ones `TO_TEXT` prints, so `0.1` becomes `0.1` rather than the float's exact binary value. |
+| Printing | Every digit, the point `scale` places from the right, at least one digit before it, no exponent, no suffix: `0.30`, `-0.05`, `12`. |
+
+A decimal literal is digits, an optional fraction, and a `d` suffix: `19.99d`,
+`-0.05d`, `3d`. `tests/conformance/decimal_random.phone` (written by
+`scripts/gen_decimal_random.py`) holds seeded random operands for the
+arithmetic, so each runtime's hand-written decimal is checked against the
+other's.
+
+### 3.4 Fractions
 
 A `fraction` is an exact ratio of two 64-bit integers: `1/3` stays `1/3` and
 `1/10 + 2/10` is exactly `3/10`. Neither host's own fraction type is used —
@@ -172,6 +230,8 @@ Backend representations:
 | Phonebook | Python | Rust |
 |---|---|---|
 | `int` | `int` | `i64` |
+| `bigint` | `int` | `phonebook_rt::BigInt` |
+| `decimal` | `phonebook_rt.decimal_.Decimal` | `phonebook_rt::Decimal` |
 | `float` | `float` | `f64` |
 | `fraction` | `phonebook_rt.numbers_.Fraction` | `phonebook_rt::numbers_::Fraction` |
 | `bool` | `bool` | `bool` |
@@ -215,7 +275,7 @@ return      := "return" NAME
 call        := ADDRESS VERSIONSEL? "@[" args? "]" ("->" NAME)?
 args        := arg ("," arg)*
 arg         := (NAME "=")? (literal | NAME | ADDRESS)
-literal     := STRING | INT | FLOAT | "true" | "false"
+literal     := STRING | INT | BIGINT | DECIMAL | FLOAT | "true" | "false"
 comment     := "#" .* EOL
 ```
 
@@ -266,7 +326,7 @@ conformance test:
 | Float NaN, infinity, negative zero | none of them exist (§3.1) |
 | Rounding halves (Python to even, Rust away from zero) | `ROUND` sends halves **away from zero** |
 | Float to int (Rust saturates) | `TO_INT` **truncates**, and out of range is an `overflow` error |
-| Fractions (Python's grow without limit, Rust has none) | always lowest terms, 64-bit parts, `overflow` past that (§3.2) |
+| Fractions (Python's grow without limit, Rust has none) | always lowest terms, 64-bit parts, `overflow` past that (§3.4) |
 
 ## 6. Registry entries
 
@@ -349,7 +409,7 @@ compiler0 (Python, this repo)
 ```
 
 That requires a semantic kernel covering parsing, syntax trees, and error
-handling — well beyond the 85 addresses of v0. v0 deliberately does not chase
+handling — well beyond the 111 addresses of v0. v0 deliberately does not chase
 it.
 
 ## 9. Out of scope in v0

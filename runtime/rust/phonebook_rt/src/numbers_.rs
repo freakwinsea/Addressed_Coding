@@ -1,4 +1,4 @@
-//! Area 400 — integer, floating-point and fraction arithmetic.
+//! Area 400 — integer, floating-point, bigint, decimal and fraction arithmetic.
 //!
 //! Rust is the backend that agrees with the contract here for free: `/`
 //! truncates toward zero and `%` takes the sign of the dividend, which is
@@ -446,6 +446,261 @@ fn layout(digits: &str, exponent: i32) -> String {
     };
     let sign = if exponent >= 0 { '+' } else { '-' };
     format!("{mantissa}e{sign}{:02}", exponent.abs())
+}
+
+// --------------------------------------------------------------------------
+// bigints
+// --------------------------------------------------------------------------
+//
+// The arithmetic lives in `crate::bigint`, because Rust has no big integer of
+// its own. Every result that can grow goes through `BigInt::checked`, which is
+// where the 4000-digit ceiling is enforced, as `_checked_big` does in Python.
+
+use crate::bigint::BigInt;
+
+/// 400-0000023 TO_BIG — every int is a bigint; this never fails.
+pub fn to_big(value: &i64) -> BigInt {
+    BigInt::from_i64(*value)
+}
+
+/// 400-0000024 BIG_TO_INT — overflow outside the 64-bit range, never wraps.
+pub fn big_to_int(value: &BigInt) -> i64 {
+    match value.to_i64() {
+        Some(value) => value,
+        None => crate::fault(
+            "overflow",
+            "BIG_TO_INT value does not fit in a 64-bit signed integer",
+        ),
+    }
+}
+
+/// 400-0000025 ADD_BIG
+pub fn add_big(a: &BigInt, b: &BigInt) -> BigInt {
+    a.add(b).checked("ADD_BIG")
+}
+
+/// 400-0000026 SUB_BIG
+pub fn sub_big(a: &BigInt, b: &BigInt) -> BigInt {
+    a.sub(b).checked("SUB_BIG")
+}
+
+/// 400-0000027 MUL_BIG
+pub fn mul_big(a: &BigInt, b: &BigInt) -> BigInt {
+    a.mul(b).checked("MUL_BIG")
+}
+
+/// 400-0000028 DIV_BIG — truncates toward zero, as DIV does.
+pub fn div_big(a: &BigInt, b: &BigInt) -> BigInt {
+    if b.is_zero() {
+        crate::fault("division_by_zero", "DIV_BIG by zero");
+    }
+    a.div_rem(b).0
+}
+
+/// 400-0000029 MOD_BIG — sign of the dividend, as MOD does.
+pub fn mod_big(a: &BigInt, b: &BigInt) -> BigInt {
+    if b.is_zero() {
+        crate::fault("division_by_zero", "MOD_BIG by zero");
+    }
+    a.div_rem(b).1
+}
+
+/// 400-0000030 POW_BIG — the same square-and-multiply as POW, with every step
+/// checked against the ceiling, so no intermediate grows past twice its digits.
+pub fn pow_big(base: &BigInt, exponent: &i64) -> BigInt {
+    if *exponent < 0 {
+        crate::fault(
+            "negative_exponent",
+            &format!("POW_BIG exponent {exponent} is negative"),
+        );
+    }
+    let mut base = base.clone();
+    let mut exponent = *exponent;
+    let mut result = BigInt::from_i64(1);
+    while exponent > 0 {
+        if exponent & 1 == 1 {
+            result = result.mul(&base).checked("POW_BIG");
+        }
+        exponent >>= 1;
+        if exponent > 0 {
+            base = base.mul(&base).checked("POW_BIG");
+        }
+    }
+    result
+}
+
+/// 400-0000031 PARSE_BIG — never fails; unparseable text yields the fallback.
+/// Leading zeros are dropped before the digits are counted.
+pub fn parse_big(value: &str, fallback: &BigInt) -> BigInt {
+    BigInt::parse(&crate::text::trim(value)).unwrap_or_else(|| fallback.clone())
+}
+
+// --------------------------------------------------------------------------
+// decimals
+// --------------------------------------------------------------------------
+//
+// The type itself is in `crate::decimal`. What the functions below add is the
+// contract around it: which scale a result has, the one rounding rule (halves
+// away from zero, as ROUND), and the ceilings, which every result that can
+// grow passes through `Decimal::checked` to meet.
+
+use crate::decimal::{divide_rounded, Decimal, MAX_SCALE};
+
+fn checked_places(places: i64, operation: &str) -> usize {
+    if places < 0 || places > MAX_SCALE as i64 {
+        crate::fault(
+            "invalid_places",
+            &format!("{operation} places {places} is not between 0 and {MAX_SCALE}"),
+        );
+    }
+    places as usize
+}
+
+/// 400-0000040 TO_DEC — an int as a decimal with no places; never fails.
+pub fn to_dec(value: &i64) -> Decimal {
+    Decimal::new(BigInt::from_i64(*value), 0)
+}
+
+/// 400-0000041 BIG_TO_DEC — a bigint as a decimal with no places; never fails.
+pub fn big_to_dec(value: &BigInt) -> Decimal {
+    Decimal::new(value.clone(), 0)
+}
+
+/// 400-0000042 DEC_TO_INT — truncates toward zero, as TO_INT does.
+pub fn dec_to_int(value: &Decimal) -> i64 {
+    let whole = value.coefficient().div_rem(&BigInt::pow10(value.scale())).0;
+    match whole.to_i64() {
+        Some(whole) => whole,
+        None => crate::fault(
+            "overflow",
+            "DEC_TO_INT value does not fit in a 64-bit signed integer",
+        ),
+    }
+}
+
+/// 400-0000043 ADD_DEC — the result has the larger of the two scales.
+pub fn add_dec(a: &Decimal, b: &Decimal) -> Decimal {
+    let scale = a.scale().max(b.scale());
+    Decimal::new(a.rescaled(scale).add(&b.rescaled(scale)), scale).checked("ADD_DEC")
+}
+
+/// 400-0000044 SUB_DEC — the result has the larger of the two scales.
+pub fn sub_dec(a: &Decimal, b: &Decimal) -> Decimal {
+    let scale = a.scale().max(b.scale());
+    Decimal::new(a.rescaled(scale).sub(&b.rescaled(scale)), scale).checked("SUB_DEC")
+}
+
+/// 400-0000045 MUL_DEC — exact; the scales add, so 1.5 x 0.25 is 0.375.
+pub fn mul_dec(a: &Decimal, b: &Decimal) -> Decimal {
+    Decimal::new(a.coefficient().mul(b.coefficient()), a.scale() + b.scale()).checked("MUL_DEC")
+}
+
+/// 400-0000046 DIV_DEC — the exact quotient, rounded once to `places`.
+///
+/// a / b = (ca / 10^sa) / (cb / 10^sb), so the quotient at `places` places is
+/// ca * 10^(sb + places) / (cb * 10^sa), rounded to a whole number. Both
+/// exponents are never negative, so nothing is rounded before that division.
+pub fn div_dec(a: &Decimal, b: &Decimal, places: &i64) -> Decimal {
+    let places = checked_places(*places, "DIV_DEC");
+    if b.coefficient().is_zero() {
+        crate::fault("division_by_zero", "DIV_DEC by zero");
+    }
+    let mut numerator = a.coefficient().mul(&BigInt::pow10(b.scale() + places));
+    let mut denominator = b.coefficient().mul(&BigInt::pow10(a.scale()));
+    if denominator.is_negative() {
+        numerator = numerator.neg();
+        denominator = denominator.neg();
+    }
+    Decimal::new(divide_rounded(&numerator, &denominator), places).checked("DIV_DEC")
+}
+
+/// 400-0000047 ROUND_DEC — to exactly `places` places, halves away from zero.
+/// Fewer places than the value has rounds; more pads with zeros, so
+/// ROUND_DEC(5, 2) is 5.00.
+pub fn round_dec(value: &Decimal, places: &i64) -> Decimal {
+    let places = checked_places(*places, "ROUND_DEC");
+    Decimal::new(value.rescaled(places), places).checked("ROUND_DEC")
+}
+
+/// 400-0000048 PARSE_DEC — never fails; unparseable text yields the fallback.
+pub fn parse_dec(value: &str, fallback: &Decimal) -> Decimal {
+    Decimal::parse(&crate::text::trim(value)).unwrap_or_else(|| fallback.clone())
+}
+
+/// 400-0000049 DEC_TO_FLOAT — the nearest float, ties to even.
+///
+/// `str::parse::<f64>` of the decimal's own text is correctly rounded however
+/// many digits it has, as Python's `float()` is, so both backends read the
+/// same digits the same way.
+pub fn dec_to_float(value: &Decimal) -> f64 {
+    match value.to_string().parse::<f64>() {
+        Ok(parsed) => finite(parsed, "DEC_TO_FLOAT"),
+        Err(_) => unreachable!("a decimal's text is always a valid float"),
+    }
+}
+
+/// 400-0000050 FLOAT_TO_DEC — the float's shortest digits, as TO_TEXT prints
+/// them, never its exact binary value: 0.1 is 0.1.
+///
+/// With digits d1...dn and exponent E, the value is d1...dn x 10^(E-n+1). A
+/// float has at most 17 significant digits and E is between -324 and 308, so
+/// the result is always inside both ceilings.
+pub fn float_to_dec(value: &f64) -> Decimal {
+    let (digits, exponent) = shortest_digits(value.abs());
+    let power = exponent as i64 - digits.len() as i64 + 1;
+    let sign = if *value < 0.0 { "-" } else { "" };
+    let coefficient = BigInt::literal(&format!("{sign}{digits}"));
+    if power >= 0 {
+        return Decimal::new(coefficient.mul(&BigInt::pow10(power as usize)), 0);
+    }
+    Decimal::new(coefficient, (-power) as usize)
+}
+
+// --------------------------------------------------------------------------
+// comparisons
+// --------------------------------------------------------------------------
+
+/// 400-0000060 NUMBER_EQUALS — exact, floats included.
+pub fn number_equals<T: PartialEq>(a: &T, b: &T) -> bool {
+    a == b
+}
+
+/// 400-0000061 NUMBER_NOT_EQUALS
+pub fn number_not_equals<T: PartialEq>(a: &T, b: &T) -> bool {
+    a != b
+}
+
+/// 400-0000062 LESS_OR_EQUAL
+pub fn less_or_equal<T: PartialOrd>(a: &T, b: &T) -> bool {
+    a <= b
+}
+
+/// 400-0000063 GREATER_OR_EQUAL
+pub fn greater_or_equal<T: PartialOrd>(a: &T, b: &T) -> bool {
+    a >= b
+}
+
+/// 400-0000064 COMPARE — exactly -1, 0, or 1.
+///
+/// Written with `<` and `>` rather than `partial_cmp`, which returns an
+/// `Option` for floats; with no NaN there is always an answer.
+pub fn compare<T: PartialOrd>(a: &T, b: &T) -> i64 {
+    if a < b {
+        -1
+    } else if a > b {
+        1
+    } else {
+        0
+    }
+}
+
+/// 400-0000065 CLOSE_TO — absolute tolerance, edge included.
+///
+/// A difference too large to be finite comes out as infinity, which no
+/// tolerance reaches, and a negative tolerance is below every difference.
+/// Neither needs its own branch.
+pub fn close_to(a: &f64, b: &f64, tolerance: &f64) -> bool {
+    (a - b).abs() <= *tolerance
 }
 
 // --------------------------------------------------------------------------

@@ -12,16 +12,23 @@ from dataclasses import dataclass, field
 
 from .errors import CheckError
 
-PRIMITIVES = {"int", "float", "fraction", "bool", "text", "unit", "any"}
+PRIMITIVES = {"int", "bigint", "float", "decimal", "fraction", "bool", "text", "unit", "any"}
 CONTAINERS = {"list": 1, "map": 2, "pair": 2}
 
 #: Types that can be ordered by SORT / LESS_THAN and friends. float is here
 #: because every float is finite and zero has one sign, so the order is total.
-COMPARABLE = {"int", "float", "fraction", "text", "bool"}
+COMPARABLE = {"int", "bigint", "float", "decimal", "fraction", "text", "bool"}
 #: Types that can be a map key or deduplicated by UNIQUE. float is not: equality
-#: on computed floats is a trap, and Rust's f64 is not `Ord`. fraction is: it is
-#: exact and always in lowest terms, so equal values have equal parts.
-KEYABLE = {"int", "fraction", "text", "bool"}
+#: on computed floats is a trap, and Rust's f64 is not `Ord`. bigint is exact, so
+#: it is. decimal is not, because 0.3 and 0.30 are equal but print differently,
+#: so which of the two a map kept as its key would be up to the host. fraction
+#: is: it is exact and always in lowest terms, so equal values have equal parts.
+KEYABLE = {"int", "bigint", "fraction", "text", "bool"}
+#: Number types, for the comparisons in area 400. float is here even though it
+#: is not keyable: a program that asks whether two floats are equal gets exact
+#: equality, and CLOSE_TO is there for the computed-float case.
+NUMERIC = {"int", "float"}
+CONSTRAINTS = {"comparable": COMPARABLE, "keyable": KEYABLE, "numeric": NUMERIC}
 
 _VAR = re.compile(r"^[A-Z][A-Z0-9]*$")
 
@@ -65,7 +72,9 @@ class Type:
 
 
 INT = Type("int")
+BIGINT = Type("bigint")
 FLOAT = Type("float")
+DECIMAL = Type("decimal")
 BOOL = Type("bool")
 TEXT = Type("text")
 UNIT = Type("unit")
@@ -194,7 +203,7 @@ def unify(declared: Type, actual: Type, subs: Substitution) -> Type:
 
 
 def check_constraint(var: str, kind: str, subs: Substitution) -> None:
-    """Enforce a `comparable` / `keyable` constraint once the variable resolves.
+    """Enforce a `comparable` / `keyable` / `numeric` constraint once the variable resolves.
 
     Unresolved variables pass: nothing concrete has been chosen yet, so there is
     nothing to reject.
@@ -205,7 +214,7 @@ def check_constraint(var: str, kind: str, subs: Substitution) -> None:
     resolved = substitute(resolved, subs)
     if resolved.is_var or resolved.name == "any":
         return
-    allowed = COMPARABLE if kind == "comparable" else KEYABLE
+    allowed = CONSTRAINTS[kind]
     if resolved.name not in allowed:
         raise CheckError(
             f"{resolved} is not {kind}",
