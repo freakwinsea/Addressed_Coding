@@ -950,6 +950,118 @@ pub fn fraction_text(value: &Fraction) -> String {
 }
 
 // --------------------------------------------------------------------------
+// conversions between the exact types
+// --------------------------------------------------------------------------
+
+/// 400-0000100 DEC_TO_BIG — truncates toward zero, as DEC_TO_INT does; never fails.
+pub fn dec_to_big(value: &Decimal) -> BigInt {
+    value.coefficient().div_rem(&BigInt::pow10(value.scale())).0
+}
+
+/// 400-0000101 BIG_TO_FLOAT — the nearest float, ties to even.
+///
+/// `str::parse::<f64>` of the bigint's text, as DEC_TO_FLOAT reads a
+/// decimal's, so both backends round the same digits the same way.
+pub fn big_to_float(value: &BigInt) -> f64 {
+    match value.to_string().parse::<f64>() {
+        Ok(parsed) => finite(parsed, "BIG_TO_FLOAT"),
+        Err(_) => unreachable!("a bigint's text is always a valid float"),
+    }
+}
+
+/// 400-0000102 FLOAT_TO_BIG — the float's exact binary value, truncated
+/// toward zero.
+///
+/// NOT `as i128`, which saturates. A finite float is mantissa x 2^exponent
+/// with a 53-bit mantissa, so the whole part is the mantissa shifted right
+/// (dropping the fraction bits) or multiplied up by a power of two.
+pub fn float_to_big(value: &f64) -> BigInt {
+    let bits = value.to_bits();
+    let exponent_bits = ((bits >> 52) & 0x7ff) as i64;
+    if exponent_bits == 0 {
+        // Zero or subnormal: always less than 1 in size.
+        return BigInt::from_i64(0);
+    }
+    let mantissa = ((bits & ((1u64 << 52) - 1)) | (1u64 << 52)) as i64;
+    let exponent = exponent_bits - 1075;
+    let mut magnitude = if exponent >= 0 {
+        let mut result = BigInt::from_i64(mantissa);
+        let mut left = exponent;
+        while left > 0 {
+            let step = left.min(62);
+            result = result.mul(&BigInt::from_i64(1i64 << step));
+            left -= step;
+        }
+        result
+    } else if exponent > -53 {
+        BigInt::from_i64(mantissa >> -exponent)
+    } else {
+        BigInt::from_i64(0)
+    };
+    if *value < 0.0 {
+        magnitude = magnitude.neg();
+    }
+    magnitude
+}
+
+/// Euclid's algorithm on bigints, both not negative.
+fn gcd_big(mut a: BigInt, mut b: BigInt) -> BigInt {
+    while !b.is_zero() {
+        let rest = a.div_rem(&b).1;
+        a = b;
+        b = rest;
+    }
+    a
+}
+
+/// 400-0000103 DEC_TO_FRACTION — exact: coefficient / 10^scale, reduced.
+///
+/// The coefficient can have 4000 digits, far past `fraction`'s i128 working,
+/// so this reduces in bigints first and only then asks whether the parts fit.
+pub fn dec_to_fraction(value: &Decimal) -> Fraction {
+    let top = value.coefficient().clone();
+    let bottom = BigInt::pow10(value.scale());
+    let divisor = gcd_big(top.abs(), bottom.clone());
+    let top = top.div_rem(&divisor).0;
+    let bottom = bottom.div_rem(&divisor).0;
+    match (top.to_i64(), bottom.to_i64()) {
+        (Some(numerator), Some(denominator)) => Fraction {
+            numerator,
+            denominator,
+        },
+        _ => crate::fault(
+            "overflow",
+            "DEC_TO_FRACTION result does not fit in a 64-bit fraction",
+        ),
+    }
+}
+
+/// 400-0000104 FRACTION_TO_DEC — rounded once to `places`, halves away from zero.
+///
+/// numerator * 10^places / denominator, rounded to a whole number, is the
+/// coefficient. The denominator is always positive, as divide_rounded needs.
+pub fn fraction_to_dec(value: &Fraction, places: &i64) -> Decimal {
+    let places = checked_places(*places, "FRACTION_TO_DEC");
+    let numerator = BigInt::from_i64(value.numerator).mul(&BigInt::pow10(places));
+    Decimal::new(
+        divide_rounded(&numerator, &BigInt::from_i64(value.denominator)),
+        places,
+    )
+}
+
+/// 400-0000105 BIG_TO_FRACTION — the value over 1; overflow past 64 bits.
+pub fn big_to_fraction(value: &BigInt) -> Fraction {
+    match value.to_i64() {
+        Some(numerator) => Fraction {
+            numerator,
+            denominator: 1,
+        },
+        None => crate::fault(
+            "overflow",
+            "BIG_TO_FRACTION value does not fit in a 64-bit fraction",
+        ),
+    }
+}
 // printing
 // --------------------------------------------------------------------------
 //

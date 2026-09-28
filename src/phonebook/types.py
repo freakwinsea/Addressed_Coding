@@ -27,7 +27,7 @@ KEYABLE = {"int", "bigint", "fraction", "text", "bool"}
 #: Number types, for the comparisons in area 400. float is here even though it
 #: is not keyable: a program that asks whether two floats are equal gets exact
 #: equality, and CLOSE_TO is there for the computed-float case.
-NUMERIC = {"int", "float"}
+NUMERIC = {"int", "bigint", "float", "decimal", "fraction"}
 CONSTRAINTS = {"comparable": COMPARABLE, "keyable": KEYABLE, "numeric": NUMERIC}
 
 _VAR = re.compile(r"^[A-Z][A-Z0-9]*$")

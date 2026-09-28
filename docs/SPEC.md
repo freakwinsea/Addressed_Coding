@@ -66,7 +66,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `100` | Core | 6 addresses |
 | `200` | Text | 12 |
 | `300` | Collections | 16 |
-| `400` | Numbers | 66 |
+| `400` | Numbers | 75 |
 | `500` | I/O — the only block that touches the filesystem | 4 |
 | `600` | Logic and comparison | 7 |
 | `700` | Reserved for future shared blocks | empty |
@@ -74,7 +74,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `900` | Rust-native escape hatch | reserved, empty |
 | `999` | Quarantine — unregistered or withdrawn. The checker rejects it. | reserved |
 
-114 global addresses in v0. That is the entire budget; adding one is meant to
+120 global addresses in v0. That is the entire budget; adding one is meant to
 feel expensive (see `CONTRIBUTING.md`).
 
 `000` is the inverse of "dial 9 for an outside line": it is the local
@@ -98,7 +98,7 @@ Some contracts constrain a generic: `comparable` (orderable by `SORT` and
 `LESS_THAN`), `keyable` (usable as a map key or by `UNIQUE`), and `numeric`
 (accepted by the number comparisons in area 400). `comparable` is `int`,
 `bigint`, `float`, `decimal`, `fraction`, `text`, `bool`; `keyable` is `int`,
-`bigint`, `fraction`, `text`, `bool`; `numeric` is `int`, `float`. The
+`bigint`, `fraction`, `text`, `bool`; `numeric` is `int`, `bigint`, `float`, `decimal`, `fraction`. The
 constraint is checked once the variable resolves to a concrete type.
 
 `int` and `float` never mix. There is no implicit conversion: `ADD` takes two
@@ -423,7 +423,7 @@ compiler0 (Python, this repo)
 ```
 
 That requires a semantic kernel covering parsing, syntax trees, and error
-handling — well beyond the 114 addresses of v0. v0 deliberately does not chase
+handling — well beyond the 120 addresses of v0. v0 deliberately does not chase
 it.
 
 ## 9. Out of scope in v0

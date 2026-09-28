@@ -920,7 +920,10 @@ b
 400-0000060  NUMBER_EQUALS(a: T, b: T) -> bool
              True when two numbers of the same type are equal
              ! Both arguments have the same type: an int is never compared
-               with a float.
+               with a float. Works for int, bigint, float, decimal and
+               fraction.
+             ! Decimals are equal by value, so 0.3 equals 0.30. Fractions are
+               always in lowest terms, so 2/4 equals 1/2.
              ! EXACT. For floats this is equality of the binary value, so 0.1
                + 0.2 does not equal 0.3. Use CLOSE_TO (400-0000065) for
                computed floats.
@@ -931,6 +934,8 @@ b
              True when two numbers of the same type are different
              ! Exactly the opposite of NUMBER_EQUALS (400-0000060), with the
                same exactness for floats.
+             ! Works for int, bigint, float, decimal and fraction; decimals
+               compare by value, so 0.3 and 0.30 are equal.
 
 400-0000062  LESS_OR_EQUAL(a: T, b: T) -> bool
              True when the first number is less than or equal to the second
@@ -938,6 +943,8 @@ b
                arguments have the same type.
              ! True exactly when LESS_THAN(a, b) or NUMBER_EQUALS(a, b) is
                true.
+             ! Works for int, bigint, float, decimal and fraction; decimals
+               compare by value, so 0.3 and 0.30 are equal.
 
 400-0000063  GREATER_OR_EQUAL(a: T, b: T) -> bool
              True when the first number is greater than or equal to the second
@@ -945,6 +952,8 @@ b
                Both arguments have the same type.
              ! True exactly when GREATER_THAN(a, b) or NUMBER_EQUALS(a, b) is
                true.
+             ! Works for int, bigint, float, decimal and fraction; decimals
+               compare by value, so 0.3 and 0.30 are equal.
 
 400-0000064  COMPARE(a: T, b: T) -> int
              Compare two numbers: -1 if the first is smaller, 0 if equal, 1 if larger
@@ -954,6 +963,8 @@ b
                means NUMBER_EQUALS (400-0000060) is true.
              ! Python has no cmp() and Rust's cmp returns an Ordering, not a
                number; the contract picks the integers.
+             ! Works for int, bigint, float, decimal and fraction; decimals
+               compare by value, so 0.3 and 0.30 are equal.
 
 400-0000065  CLOSE_TO(a: float, b: float, tolerance: float) -> bool
              True when two floats are within a tolerance of each other
@@ -1071,6 +1082,60 @@ b
              ! The result is in lowest terms: '2/4' reads as 1/2. Whatever
                TO_TEXT (100-0000005) prints for a fraction reads back as the
                same fraction.
+
+400-0000100  DEC_TO_BIG(value: decimal) -> bigint
+             Drop a decimal's fractional part to get a bigint
+             ! TRUNCATES TOWARD ZERO, as DEC_TO_INT (400-0000042) does: 2.9
+               is 2 and -2.9 is -2. Use ROUND_DEC with 0 places first for
+               nearest.
+             ! Never fails: a decimal has at most 4000 digits, and so may a
+               bigint.
+
+400-0000101  BIG_TO_FLOAT(value: bigint) -> float
+             Convert a bigint to the nearest float
+             ! The float nearest the bigint's exact value, ties to even, the
+               way PARSE_FLOAT reads its digits. Past 2^53 not every whole
+               number is a float, so 2^53 + 1 becomes 2^53.
+             ! A value too large to be a finite float is an overflow error.
+             errors: overflow
+
+400-0000102  FLOAT_TO_BIG(value: float) -> bigint
+             Drop a float's fractional part to get a bigint
+             ! TRUNCATES TOWARD ZERO, as TO_INT (400-0000020) does: 2.9 is 2
+               and -2.9 is -2. Use ROUND first for nearest.
+             ! The float's EXACT binary value, not its printed digits: 1e23
+               is 99999999999999991611392, because that is the float 1e23
+               really is. FLOAT_TO_DEC (400-0000050) is the one that keeps
+               the printed digits.
+             ! Never fails: the largest float has 309 digits, well under the
+               bigint ceiling.
+
+400-0000103  DEC_TO_FRACTION(value: decimal) -> fraction
+             Turn a decimal into the exact same fraction
+             ! EXACT, in lowest terms: 0.75 is 3/4, 2.50 is 5/2, and -0.10 is
+               -1/10.
+             ! When the reduced numerator or denominator does not fit in 64
+               bits, the result is an overflow error. It never rounds to make
+               it fit.
+             errors: overflow
+
+400-0000104  FRACTION_TO_DEC(value: fraction, places: int) -> decimal
+             Turn a fraction into a decimal, rounded to a number of places
+             ! The exact value numerator / denominator, rounded ONCE to
+               exactly `places` digits after the point. HALVES AWAY FROM
+               ZERO: 1/8 to 2 places is 0.13, and -1/8 is -0.13.
+             ! The result always has `places` places, even when the fraction
+               is exact: 1/4 to 3 places is 0.250.
+             ! `places` must be between 0 and 1000, or it is an
+               invalid_places error. Otherwise it never fails.
+             errors: invalid_places
+
+400-0000105  BIG_TO_FRACTION(value: bigint) -> fraction
+             Turn a bigint into a whole-number fraction
+             ! The value over 1: 7 becomes 7, which prints as 7.
+             ! A fraction's parts are 64-bit, so a bigint that does not fit a
+               64-bit signed integer is an overflow error.
+             errors: overflow
 
 400-0000120  FORMAT_FLOAT(value: float, places: int) -> text
              Print a float with a set number of places, like 3.14

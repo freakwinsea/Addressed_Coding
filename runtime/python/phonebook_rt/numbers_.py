@@ -755,6 +755,52 @@ def fraction_text(value: Fraction) -> str:
 
 
 # --------------------------------------------------------------------------
+# conversions between the exact types
+# --------------------------------------------------------------------------
+
+
+def dec_to_big(value: Decimal) -> int:
+    """400-0000100 DEC_TO_BIG — truncates toward zero, as DEC_TO_INT does; never fails."""
+    whole = abs(value.coefficient) // 10**value.scale
+    return -whole if value.coefficient < 0 else whole
+
+
+def big_to_float(value: int) -> float:
+    """400-0000101 BIG_TO_FLOAT — the nearest float, ties to even.
+
+    `float()` of the bigint's text, as DEC_TO_FLOAT reads a decimal's, so both
+    backends round the same digits the same way. `float(int)` would round the
+    same, but raises its own OverflowError where this should fault.
+    """
+    return _finite(float(str(value)), "BIG_TO_FLOAT")
+
+
+def float_to_big(value: float) -> int:
+    """400-0000102 FLOAT_TO_BIG — the float's exact binary value, truncated
+    toward zero. `int()` of a float already does exactly that."""
+    return int(value)
+
+
+def dec_to_fraction(value: Decimal) -> Fraction:
+    """400-0000103 DEC_TO_FRACTION — exact: coefficient / 10^scale, reduced."""
+    return _fraction(value.coefficient, 10**value.scale, "DEC_TO_FRACTION")
+
+
+def fraction_to_dec(value: Fraction, places: int) -> Decimal:
+    """400-0000104 FRACTION_TO_DEC — rounded once to `places`, halves away from zero.
+
+    numerator * 10^places / denominator, rounded to a whole number, is the
+    coefficient. The denominator is always positive, as divide_rounded needs.
+    """
+    _checked_places(places, "FRACTION_TO_DEC")
+    return Decimal(divide_rounded(value.numerator * 10**places, value.denominator), places)
+
+
+def big_to_fraction(value: int) -> Fraction:
+    """400-0000105 BIG_TO_FRACTION — the value over 1; overflow past 64 bits."""
+    if value < INT64_MIN or value > INT64_MAX:
+        raise PhonebookFault("overflow", "BIG_TO_FRACTION value does not fit in a 64-bit fraction")
+    return Fraction(value, 1)
 # printing
 # --------------------------------------------------------------------------
 #
