@@ -20,6 +20,7 @@
 //!    already said how, and the code string here is the one from
 //!    `contract.errors`.
 
+pub mod bigint;
 pub mod collections_;
 pub mod core;
 pub mod io_;
@@ -27,6 +28,7 @@ pub mod logic_;
 pub mod numbers_;
 pub mod text;
 
+pub use crate::bigint::BigInt;
 pub use crate::core::PbText;
 
 /// Stop with a contracted failure.

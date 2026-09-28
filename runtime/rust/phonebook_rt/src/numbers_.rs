@@ -386,3 +386,90 @@ fn layout(digits: &str, exponent: i32) -> String {
     let sign = if exponent >= 0 { '+' } else { '-' };
     format!("{mantissa}e{sign}{:02}", exponent.abs())
 }
+
+// --------------------------------------------------------------------------
+// bigints
+// --------------------------------------------------------------------------
+//
+// The arithmetic lives in `crate::bigint`, because Rust has no big integer of
+// its own. Every result that can grow goes through `BigInt::checked`, which is
+// where the 4000-digit ceiling is enforced, as `_checked_big` does in Python.
+
+use crate::bigint::BigInt;
+
+/// 400-0000023 TO_BIG — every int is a bigint; this never fails.
+pub fn to_big(value: &i64) -> BigInt {
+    BigInt::from_i64(*value)
+}
+
+/// 400-0000024 BIG_TO_INT — overflow outside the 64-bit range, never wraps.
+pub fn big_to_int(value: &BigInt) -> i64 {
+    match value.to_i64() {
+        Some(value) => value,
+        None => crate::fault(
+            "overflow",
+            "BIG_TO_INT value does not fit in a 64-bit signed integer",
+        ),
+    }
+}
+
+/// 400-0000025 ADD_BIG
+pub fn add_big(a: &BigInt, b: &BigInt) -> BigInt {
+    a.add(b).checked("ADD_BIG")
+}
+
+/// 400-0000026 SUB_BIG
+pub fn sub_big(a: &BigInt, b: &BigInt) -> BigInt {
+    a.sub(b).checked("SUB_BIG")
+}
+
+/// 400-0000027 MUL_BIG
+pub fn mul_big(a: &BigInt, b: &BigInt) -> BigInt {
+    a.mul(b).checked("MUL_BIG")
+}
+
+/// 400-0000028 DIV_BIG — truncates toward zero, as DIV does.
+pub fn div_big(a: &BigInt, b: &BigInt) -> BigInt {
+    if b.is_zero() {
+        crate::fault("division_by_zero", "DIV_BIG by zero");
+    }
+    a.div_rem(b).0
+}
+
+/// 400-0000029 MOD_BIG — sign of the dividend, as MOD does.
+pub fn mod_big(a: &BigInt, b: &BigInt) -> BigInt {
+    if b.is_zero() {
+        crate::fault("division_by_zero", "MOD_BIG by zero");
+    }
+    a.div_rem(b).1
+}
+
+/// 400-0000030 POW_BIG — the same square-and-multiply as POW, with every step
+/// checked against the ceiling, so no intermediate grows past twice its digits.
+pub fn pow_big(base: &BigInt, exponent: &i64) -> BigInt {
+    if *exponent < 0 {
+        crate::fault(
+            "negative_exponent",
+            &format!("POW_BIG exponent {exponent} is negative"),
+        );
+    }
+    let mut base = base.clone();
+    let mut exponent = *exponent;
+    let mut result = BigInt::from_i64(1);
+    while exponent > 0 {
+        if exponent & 1 == 1 {
+            result = result.mul(&base).checked("POW_BIG");
+        }
+        exponent >>= 1;
+        if exponent > 0 {
+            base = base.mul(&base).checked("POW_BIG");
+        }
+    }
+    result
+}
+
+/// 400-0000031 PARSE_BIG — never fails; unparseable text yields the fallback.
+/// Leading zeros are dropped before the digits are counted.
+pub fn parse_big(value: &str, fallback: &BigInt) -> BigInt {
+    BigInt::parse(&crate::text::trim(value)).unwrap_or_else(|| fallback.clone())
+}

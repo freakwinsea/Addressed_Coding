@@ -66,7 +66,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `100` | Core | 6 addresses |
 | `200` | Text | 12 |
 | `300` | Collections | 16 |
-| `400` | Numbers | 22 |
+| `400` | Numbers | 31 |
 | `500` | I/O — the only block that touches the filesystem | 4 |
 | `600` | Logic and comparison | 7 |
 | `700` | Reserved for future shared blocks | empty |
@@ -74,7 +74,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `900` | Rust-native escape hatch | reserved, empty |
 | `999` | Quarantine — unregistered or withdrawn. The checker rejects it. | reserved |
 
-67 global addresses in v0. That is the entire budget; adding one is meant to
+76 global addresses in v0. That is the entire budget; adding one is meant to
 feel expensive (see `CONTRIBUTING.md`).
 
 `000` is the inverse of "dial 9 for an outside line": it is the local
@@ -85,7 +85,7 @@ auditing tractable — see §7.
 ## 3. Types
 
 ```
-int  float  bool  text  unit  list<T>  map<K,V>  pair<K,V>  callable(T,...)->R  any
+int  bigint  float  bool  text  unit  list<T>  map<K,V>  pair<K,V>  callable(T,...)->R  any
 ```
 
 Generic variables `T`, `K`, `V`, `A`, `R` are unified at check time. `unit` is
@@ -96,12 +96,14 @@ reserved name with no v0 addresses.
 
 Some contracts constrain a generic: `comparable` (orderable by `SORT` and
 `LESS_THAN`) and `keyable` (usable as a map key or by `UNIQUE`). `comparable` is
-`int`, `float`, `text`, `bool`; `keyable` is `int`, `text`, `bool`. The
+`int`, `bigint`, `float`, `text`, `bool`; `keyable` is `int`, `bigint`, `text`,
+`bool`. The
 constraint is checked once the variable resolves to a concrete type.
 
 `int` and `float` never mix. There is no implicit conversion: `ADD` takes two
 `int`s, `ADD_FLOAT` takes two `float`s, and `TO_FLOAT` / `TO_INT` cross between
-them.
+them. `bigint` is the same: `ADD_BIG` takes two `bigint`s, and `TO_BIG` /
+`BIG_TO_INT` cross to and from `int`.
 
 ### 3.1 Floats
 
@@ -144,11 +146,35 @@ where the hosts would otherwise disagree.
 A float literal in a program is written the same way `PARSE_FLOAT` reads one,
 without the leading `+`: `1.5`, `-0.25`, `2e10`, `6.02e23`.
 
+### 3.2 Bigints
+
+A `bigint` is an exact whole number of **at most 4000 decimal digits**. It never
+rounds and never wraps. Python's `int` already is one. Rust's standard library
+has nothing like it, so the Rust runtime carries its own, `phonebook_rt::BigInt`
+(`runtime/rust/phonebook_rt/src/bigint.rs`): sign and magnitude, base-10^9
+limbs, schoolbook algorithms, no dependencies.
+
+| Question | Contract |
+|---|---|
+| How big | At most 4000 digits. Any result with more is an `overflow` error, and a literal with more is a parse error. Leading zeros do not count. |
+| Why a ceiling at all | Without one, `POW_BIG(2, 2^62)` never finishes, and Python refuses to print an int of more than 4300 digits. 4000 is under that, so neither backend needs special settings. |
+| Division | `DIV_BIG` truncates toward zero and `MOD_BIG` takes the dividend's sign, exactly as `DIV` and `MOD` do. |
+| Powers | `POW_BIG` takes an `int` exponent and checks every step, so no intermediate grows past 8000 digits before an overflow is noticed. |
+| Reading text | `PARSE_BIG` uses the `PARSE_INT` grammar: `[+-]?digits` after trimming. |
+| Printing | Base 10, a leading `-` for negatives, no suffix: the same as `int`. |
+
+A bigint literal is an integer with an `n` suffix, as in JavaScript: `12n`,
+`-123456789012345678901234567890n`. `-0n` is `0n`.
+`tests/conformance/bigint_random.phone` (written by
+`scripts/gen_bigint_random.py`) holds seeded random operands for all five
+arithmetic operations, so the Rust arithmetic is checked against Python's.
+
 Backend representations:
 
 | Phonebook | Python | Rust |
 |---|---|---|
 | `int` | `int` | `i64` |
+| `bigint` | `int` | `phonebook_rt::BigInt` |
 | `float` | `float` | `f64` |
 | `bool` | `bool` | `bool` |
 | `text` | `str` | `String` |
@@ -191,7 +217,7 @@ return      := "return" NAME
 call        := ADDRESS VERSIONSEL? "@[" args? "]" ("->" NAME)?
 args        := arg ("," arg)*
 arg         := (NAME "=")? (literal | NAME | ADDRESS)
-literal     := STRING | INT | FLOAT | "true" | "false"
+literal     := STRING | INT | BIGINT | FLOAT | "true" | "false"
 comment     := "#" .* EOL
 ```
 
@@ -324,7 +350,7 @@ compiler0 (Python, this repo)
 ```
 
 That requires a semantic kernel covering parsing, syntax trees, and error
-handling — well beyond the 67 addresses of v0. v0 deliberately does not chase
+handling — well beyond the 76 addresses of v0. v0 deliberately does not chase
 it.
 
 ## 9. Out of scope in v0

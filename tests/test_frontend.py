@@ -235,6 +235,37 @@ def test_floats_are_comparable_but_not_keyable(registry):
     )
 
 
+def test_bigint_literals(registry):
+    checked = build(
+        "400-0000025@[123456789012345678901234567890n, -0n] -> total\n100-0000001@[total]\n",
+        registry,
+    )
+    args = checked.body[0].call.args
+    assert [arg.value for arg in args] == [123456789012345678901234567890, 0]
+    assert all(arg.type.name == "bigint" for arg in args)
+
+
+def test_bigint_literal_has_a_ceiling(registry):
+    build(f"400-0000025@[{'9' * 4000}n, 1n] -> total\n100-0000001@[total]\n", registry)
+    build(f"400-0000025@[-{'0' * 50}{'9' * 4000}n, 1n] -> total\n100-0000001@[total]\n", registry)
+    fails(
+        f"400-0000025@[1{'0' * 4000}n, 1n] -> total\n100-0000001@[total]\n",
+        registry,
+        "4001 digits",
+    )
+
+
+def test_int_and_bigint_do_not_mix(registry):
+    fails("400-0000025@[1, 2n] -> total\n100-0000001@[total]\n", registry, "expected bigint, got int")
+    fails("400-0000001@[1, 2n] -> total\n100-0000001@[total]\n", registry, "expected int, got bigint")
+
+
+def test_bigints_are_comparable_and_keyable(registry):
+    build("300-0000001@[2n, 1n] -> xs\n300-0000005@[xs] -> ys\n100-0000001@[ys]\n", registry)
+    build("300-0000001@[2n, 1n] -> xs\n300-0000008@[xs] -> ys\n100-0000001@[ys]\n", registry)
+    build("600-0000004@[2n, 1n] -> same\n100-0000001@[same]\n", registry)
+
+
 def test_contract_version_mismatch(registry):
     fails('100-0000001@contract:99@["hi"]\n', registry, "contract v")
 
@@ -245,7 +276,7 @@ def test_contract_version_mismatch(registry):
 
 
 @pytest.mark.parametrize(
-    "name", ["line_count", "word_freq", "records", "audit_demo"]
+    "name", ["line_count", "word_freq", "records", "audit_demo", "big_numbers"]
 )
 def test_examples_check(name, registry, root):
     from phonebook.parser import parse_file
