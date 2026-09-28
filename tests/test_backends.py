@@ -49,6 +49,8 @@ def _latest():
     [
         ("text", "String"),
         ("int", "i64"),
+        ("float", "f64"),
+        ("list<float>", "Vec<f64>"),
         ("list<text>", "Vec<String>"),
         ("map<text,int>", "BTreeMap<String, i64>"),
         ("pair<text,int>", "(String, i64)"),

@@ -8,6 +8,7 @@ lets `dial annotate` and `dial run --trace` line up with the source exactly.
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 
@@ -22,7 +23,7 @@ from .nodes import (
     Ref,
     Selector,
 )
-from .types import BOOL, INT, TEXT, parse_type
+from .types import BOOL, FLOAT, INT, TEXT, parse_type
 
 ADDRESS = r"[0-9]{3}-[0-9]{7}"
 SELECTOR = r"@(?:latest|contract:[0-9]+|impl:[0-9]+)"
@@ -39,6 +40,9 @@ PIN_RE = re.compile(rf"^pin\s+(?P<address>{ADDRESS})\s+(?P<selector>{SELECTOR})\
 HEADER_RE = re.compile(r"^phonebook\s+(?P<version>[0-9]+\.[0-9]+)\s*$")
 RETURN_RE = re.compile(r"^return\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*$")
 INT_RE = re.compile(r"^-?[0-9]+$")
+#: Checked after INT_RE, so a float literal is a digit string with a fraction,
+#: an exponent, or both. The same shape PARSE_FLOAT accepts, minus the "+".
+FLOAT_RE = re.compile(r"^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$")
 NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 ADDRESS_RE = re.compile(rf"^{ADDRESS}$")
 
@@ -246,6 +250,16 @@ class _Parser:
                     line_no,
                 )
             return Literal(value, INT, label)
+        if FLOAT_RE.match(text):
+            value = float(text)
+            if not math.isfinite(value):
+                self.fail(
+                    f"float literal {text} is too large to be finite"
+                    "\n  hint: floats are always finite; the largest is about 1.8e308",
+                    line_no,
+                )
+            # Zero has one sign: -0.0 is written 0.0 everywhere else, so here too.
+            return Literal(value if value != 0.0 else 0.0, FLOAT, label)
         if ADDRESS_RE.match(text):
             return AddressRef(text, label)
         if NAME_RE.match(text):

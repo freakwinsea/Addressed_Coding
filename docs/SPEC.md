@@ -66,7 +66,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `100` | Core | 6 addresses |
 | `200` | Text | 12 |
 | `300` | Collections | 16 |
-| `400` | Numbers | 14 |
+| `400` | Numbers | 22 |
 | `500` | I/O — the only block that touches the filesystem | 4 |
 | `600` | Logic and comparison | 7 |
 | `700` | Reserved for future shared blocks | empty |
@@ -74,7 +74,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `900` | Rust-native escape hatch | reserved, empty |
 | `999` | Quarantine — unregistered or withdrawn. The checker rejects it. | reserved |
 
-59 global addresses in v0. That is the entire budget; adding one is meant to
+67 global addresses in v0. That is the entire budget; adding one is meant to
 feel expensive (see `CONTRIBUTING.md`).
 
 `000` is the inverse of "dial 9 for an outside line": it is the local
@@ -85,25 +85,71 @@ auditing tractable — see §7.
 ## 3. Types
 
 ```
-int  bool  text  unit  list<T>  map<K,V>  pair<K,V>  callable(T,...)->R  any
+int  float  bool  text  unit  list<T>  map<K,V>  pair<K,V>  callable(T,...)->R  any
 ```
 
 Generic variables `T`, `K`, `V`, `A`, `R` are unified at check time. `unit` is
 the result of an address that produces no value — it cannot be bound, and a
 call that returns anything else must be bound. `any` matches anything without
-binding, which is how `PRINT` and `TO_TEXT` accept every value. `float` and
-`bytes` are reserved names with no v0 addresses.
+binding, which is how `PRINT` and `TO_TEXT` accept every value. `bytes` is a
+reserved name with no v0 addresses.
 
 Some contracts constrain a generic: `comparable` (orderable by `SORT` and
-`LESS_THAN`) and `keyable` (usable as a map key or by `UNIQUE`). Both resolve to
-`int`, `text`, `bool` in v0. The constraint is checked once the variable
-resolves to a concrete type.
+`LESS_THAN`) and `keyable` (usable as a map key or by `UNIQUE`). `comparable` is
+`int`, `float`, `text`, `bool`; `keyable` is `int`, `text`, `bool`. The
+constraint is checked once the variable resolves to a concrete type.
+
+`int` and `float` never mix. There is no implicit conversion: `ADD` takes two
+`int`s, `ADD_FLOAT` takes two `float`s, and `TO_FLOAT` / `TO_INT` cross between
+them.
+
+### 3.1 Floats
+
+A `float` is an IEEE 754 binary64 value. Python's `float` and Rust's `f64` are
+both exactly that, and both get `+ - * /` from the same hardware rounding
+(to nearest, ties to even). Everything *around* the arithmetic is where the two
+languages differ, so the contracts pin it:
+
+| Question | Contract |
+|---|---|
+| NaN and infinity | **They never exist.** A result too large to be finite is an `overflow` error. Dividing by zero, `0.0 / 0.0` included, is a `division_by_zero` error. `PARSE_FLOAT` rejects `nan`, `inf`, and anything too large, returning its fallback. A literal too large to be finite is a parse error. |
+| Negative zero | **Zero has one sign.** Any result that would be `-0.0` is `0.0`, so it can never print as `-0.0` or behave differently from `0.0`. |
+| Ordering | Numeric. With no NaN and one zero, the order is total, which is why `float` is `comparable`. |
+| Equality and map keys | `float` is **not** `keyable`: equality on computed floats is a trap (`0.1 + 0.2` is not `0.3`), and Rust's `f64` cannot key a `BTreeMap`. Compare with `LESS_THAN` / `GREATER_THAN`. |
+| Rounding halves | `ROUND` sends halves **away from zero**: 2.5 is 3.0. Python's `round()` would say 2.0. It decides on the exact binary value, so 0.49999999999999994 is 0.0. |
+| To an int | `TO_INT` **truncates toward zero** and is an `overflow` error outside the 64-bit range. Rust's `as i64` would saturate instead. |
+| From an int | `TO_FLOAT` rounds to nearest, ties to even, which only matters past 2^53. |
+| Reading text | `PARSE_FLOAT` accepts `[+-]digits[.digits][(e|E)[+-]digits]` after trimming, and nothing else: not `.5`, `5.`, `1_000`, `nan`, `inf`. Rust's parser would take `.5` and `inf`; Python's would take `1_000`. |
+| Printing | See below. |
+
+**How a float prints.** `TO_TEXT` (and so `PRINT`) writes the shortest decimal
+digit string that reads back as the same float. When several strings of that
+length do, it takes the one closest to the exact value, and when two are
+equally close, the one ending in an even digit. With those digits
+`d1 d2 ... dn` and decimal exponent `E` (value = `d1.d2...dn x 10^E`):
+
+- if `-4 <= E < 16`, positional, always with a digit after the point:
+  `1.0`, `-2.5`, `0.0001`, `123456789012345.6`;
+- otherwise `d1`, then `.` and the rest of the digits if there are any, then
+  `e`, a sign, and at least two exponent digits: `1e+16`, `1.5e-05`, `5e-324`.
+
+That is exactly Python's `repr()` of a finite float. It is *not* Rust's
+`Display`, which writes `1.0` as `1` and `1e16` as `10000000000000000`, and it
+is not quite Rust's `{:e}` either, which breaks a tie between two shortest
+candidates upward (`635057293855503.25` gives `...503.3`; the contract says
+`...503.2`). Both runtimes take their digits from their host and apply the
+layout by hand, and `tests/conformance/float_rendering.phone` holds the cases
+where the hosts would otherwise disagree.
+
+A float literal in a program is written the same way `PARSE_FLOAT` reads one,
+without the leading `+`: `1.5`, `-0.25`, `2e10`, `6.02e23`.
 
 Backend representations:
 
 | Phonebook | Python | Rust |
 |---|---|---|
 | `int` | `int` | `i64` |
+| `float` | `float` | `f64` |
 | `bool` | `bool` | `bool` |
 | `text` | `str` | `String` |
 | `list<T>` | `list[T]` | `Vec<T>` |
@@ -145,7 +191,7 @@ return      := "return" NAME
 call        := ADDRESS VERSIONSEL? "@[" args? "]" ("->" NAME)?
 args        := arg ("," arg)*
 arg         := (NAME "=")? (literal | NAME | ADDRESS)
-literal     := STRING | INT | "true" | "false"
+literal     := STRING | INT | FLOAT | "true" | "false"
 comment     := "#" .* EOL
 ```
 
@@ -192,6 +238,10 @@ conformance test:
 | Remainder sign | `MOD` takes the **sign of the dividend** |
 | String indexing (bytes vs. chars) | `LENGTH` and `SLICE` count **Unicode scalar values**; `SLICE` clamps out-of-range bounds instead of failing |
 | Boolean rendering (`True` vs. `true`) | `TO_TEXT` renders `true` / `false` |
+| Float rendering (`1.0` vs. `1`, `1e+16` vs. `10000000000000000`) | `TO_TEXT` writes the shortest round-trip digits in Python's `repr` layout (§3.1) |
+| Float NaN, infinity, negative zero | none of them exist (§3.1) |
+| Rounding halves (Python to even, Rust away from zero) | `ROUND` sends halves **away from zero** |
+| Float to int (Rust saturates) | `TO_INT` **truncates**, and out of range is an `overflow` error |
 
 ## 6. Registry entries
 
@@ -274,10 +324,10 @@ compiler0 (Python, this repo)
 ```
 
 That requires a semantic kernel covering parsing, syntax trees, and error
-handling — well beyond the 59 addresses of v0. v0 deliberately does not chase
+handling — well beyond the 67 addresses of v0. v0 deliberately does not chase
 it.
 
 ## 9. Out of scope in v0
 
 Mutation, loops, objects, concurrency, network and GUI addresses, the `800` and
-`900` native blocks, floats, and self-hosting.
+`900` native blocks, arbitrary-precision decimals, and self-hosting.

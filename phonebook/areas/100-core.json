@@ -103,7 +103,7 @@
       "description": "Produces the canonical text form of a value. This is the single rendering rule for the whole language; PRINT and PRINT_LINES defer to it.",
       "keywords": ["text", "string", "render", "convert", "stringify", "format", "to string"],
       "contract": {
-        "version": 1,
+        "version": 2,
         "inputs": [{ "name": "value", "type": "any" }],
         "output": { "name": "rendered", "type": "text" },
         "effects": [],
@@ -115,7 +115,9 @@
           "int renders in base 10 with a leading '-' for negatives.",
           "text renders as itself, unquoted.",
           "list renders as '[a, b, c]' with each element rendered by this same rule.",
-          "pair renders as '(k, v)'."
+          "pair renders as '(k, v)'.",
+          "float renders as the shortest decimal digit string that reads back as the same float. If several strings of that length do, it is the closest to the float's exact value, and if two are equally close, the one whose last digit is even: 635057293855503.25 renders as '635057293855503.2'. With those digits d1 d2 ... dn and exponent E, so that the value is d1.d2...dn x 10^E: when -4 <= E < 16 it is written positionally with at least one digit after the point ('1.0', '0.0001', '123.45'); otherwise as d1, then '.' and the remaining digits if any, then 'e', a sign, and at least two exponent digits ('1e+16', '1.5e-05').",
+          "That is exactly Python's repr() for a finite float, and NOT Rust's Display, which writes 1e16 as '10000000000000000' and 1.0 as '1'. There is no '-0.0', 'nan' or 'inf' to render: floats are finite and zero has one sign."
         ]
       },
       "examples": ["100-0000005@[count] -> label"],
@@ -124,7 +126,13 @@
         { "id": "to_text.bool_false", "args": [false], "expect": "false" },
         { "id": "to_text.int", "args": [-42], "expect": "-42" },
         { "id": "to_text.text", "args": ["hi"], "expect": "hi" },
-        { "id": "to_text.list", "args": [["a", "b"]], "expect": "[a, b]" }
+        { "id": "to_text.list", "args": [["a", "b"]], "expect": "[a, b]" },
+        { "id": "to_text.float_whole", "args": [1.0], "expect": "1.0" },
+        { "id": "to_text.float_shortest", "args": [0.30000000000000004], "expect": "0.30000000000000004" },
+        { "id": "to_text.float_small", "args": [0.0001], "expect": "0.0001" },
+        { "id": "to_text.float_tiny", "args": [1.5e-05], "expect": "1.5e-05" },
+        { "id": "to_text.float_large", "args": [1e16], "expect": "1e+16" },
+        { "id": "to_text.float_below_exponent", "args": [123456789012345.6], "expect": "123456789012345.6" }
       ],
       "status": "active",
       "since": "0.1.0"

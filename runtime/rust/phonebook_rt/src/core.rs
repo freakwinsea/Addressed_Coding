@@ -18,6 +18,12 @@ impl PbText for i64 {
     }
 }
 
+impl PbText for f64 {
+    fn pb_text(&self) -> String {
+        crate::numbers_::float_text(self)
+    }
+}
+
 impl PbText for bool {
     fn pb_text(&self) -> String {
         if *self { "true" } else { "false" }.to_string()

@@ -12,7 +12,13 @@ from phonebook_rt import IMPLEMENTATIONS, PhonebookFault
 
 
 def normalize(value):
-    """JSON has no tuples and no distinction between our pairs and lists."""
+    """JSON has no tuples and no distinction between our pairs and lists.
+
+    Floats are tagged so that an int result never passes for an expected float
+    just because 3 == 3.0 in Python.
+    """
+    if isinstance(value, float):
+        return ("float", value)
     if isinstance(value, tuple):
         return [normalize(v) for v in value]
     if isinstance(value, list):
@@ -134,6 +140,88 @@ class TestContractsThatOverrideTheHostLanguage:
         with pytest.raises(PhonebookFault) as excinfo:
             numbers_.clamp(5, 10, 0)
         assert excinfo.value.code == "invalid_range"
+
+
+class TestFloatPromises:
+    """Where Python's own float behavior is not the contract."""
+
+    def test_round_sends_halves_away_from_zero(self):
+        from phonebook_rt import numbers_
+
+        assert numbers_.round_(2.5) == 3.0  # Python's round() would say 2
+        assert round(2.5) == 2
+        assert numbers_.round_(-2.5) == -3.0
+        assert numbers_.round_(0.49999999999999994) == 0.0  # floor(x + 0.5) says 1.0
+
+    def test_no_negative_zero(self):
+        import math
+
+        from phonebook_rt import numbers_
+
+        for result in (
+            numbers_.mul_float(-2.0, 0.0),
+            numbers_.sub_float(0.0, 0.0),
+            numbers_.round_(-0.4),
+            numbers_.parse_float("-0", 1.0),
+            numbers_.div_float(-5e-324, 2.0),
+        ):
+            assert result == 0.0 and math.copysign(1.0, result) == 1.0
+
+    def test_nan_and_infinity_never_exist(self):
+        from phonebook_rt import numbers_
+
+        for text in ("nan", "NaN", "inf", "-inf", "infinity", "1e400"):
+            assert numbers_.parse_float(text, -1.0) == -1.0
+        with pytest.raises(PhonebookFault) as excinfo:
+            numbers_.div_float(0.0, 0.0)
+        assert excinfo.value.code == "division_by_zero"
+        with pytest.raises(PhonebookFault) as excinfo:
+            numbers_.mul_float(1e300, 1e300)
+        assert excinfo.value.code == "overflow"
+
+    def test_parse_float_rejects_what_float_accepts(self):
+        from phonebook_rt import numbers_
+
+        for text in ("1_000.5", ".5", "5.", "0x1p3", "1e", "+", " "):
+            assert numbers_.parse_float(text, -1.0) == -1.0, text
+
+    def test_to_int_never_saturates(self):
+        from phonebook_rt import numbers_
+
+        assert numbers_.to_int(-9.223372036854775808e18) == numbers_.INT64_MIN
+        with pytest.raises(PhonebookFault) as excinfo:
+            numbers_.to_int(9.223372036854775808e18)
+        assert excinfo.value.code == "overflow"
+
+    def test_float_text_matches_repr(self):
+        """The layout is written by hand; repr is the independent check of it."""
+        import random
+        import struct
+
+        from phonebook_rt import numbers_
+
+        rng = random.Random(0)
+        checked = 0
+        while checked < 20000:
+            bits = rng.getrandbits(64).to_bytes(8, "little")
+            value = struct.unpack("<d", bits)[0]
+            if value != value or value in (float("inf"), float("-inf")) or value == 0.0:
+                continue
+            assert numbers_.float_text(value) == repr(value)
+            checked += 1
+
+    def test_float_text_layout_boundaries(self):
+        from phonebook_rt import core
+
+        assert core.to_text(0.0) == "0.0"
+        assert core.to_text(0.0001) == "0.0001"
+        assert core.to_text(0.00001) == "1e-05"
+        assert core.to_text(1e15) == "1000000000000000.0"
+        assert core.to_text(1e16) == "1e+16"
+        assert core.to_text(1e100) == "1e+100"
+        assert core.to_text([1.0, -0.5]) == "[1.0, -0.5]"
+        # A tie between two shortest candidates goes to the even digit.
+        assert core.to_text(635057293855503.25) == "635057293855503.2"
 
 
 class TestOrderingPromises:

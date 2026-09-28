@@ -98,7 +98,7 @@
       "summary": "Sort a list into ascending order",
       "keywords": ["sort", "order", "ascending", "arrange", "rank"],
       "contract": {
-        "version": 1,
+        "version": 2,
         "inputs": [{ "name": "sequence", "type": "list<T>" }],
         "output": { "name": "sorted", "type": "list<T>" },
         "constraints": { "T": "comparable" },
@@ -109,13 +109,15 @@
         "notes": [
           "STABLE.",
           "int sorts numerically; text sorts by Unicode scalar value, which is not locale-aware and is identical in every backend.",
-          "bool sorts false before true."
+          "bool sorts false before true.",
+          "float sorts numerically. Every float is finite and there is no negative zero, so the order is total."
         ]
       },
       "examples": ["300-0000005@[names] -> ordered"],
       "conformance": [
         { "id": "sort.ints", "args": [[3, 1, 2]], "expect": [1, 2, 3] },
-        { "id": "sort.text_codepoint", "args": [["b", "A", "a"]], "expect": ["A", "a", "b"] }
+        { "id": "sort.text_codepoint", "args": [["b", "A", "a"]], "expect": ["A", "a", "b"] },
+        { "id": "sort.floats", "args": [[2.5, -1.0, 0.1]], "expect": [-1.0, 0.1, 2.5] }
       ],
       "status": "active",
       "since": "0.1.0"

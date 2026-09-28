@@ -1,0 +1,82 @@
+phonebook 0.1
+
+# Floats are the same IEEE 754 binary64 in both backends, and the hardware
+# already agrees on + - * /. Everything around the arithmetic is where Python
+# and Rust part ways, so that is what this file exercises: printing, halves,
+# truncation, negative zero, and what text counts as a float.
+
+# Printing. Rust's Display would write 1.0 as "1" and 1e16 as
+# "10000000000000000"; the contract says "1.0" and "1e+16".
+100-0000001@[1.0]
+100-0000001@[-2.5]
+100-0000001@[1e16]
+100-0000001@[1.5e-5]
+100-0000001@[0.0001]
+100-0000001@[123456789012345.6]
+100-0000001@[-0.0]                        # zero has one sign -> 0.0
+
+# Arithmetic, rounded to nearest. 0.1 + 0.2 is not 0.3 in binary, and both
+# backends must say so the same way.
+400-0000015@[0.1, 0.2] -> a               # ADD_FLOAT
+100-0000001@[a]
+400-0000016@[0.3, 0.1] -> b               # SUB_FLOAT
+100-0000001@[b]
+400-0000017@[-2.0, 0.0] -> c              # MUL_FLOAT -> 0.0, not -0.0
+100-0000001@[c]
+400-0000018@[1.0, 3.0] -> d               # DIV_FLOAT
+100-0000001@[d]
+400-0000018@[-7.0, 2.0] -> e
+100-0000001@[e]
+
+# ROUND sends halves away from zero. Python's round() would give 2.0 and
+# -2.0 for the first two; Rust's f64::round agrees with the contract.
+400-0000021@[2.5] -> r1
+100-0000001@[r1]
+400-0000021@[-2.5] -> r2
+100-0000001@[r2]
+400-0000021@[0.49999999999999994] -> r3   # below one half, so 0.0
+100-0000001@[r3]
+400-0000021@[-0.4] -> r4                  # 0.0, not -0.0
+100-0000001@[r4]
+
+# TO_INT truncates toward zero, the same direction as DIV.
+400-0000020@[2.9] -> i1
+100-0000001@[i1]
+400-0000020@[-2.9] -> i2
+100-0000001@[i2]
+400-0000020@[r2] -> i3
+100-0000001@[i3]
+
+# TO_FLOAT rounds past 2^53 to nearest, ties to even.
+400-0000019@[9007199254740993] -> f1
+100-0000001@[f1]
+400-0000019@[-7] -> f2
+100-0000001@[f2]
+
+# PARSE_FLOAT: Rust's parse::<f64> accepts "inf", "nan" and ".5"; Python's
+# float() accepts "1_000". The contract accepts none of them.
+400-0000022@[" -1.5e3 ", 0.0] -> p1
+100-0000001@[p1]
+400-0000022@["nan", -1.0] -> p2
+100-0000001@[p2]
+400-0000022@["inf", -1.0] -> p3
+100-0000001@[p3]
+400-0000022@[".5", -1.0] -> p4
+100-0000001@[p4]
+400-0000022@["1_000", -1.0] -> p5
+100-0000001@[p5]
+400-0000022@["1e999", -1.0] -> p6          # too large to be finite
+100-0000001@[p6]
+400-0000022@["1e-999", -1.0] -> p7         # too small: 0.0
+100-0000001@[p7]
+400-0000022@["-0", -1.0] -> p8             # 0.0, not -0.0
+100-0000001@[p8]
+
+# Floats are comparable: SORT and LESS_THAN order them numerically.
+300-0000001@[2.5, -1.0, 0.1, 1e16, -0.001] -> values
+300-0000005@[values] -> ordered
+100-0000001@[ordered]
+600-0000005@[0.1, 0.2] -> smaller
+100-0000001@[smaller]
+600-0000006@[a, 0.3] -> larger            # 0.30000000000000004 > 0.3
+100-0000001@[larger]

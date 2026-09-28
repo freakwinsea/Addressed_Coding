@@ -9,7 +9,7 @@ Two rules keep the borrow checker out of the contracts:
 
 The result clones more than hand-written Rust would. That is the honest cost of
 a registry that describes values rather than memory, and it is the reason the
-same 59 addresses can drive a garbage-collected backend and a borrow-checked
+same 67 addresses can drive a garbage-collected backend and a borrow-checked
 one without either leaking into the other.
 """
 
@@ -45,6 +45,8 @@ def rust_type(t: Type) -> str:
         return "String"
     if t.name == "int":
         return "i64"
+    if t.name == "float":
+        return "f64"
     if t.name == "bool":
         return "bool"
     if t.name == "unit":
@@ -172,6 +174,11 @@ class _Emitter:
                 rendered = "true" if arg.value else "false"
             elif isinstance(arg.value, str):
                 rendered = json.dumps(arg.value, ensure_ascii=False) + ".to_string()"
+            elif isinstance(arg.value, float):
+                # repr is the shortest form that reads back exactly, and Rust
+                # reads it the same way; the suffix keeps `1e+16` from being
+                # left to inference.
+                rendered = f"{arg.value!r}f64"
             else:
                 rendered = str(arg.value)
         elif isinstance(arg, Ref):

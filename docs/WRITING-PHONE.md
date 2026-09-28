@@ -32,7 +32,7 @@ ADDRESS@[arg, arg, ...]              # when the address returns nothing
 
 - `# ` starts a comment, to end of line.
 - The `phonebook 0.1` header goes first. It is optional but conventional.
-- Literals: `"text"`, `42`, `-7`, `true`, `false`. Escapes: `\n \t \r \\ \"`.
+- Literals: `"text"`, `42`, `-7`, `1.5`, `-2e3`, `true`, `false`. Escapes: `\n \t \r \\ \"`.
 - Arguments may be named: `@[sequence=lines, predicate=000-0000001]`. The names
   must match the contract, in order.
 
@@ -110,7 +110,7 @@ match what the address wants:
 |---|---|---|
 | `FILTER` | `callable(T)->bool` | one param, returns `bool` |
 | `MAP` | `callable(T)->R` | one param, returns anything |
-| `SORT_BY` | `callable(T)->K` | one param, returns `int`/`text`/`bool` |
+| `SORT_BY` | `callable(T)->K` | one param, returns `int`/`float`/`text`/`bool` |
 | `REDUCE` | `callable(A,T)->A` | **two** params: accumulator first, item second |
 
 You can also pass a registered address directly when its shape already fits —
@@ -120,7 +120,7 @@ is the normal answer.
 ## 4. Types
 
 ```
-int   bool   text   unit
+int   float   bool   text   unit
 list<T>   map<K,V>   pair<K,V>   callable(T,...)->R   any
 ```
 
@@ -128,9 +128,14 @@ list<T>   map<K,V>   pair<K,V>   callable(T,...)->R   any
 - `pair<K,V>` comes from `ENTRIES`; take it apart with `PAIR_KEY` / `PAIR_VALUE`.
 - `map<K,V>` comes from `READ_CSV` (one map per row) and `COUNT_OCCURRENCES`.
 - Generic variables (`T`, `K`, `V`, `A`, `R`) are resolved from your arguments.
-- Some addresses require a *comparable* or *keyable* type — that means `int`,
-  `text`, or `bool` in v0. You cannot sort a list of lists.
-- **There are no floats.** Integer arithmetic only. For money, use whole cents.
+- Some addresses require a *comparable* or *keyable* type. Comparable is `int`,
+  `float`, `text`, or `bool`; keyable is the same without `float`. You cannot
+  sort a list of lists, and you cannot use a float as a map key or in `EQUALS`.
+- **`int` and `float` never mix.** `ADD` is for ints and `ADD_FLOAT` for floats;
+  write `2.0`, not `2`, where a float is wanted. Cross with `TO_FLOAT` and
+  `TO_INT` (which truncates; use `ROUND` first for nearest).
+- Floats are always finite. Dividing by zero is an error, not infinity.
+  For money, whole cents in an `int` are still the exact choice.
 
 ## 5. Patterns you will need
 
@@ -226,7 +231,8 @@ ext 000-0000006 TALLY_OF (entry: pair<text,int>) -> int {
 | Binding the result of `PRINT` | `PRINT` returns nothing |
 | Using `IS_EMPTY` on a list | it takes `text`; use `COUNT` and compare to 0 |
 | Expecting `PARSE_INT` to fail | it takes a fallback and always succeeds |
-| Expecting decimals | integers only; use cents |
+| Mixing `int` and `float` | convert with `TO_FLOAT` / `TO_INT` |
+| Comparing floats with `EQUALS` | not allowed; use `LESS_THAN` / `GREATER_THAN` |
 | An `ext` you never call | delete it, or use it |
 | Recursion | not allowed |
 | Making up an address | check the table below; if it is not there, build it from what is |
@@ -286,6 +292,21 @@ backend languages would otherwise disagree. Read those.
              ! list renders as '[a, b, c]' with each element rendered by this
                same rule.
              ! pair renders as '(k, v)'.
+             ! float renders as the shortest decimal digit string that reads
+               back as the same float. If several strings of that length do,
+               it is the closest to the float's exact value, and if two are
+               equally close, the one whose last digit is even:
+               635057293855503.25 renders as '635057293855503.2'. With those
+               digits d1 d2 ... dn and exponent E, so that the value is
+               d1.d2...dn x 10^E: when -4 <= E < 16 it is written
+               positionally with at least one digit after the point ('1.0',
+               '0.0001', '123.45'); otherwise as d1, then '.' and the
+               remaining digits if any, then 'e', a sign, and at least two
+               exponent digits ('1e+16', '1.5e-05').
+             ! That is exactly Python's repr() for a finite float, and NOT
+               Rust's Display, which writes 1e16 as '10000000000000000' and
+               1.0 as '1'. There is no '-0.0', 'nan' or 'inf' to render:
+               floats are finite and zero has one sign.
 
 100-0000006  ASSERT(condition: bool, message: text)
              Fail with a message unless a condition holds
@@ -407,6 +428,8 @@ b
              ! int sorts numerically; text sorts by Unicode scalar value,
                which is not locale-aware and is identical in every backend.
              ! bool sorts false before true.
+             ! float sorts numerically. Every float is finite and there is no
+               negative zero, so the order is total.
 
 300-0000006  SORT_BY(sequence: list<T>, key: callable(T)->K, descending: bool) -> list<T>
              Sort a list by a derived key
@@ -551,6 +574,79 @@ b
 400-0000014  SIGN(a: int) -> int
              Whether an integer is negative, zero, or positive
              ! Returns exactly -1, 0, or 1. Never fails.
+
+400-0000015  ADD_FLOAT(a: float, b: float) -> float
+             Add two floats
+             ! float is IEEE 754 binary64. The result is the exact sum
+               rounded to nearest, ties to even, which every backend gets
+               from its hardware.
+             ! FINITE ONLY: a result too large to be finite is an overflow
+               error. NaN and infinity never exist as values.
+             ! NO NEGATIVE ZERO: a result of -0.0 is 0.0.
+             errors: overflow
+
+400-0000016  SUB_FLOAT(a: float, b: float) -> float
+             Subtract the second float from the first
+             ! Rounded to nearest, ties to even. A result too large to be
+               finite is an overflow error.
+             ! NO NEGATIVE ZERO: 0.0 - 0.0 is 0.0, and so is any other
+               difference that would be -0.0.
+             errors: overflow
+
+400-0000017  MUL_FLOAT(a: float, b: float) -> float
+             Multiply two floats
+             ! Rounded to nearest, ties to even. A result too large to be
+               finite is an overflow error; a result too small to represent
+               is 0.0.
+             ! NO NEGATIVE ZERO: -2.0 * 0.0 is 0.0.
+             errors: overflow
+
+400-0000018  DIV_FLOAT(a: float, b: float) -> float
+             Divide one float by another
+             ! Rounded to nearest, ties to even.
+             ! DIVIDING BY ZERO IS AN ERROR, including 0.0 / 0.0. IEEE 754
+               would give infinity or NaN; this contract never produces
+               either.
+             ! A quotient too large to be finite is an overflow error. One
+               too small to represent is 0.0, never -0.0.
+             errors: division_by_zero, overflow
+
+400-0000019  TO_FLOAT(value: int) -> float
+             Convert an integer to a float
+             ! Exact for every integer whose magnitude is at most 2^53.
+               Larger integers round to the nearest float, ties to even:
+               9007199254740993 becomes 9007199254740992.0.
+
+400-0000020  TO_INT(value: float) -> int
+             Convert a float to an integer, truncating toward zero
+             ! TRUNCATES TOWARD ZERO: 2.9 is 2 and -2.9 is -2.
+             ! A value whose truncation does not fit a 64-bit signed integer
+               is an overflow error. It never saturates, which is what Rust's
+               `as i64` would do.
+             errors: overflow
+
+400-0000021  ROUND(value: float) -> float
+             Round a float to the nearest whole number, halves away from zero
+             ! HALVES AWAY FROM ZERO: 2.5 is 3.0 and -2.5 is -3.0. A Python
+               backend must NOT use round(), which would give 2.
+             ! Decided on the exact binary value, never on its printed
+               digits: 0.49999999999999994 is 0.0, because it is below one
+               half.
+             ! The result is a float. Use TO_INT (400-0000020) to get an int.
+               NO NEGATIVE ZERO: -0.4 rounds to 0.0.
+
+400-0000022  PARSE_FLOAT(value: text, fallback: float) -> float
+             Read a float from text, or a fallback when it is not one
+             ! Never fails; unparseable text returns the fallback.
+             ! Accepts, after trimming surrounding whitespace: an optional
+               '+' or '-', one or more ASCII digits, optionally '.' and one
+               or more digits, optionally 'e' or 'E', an optional sign, and
+               one or more digits. So '3', '-0.5' and '1.5e3' parse; '.5',
+               '5.', '1_000', 'nan', 'inf' and 'infinity' do not.
+             ! The decimal value is rounded to the nearest float, ties to
+               even, however many digits it has.
+             ! A value too large to be finite returns the fallback. A value
+               too small to represent is 0.0. '-0' is 0.0.
 ```
 
 ### 500 — Input / output — the only addresses with effects
@@ -624,6 +720,8 @@ b
              True when the first value orders before the second
              ! Ordering matches SORT (300-0000005): numeric for int, Unicode
                scalar value for text, false before true for bool.
+             ! float compares numerically, and an int is never compared with
+               a float: both arguments have the same type.
 
 600-0000006  GREATER_THAN(a: T, b: T) -> bool
              True when the first value orders after the second

@@ -110,6 +110,8 @@ class _Emitter:
                 return "True" if arg.value else "False"
             if isinstance(arg.value, str):
                 return json.dumps(arg.value, ensure_ascii=False)
+            if isinstance(arg.value, float):
+                return repr(arg.value)
             return str(arg.value)
         if isinstance(arg, Ref):
             return names[arg.name]

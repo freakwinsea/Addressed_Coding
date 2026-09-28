@@ -205,6 +205,36 @@ def test_constraints_are_enforced(registry):
     fails(source, registry, "not comparable")
 
 
+def test_float_literals(registry):
+    checked = build("400-0000015@[1.5, -2e3] -> total\n100-0000001@[total]\n", registry)
+    literals = [arg.value for arg in checked.body[0].call.args]
+    assert literals == [1.5, -2000.0]
+    assert all(type(value) is float for value in literals)
+
+
+def test_float_literal_negative_zero_is_zero(registry):
+    checked = build("400-0000015@[-0.0, 1.0] -> total\n100-0000001@[total]\n", registry)
+    assert str(checked.body[0].call.args[0].value) == "0.0"
+
+
+def test_float_literal_must_be_finite(registry):
+    fails("400-0000015@[1e999, 1.0] -> total\n100-0000001@[total]\n", registry, "finite")
+
+
+def test_int_and_float_do_not_mix(registry):
+    fails("400-0000015@[1, 2.0] -> total\n100-0000001@[total]\n", registry, "expected float, got int")
+    fails("400-0000001@[1, 2.0] -> total\n100-0000001@[total]\n", registry, "expected int, got float")
+
+
+def test_floats_are_comparable_but_not_keyable(registry):
+    build("300-0000001@[2.5, 1.0] -> xs\n300-0000005@[xs] -> ys\n100-0000001@[ys]\n", registry)
+    fails(
+        "300-0000001@[2.5, 1.0] -> xs\n300-0000008@[xs] -> ys\n100-0000001@[ys]\n",
+        registry,
+        "not keyable",
+    )
+
+
 def test_contract_version_mismatch(registry):
     fails('100-0000001@contract:99@["hi"]\n', registry, "contract v")
 
