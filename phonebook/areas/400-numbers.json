@@ -1,7 +1,7 @@
 {
   "area": "400",
   "title": "Numbers",
-  "description": "Integer and floating-point arithmetic. int is 64-bit signed; float is IEEE 754 binary64, always finite, with no negative zero. DIV and MOD pin the two places Python and Rust disagree about negative operands; ROUND pins where they disagree about halves; TO_TEXT pins how a float prints.",
+  "description": "Integer and floating-point arithmetic. int is 64-bit signed; bigint is exact up to 4000 decimal digits; float is IEEE 754 binary64, always finite, with no negative zero. DIV and MOD pin the two places Python and Rust disagree about negative operands; ROUND pins where they disagree about halves; TO_TEXT pins how a float prints.",
   "entries": [
     {
       "address": "400-0000001",
@@ -594,6 +594,252 @@
         { "id": "parse_float.too_large", "args": ["1e999", -1.0], "expect": -1.0 },
         { "id": "parse_float.bare_point_rejected", "args": [".5", -1.0], "expect": -1.0 },
         { "id": "parse_float.underscores_rejected", "args": ["1_000.0", -1.0], "expect": -1.0 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000023",
+      "name": "TO_BIG",
+      "summary": "Widen an int to a bigint",
+      "keywords": ["bigint", "big", "widen", "convert", "promote", "arbitrary precision"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "int" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Every int is a bigint, so this never fails and never changes the value.",
+          "int and bigint never mix: ADD takes two ints and ADD_BIG takes two bigints. This is how an int crosses over."
+        ]
+      },
+      "examples": ["400-0000023@[count] -> big_count"],
+      "conformance": [
+        { "id": "to_big.positive", "args": [42], "expect": 42 },
+        { "id": "to_big.min", "args": [-9223372036854775808], "expect": -9223372036854775808 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000024",
+      "name": "BIG_TO_INT",
+      "summary": "Narrow a bigint to an int",
+      "keywords": ["bigint", "int", "narrow", "convert", "fit"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "bigint" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "A value outside the 64-bit signed range is an overflow error. It never wraps or saturates."
+        ]
+      },
+      "examples": ["400-0000024@[total] -> small_total"],
+      "conformance": [
+        { "id": "big_to_int.fits", "args": [-9223372036854775808], "expect": -9223372036854775808 },
+        { "id": "big_to_int.too_big", "args": [9223372036854775808], "expect": null, "raises": "overflow" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000025",
+      "name": "ADD_BIG",
+      "summary": "Add two bigints",
+      "keywords": ["add", "plus", "sum", "bigint", "big", "arbitrary precision"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "bigint" }, { "name": "b", "type": "bigint" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "bigint is an exact whole number of up to 4000 decimal digits. There is no rounding and no wrapping.",
+          "A result with more than 4000 decimal digits is an overflow error. Every bigint address that can grow checks this, so Python and Rust fail at exactly the same place."
+        ]
+      },
+      "examples": ["400-0000025@[a, b] -> total"],
+      "conformance": [
+        { "id": "add_big.past_int64", "args": [9223372036854775807, 1], "expect": 9223372036854775808 },
+        { "id": "add_big.opposite_signs", "args": [-5, 3], "expect": -2 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000026",
+      "name": "SUB_BIG",
+      "summary": "Subtract the second bigint from the first",
+      "keywords": ["subtract", "minus", "difference", "bigint", "big"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "bigint" }, { "name": "b", "type": "bigint" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "A result with more than 4000 decimal digits is an overflow error. Every bigint address that can grow checks this, so Python and Rust fail at exactly the same place.",
+          "Zero has one sign: 5 - 5 is 0, never -0."
+        ]
+      },
+      "examples": ["400-0000026@[a, b] -> difference"],
+      "conformance": [
+        { "id": "sub_big.below_int64", "args": [-9223372036854775808, 1], "expect": -9223372036854775809 },
+        { "id": "sub_big.to_zero", "args": [5, 5], "expect": 0 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000027",
+      "name": "MUL_BIG",
+      "summary": "Multiply two bigints",
+      "keywords": ["multiply", "times", "product", "bigint", "big"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "bigint" }, { "name": "b", "type": "bigint" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "A result with more than 4000 decimal digits is an overflow error. Every bigint address that can grow checks this, so Python and Rust fail at exactly the same place."
+        ]
+      },
+      "examples": ["400-0000027@[a, b] -> product"],
+      "conformance": [
+        { "id": "mul_big.past_int64", "args": [4294967296, 4294967296], "expect": 18446744073709551616 },
+        { "id": "mul_big.signs", "args": [-3, 7], "expect": -21 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000028",
+      "name": "DIV_BIG",
+      "summary": "Divide one bigint by another, truncating toward zero",
+      "keywords": ["divide", "quotient", "bigint", "big"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "bigint" }, { "name": "b", "type": "bigint" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": ["division_by_zero"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "TRUNCATES TOWARD ZERO, exactly as DIV (400-0000004) does: -7 / 2 is -3, not -4. A Python backend must NOT use //.",
+          "The quotient is never larger than the dividend, so this cannot overflow."
+        ]
+      },
+      "examples": ["400-0000028@[total, parts] -> share"],
+      "conformance": [
+        { "id": "div_big.truncates", "args": [-7, 2], "expect": -3 },
+        { "id": "div_big.large", "args": [1000000000000000000000000000000, 1000000000000], "expect": 1000000000000000000 },
+        { "id": "div_big.by_zero", "args": [1, 0], "expect": null, "raises": "division_by_zero" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000029",
+      "name": "MOD_BIG",
+      "summary": "Remainder of dividing one bigint by another",
+      "keywords": ["modulo", "remainder", "mod", "bigint", "big"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "bigint" }, { "name": "b", "type": "bigint" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": ["division_by_zero"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "SIGN OF THE DIVIDEND, exactly as MOD (400-0000005) does: -7 mod 2 is -1, not 1. A Python backend must NOT use %.",
+          "Consistent with DIV_BIG (400-0000028) so that a == DIV_BIG(a,b)*b + MOD_BIG(a,b)."
+        ]
+      },
+      "examples": ["400-0000029@[total, parts] -> left_over"],
+      "conformance": [
+        { "id": "mod_big.dividend_sign", "args": [-7, 2], "expect": -1 },
+        { "id": "mod_big.large", "args": [1000000000000000000000000000007, 1000000000000], "expect": 7 },
+        { "id": "mod_big.by_zero", "args": [1, 0], "expect": null, "raises": "division_by_zero" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000030",
+      "name": "POW_BIG",
+      "summary": "Raise a bigint to a whole-number power",
+      "keywords": ["pow", "power", "exponent", "raise", "bigint", "big", "factorial"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "base", "type": "bigint" }, { "name": "exponent", "type": "int" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": ["negative_exponent", "overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "POW_BIG(x, 0) is 1 for every x, including POW_BIG(0, 0).",
+          "A negative exponent is an error, not a fraction.",
+          "Overflow is an error exactly when the true result has more than 4000 decimal digits. POW_BIG(10, 3999) fits; POW_BIG(10, 4000) does not.",
+          "A backend must not build an intermediate of more than 8000 digits before noticing an overflow: the exponent is an int, and 2 to the power 2^62 would never finish."
+        ]
+      },
+      "examples": ["400-0000030@[base, 100] -> huge"],
+      "conformance": [
+        { "id": "pow_big.past_int64", "args": [2, 64], "expect": 18446744073709551616 },
+        { "id": "pow_big.zero_zero", "args": [0, 0], "expect": 1 },
+        { "id": "pow_big.negative_base", "args": [-3, 3], "expect": -27 },
+        { "id": "pow_big.ceiling_overflows", "args": [10, 4000], "expect": null, "raises": "overflow" },
+        { "id": "pow_big.one_huge_exponent", "args": [1, 9223372036854775807], "expect": 1 },
+        { "id": "pow_big.two_huge_exponent", "args": [2, 9223372036854775807], "expect": null, "raises": "overflow" },
+        { "id": "pow_big.negative_exponent", "args": [2, -1], "expect": null, "raises": "negative_exponent" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000031",
+      "name": "PARSE_BIG",
+      "summary": "Read a bigint from text, with a fallback",
+      "keywords": ["parse", "read", "convert", "text to number", "bigint", "big"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }, { "name": "fallback", "type": "bigint" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Never fails; unparseable text returns the fallback.",
+          "The same grammar as PARSE_INT (400-0000009): optional leading '-' or '+' then ASCII digits, with surrounding whitespace trimmed first. Underscores, other digit systems, and other bases are rejected.",
+          "Leading zeros do not count toward the 4000-digit ceiling. More than 4000 digits after them returns the fallback."
+        ]
+      },
+      "examples": ["400-0000031@[cell, 0n] -> amount"],
+      "conformance": [
+        { "id": "parse_big.past_int64", "args": [" 123456789012345678901234567890 ", 0], "expect": 123456789012345678901234567890 },
+        { "id": "parse_big.negative", "args": ["-42", 0], "expect": -42 },
+        { "id": "parse_big.plus", "args": ["+7", 0], "expect": 7 },
+        { "id": "parse_big.leading_zeros", "args": ["000000000000000000000000000001", 0], "expect": 1 },
+        { "id": "parse_big.junk", "args": ["12x", -1], "expect": -1 },
+        { "id": "parse_big.underscores", "args": ["1_000", -1], "expect": -1 }
       ],
       "status": "active",
       "since": "0.2.0"

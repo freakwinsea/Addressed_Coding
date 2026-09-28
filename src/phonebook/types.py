@@ -12,15 +12,16 @@ from dataclasses import dataclass, field
 
 from .errors import CheckError
 
-PRIMITIVES = {"int", "float", "bool", "text", "unit", "any"}
+PRIMITIVES = {"int", "bigint", "float", "bool", "text", "unit", "any"}
 CONTAINERS = {"list": 1, "map": 2, "pair": 2}
 
 #: Types that can be ordered by SORT / LESS_THAN and friends. float is here
 #: because every float is finite and zero has one sign, so the order is total.
-COMPARABLE = {"int", "float", "text", "bool"}
+COMPARABLE = {"int", "bigint", "float", "text", "bool"}
 #: Types that can be a map key or deduplicated by UNIQUE. float is not: equality
-#: on computed floats is a trap, and Rust's f64 is not `Ord`.
-KEYABLE = {"int", "text", "bool"}
+#: on computed floats is a trap, and Rust's f64 is not `Ord`. bigint is exact, so
+#: it is.
+KEYABLE = {"int", "bigint", "text", "bool"}
 
 _VAR = re.compile(r"^[A-Z][A-Z0-9]*$")
 
@@ -64,6 +65,7 @@ class Type:
 
 
 INT = Type("int")
+BIGINT = Type("bigint")
 FLOAT = Type("float")
 BOOL = Type("bool")
 TEXT = Type("text")

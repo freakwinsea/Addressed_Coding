@@ -110,7 +110,7 @@ match what the address wants:
 |---|---|---|
 | `FILTER` | `callable(T)->bool` | one param, returns `bool` |
 | `MAP` | `callable(T)->R` | one param, returns anything |
-| `SORT_BY` | `callable(T)->K` | one param, returns `int`/`float`/`text`/`bool` |
+| `SORT_BY` | `callable(T)->K` | one param, returns `int`/`bigint`/`float`/`text`/`bool` |
 | `REDUCE` | `callable(A,T)->A` | **two** params: accumulator first, item second |
 
 You can also pass a registered address directly when its shape already fits —
@@ -120,7 +120,7 @@ is the normal answer.
 ## 4. Types
 
 ```
-int   float   bool   text   unit
+int   bigint   float   bool   text   unit
 list<T>   map<K,V>   pair<K,V>   callable(T,...)->R   any
 ```
 
@@ -129,12 +129,16 @@ list<T>   map<K,V>   pair<K,V>   callable(T,...)->R   any
 - `map<K,V>` comes from `READ_CSV` (one map per row) and `COUNT_OCCURRENCES`.
 - Generic variables (`T`, `K`, `V`, `A`, `R`) are resolved from your arguments.
 - Some addresses require a *comparable* or *keyable* type. Comparable is `int`,
-  `float`, `text`, or `bool`; keyable is the same without `float`. You cannot
+  `bigint`, `float`, `text`, or `bool`; keyable is the same without `float`. You cannot
   sort a list of lists, and you cannot use a float as a map key or in `EQUALS`.
 - **`int` and `float` never mix.** `ADD` is for ints and `ADD_FLOAT` for floats;
   write `2.0`, not `2`, where a float is wanted. Cross with `TO_FLOAT` and
   `TO_INT` (which truncates; use `ROUND` first for nearest).
 - Floats are always finite. Dividing by zero is an error, not infinity.
+- **`bigint` is for whole numbers too big for `int`** (past about 9.2e18), up
+  to 4000 digits. Write it with an `n`: `12n`. It has its own addresses
+  (`ADD_BIG`, `MUL_BIG`, `POW_BIG`, ...) and never mixes with `int`; cross with
+  `TO_BIG` and `BIG_TO_INT`.
   For money, whole cents in an `int` are still the exact choice.
 
 ## 5. Patterns you will need
@@ -232,6 +236,7 @@ ext 000-0000006 TALLY_OF (entry: pair<text,int>) -> int {
 | Using `IS_EMPTY` on a list | it takes `text`; use `COUNT` and compare to 0 |
 | Expecting `PARSE_INT` to fail | it takes a fallback and always succeeds |
 | Mixing `int` and `float` | convert with `TO_FLOAT` / `TO_INT` |
+| Mixing `int` and `bigint` | convert with `TO_BIG` / `BIG_TO_INT`; write big literals as `12n` |
 | Comparing floats with `EQUALS` | not allowed; use `LESS_THAN` / `GREATER_THAN` |
 | An `ext` you never call | delete it, or use it |
 | Recursion | not allowed |
@@ -307,6 +312,8 @@ backend languages would otherwise disagree. Read those.
                Rust's Display, which writes 1e16 as '10000000000000000' and
                1.0 as '1'. There is no '-0.0', 'nan' or 'inf' to render:
                floats are finite and zero has one sign.
+             ! bigint renders exactly as int does: base 10 with a leading '-'
+               for negatives, and no suffix, so 12n renders as '12'.
 
 100-0000006  ASSERT(condition: bool, message: text)
              Fail with a message unless a condition holds
@@ -430,6 +437,7 @@ b
              ! bool sorts false before true.
              ! float sorts numerically. Every float is finite and there is no
                negative zero, so the order is total.
+             ! bigint sorts numerically.
 
 300-0000006  SORT_BY(sequence: list<T>, key: callable(T)->K, descending: bool) -> list<T>
              Sort a list by a derived key
@@ -648,6 +656,81 @@ b
              ! A value too large to be finite returns the fallback. A value
                too small to represent is 0.0. '-0' is 0.0.
 
+400-0000023  TO_BIG(value: int) -> bigint
+             Widen an int to a bigint
+             ! Every int is a bigint, so this never fails and never changes
+               the value.
+             ! int and bigint never mix: ADD takes two ints and ADD_BIG takes
+               two bigints. This is how an int crosses over.
+
+400-0000024  BIG_TO_INT(value: bigint) -> int
+             Narrow a bigint to an int
+             ! A value outside the 64-bit signed range is an overflow error.
+               It never wraps or saturates.
+             errors: overflow
+
+400-0000025  ADD_BIG(a: bigint, b: bigint) -> bigint
+             Add two bigints
+             ! bigint is an exact whole number of up to 4000 decimal digits.
+               There is no rounding and no wrapping.
+             ! A result with more than 4000 decimal digits is an overflow
+               error. Every bigint address that can grow checks this, so
+               Python and Rust fail at exactly the same place.
+             errors: overflow
+
+400-0000026  SUB_BIG(a: bigint, b: bigint) -> bigint
+             Subtract the second bigint from the first
+             ! A result with more than 4000 decimal digits is an overflow
+               error. Every bigint address that can grow checks this, so
+               Python and Rust fail at exactly the same place.
+             ! Zero has one sign: 5 - 5 is 0, never -0.
+             errors: overflow
+
+400-0000027  MUL_BIG(a: bigint, b: bigint) -> bigint
+             Multiply two bigints
+             ! A result with more than 4000 decimal digits is an overflow
+               error. Every bigint address that can grow checks this, so
+               Python and Rust fail at exactly the same place.
+             errors: overflow
+
+400-0000028  DIV_BIG(a: bigint, b: bigint) -> bigint
+             Divide one bigint by another, truncating toward zero
+             ! TRUNCATES TOWARD ZERO, exactly as DIV (400-0000004) does: -7 /
+               2 is -3, not -4. A Python backend must NOT use //.
+             ! The quotient is never larger than the dividend, so this cannot
+               overflow.
+             errors: division_by_zero
+
+400-0000029  MOD_BIG(a: bigint, b: bigint) -> bigint
+             Remainder of dividing one bigint by another
+             ! SIGN OF THE DIVIDEND, exactly as MOD (400-0000005) does: -7
+               mod 2 is -1, not 1. A Python backend must NOT use %.
+             ! Consistent with DIV_BIG (400-0000028) so that a ==
+               DIV_BIG(a,b)*b + MOD_BIG(a,b).
+             errors: division_by_zero
+
+400-0000030  POW_BIG(base: bigint, exponent: int) -> bigint
+             Raise a bigint to a whole-number power
+             ! POW_BIG(x, 0) is 1 for every x, including POW_BIG(0, 0).
+             ! A negative exponent is an error, not a fraction.
+             ! Overflow is an error exactly when the true result has more
+               than 4000 decimal digits. POW_BIG(10, 3999) fits; POW_BIG(10,
+               4000) does not.
+             ! A backend must not build an intermediate of more than 8000
+               digits before noticing an overflow: the exponent is an int,
+               and 2 to the power 2^62 would never finish.
+             errors: negative_exponent, overflow
+
+400-0000031  PARSE_BIG(value: text, fallback: bigint) -> bigint
+             Read a bigint from text, with a fallback
+             ! Never fails; unparseable text returns the fallback.
+             ! The same grammar as PARSE_INT (400-0000009): optional leading
+               '-' or '+' then ASCII digits, with surrounding whitespace
+               trimmed first. Underscores, other digit systems, and other
+               bases are rejected.
+             ! Leading zeros do not count toward the 4000-digit ceiling. More
+               than 4000 digits after them returns the fallback.
+
 400-0000032  GCD(a: int, b: int) -> int
              The greatest common divisor of two integers
              ! The result is never negative: GCD(-12, 18) is 6. Signs of the
@@ -768,6 +851,8 @@ b
                scalar value for text, false before true for bool.
              ! float compares numerically, and an int is never compared with
                a float: both arguments have the same type.
+             ! bigint compares numerically, and an int is never compared with
+               a bigint either.
 
 600-0000006  GREATER_THAN(a: T, b: T) -> bool
              True when the first value orders after the second

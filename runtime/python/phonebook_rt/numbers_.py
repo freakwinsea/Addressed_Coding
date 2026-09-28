@@ -300,3 +300,106 @@ def _layout(digits: str, exponent: int) -> str:
     mantissa = digits[0] + ("." + digits[1:] if len(digits) > 1 else "")
     sign = "+" if exponent >= 0 else "-"
     return f"{mantissa}e{sign}{abs(exponent):02d}"
+
+
+# --------------------------------------------------------------------------
+# bigints
+# --------------------------------------------------------------------------
+#
+# A bigint is a Python int, so the arithmetic is the host's own and exact. What
+# the contract adds is the ceiling: at most BIGINT_MAX_DIGITS decimal digits.
+# The ceiling is compared against a power of ten, never by counting the digits
+# of a string, because Python refuses to turn an int of more than 4300 digits
+# into text at all.
+
+BIGINT_MAX_DIGITS = 4000
+_BIGINT_LIMIT = 10**BIGINT_MAX_DIGITS
+
+
+def _checked_big(value: int, operation: str) -> int:
+    """Every bigint result passes through here."""
+    if -_BIGINT_LIMIT < value < _BIGINT_LIMIT:
+        return value
+    raise PhonebookFault(
+        "overflow", f"{operation} result has more than {BIGINT_MAX_DIGITS} digits"
+    )
+
+
+def to_big(value: int) -> int:
+    """400-0000023 TO_BIG — every int is a bigint; this never fails."""
+    return value
+
+
+def big_to_int(value: int) -> int:
+    """400-0000024 BIG_TO_INT — overflow outside the 64-bit range, never wraps."""
+    if value < INT64_MIN or value > INT64_MAX:
+        raise PhonebookFault("overflow", "BIG_TO_INT value does not fit in a 64-bit signed integer")
+    return value
+
+
+def add_big(a: int, b: int) -> int:
+    """400-0000025 ADD_BIG."""
+    return _checked_big(a + b, "ADD_BIG")
+
+
+def sub_big(a: int, b: int) -> int:
+    """400-0000026 SUB_BIG."""
+    return _checked_big(a - b, "SUB_BIG")
+
+
+def mul_big(a: int, b: int) -> int:
+    """400-0000027 MUL_BIG."""
+    return _checked_big(a * b, "MUL_BIG")
+
+
+def div_big(a: int, b: int) -> int:
+    """400-0000028 DIV_BIG — truncates toward zero, as DIV does. NOT `//`."""
+    if b == 0:
+        raise PhonebookFault("division_by_zero", "DIV_BIG by zero")
+    quotient = abs(a) // abs(b)
+    return -quotient if (a < 0) != (b < 0) else quotient
+
+
+def mod_big(a: int, b: int) -> int:
+    """400-0000029 MOD_BIG — sign of the dividend, as MOD does. NOT `%`."""
+    if b == 0:
+        raise PhonebookFault("division_by_zero", "MOD_BIG by zero")
+    remainder = abs(a) % abs(b)
+    return -remainder if a < 0 else remainder
+
+
+def pow_big(base: int, exponent: int) -> int:
+    """400-0000030 POW_BIG — the same square-and-multiply as POW.
+
+    NOT `**`, which would build a number of any size before anything checked
+    it. Here every step is checked against the ceiling, so no intermediate is
+    ever more than twice the ceiling's digits.
+    """
+    if exponent < 0:
+        raise PhonebookFault("negative_exponent", f"POW_BIG exponent {exponent} is negative")
+    result = 1
+    while exponent > 0:
+        if exponent & 1:
+            result = _checked_big(result * base, "POW_BIG")
+        exponent >>= 1
+        if exponent > 0:
+            base = _checked_big(base * base, "POW_BIG")
+    return result
+
+
+def parse_big(value: str, fallback: int) -> int:
+    """400-0000031 PARSE_BIG — never fails; unparseable text yields the fallback.
+
+    Leading zeros are dropped before the digits are counted or converted, so
+    "000...0001" is 1 however many zeros it has, and `int()` never sees more
+    digits than the ceiling (it would refuse past 4300).
+    """
+    candidate = value.strip(WHITESPACE)
+    if not _INT.match(candidate):
+        return fallback
+    negative = candidate[0] == "-"
+    digits = candidate.lstrip("+-").lstrip("0")
+    if len(digits) > BIGINT_MAX_DIGITS:
+        return fallback
+    parsed = int(digits) if digits else 0
+    return -parsed if negative else parsed

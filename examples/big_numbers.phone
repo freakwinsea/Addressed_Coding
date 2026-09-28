@@ -1,0 +1,31 @@
+phonebook 0.1
+
+# Whole numbers past the 64-bit range, exact in both backends.
+#
+# int stops at 9223372036854775807, and ADD, MUL and POW say so with an
+# overflow error. bigint goes to 4000 digits: Python keeps the promise with
+# its own int, Rust with the runtime's BigInt, and they print the same digits.
+
+ext 000-0000001 TIMES (acc: bigint, n: int) -> bigint {
+  400-0000023@[n]         -> wide      # TO_BIG
+  400-0000027@[acc, wide] -> next      # MUL_BIG
+  return next
+}
+
+# 25 factorial, one step past what fits in an int.
+300-0000001@[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25] -> ns
+300-0000004@[ns, 000-0000001, 1n] -> factorial
+100-0000001@[factorial]
+
+# 2 to the 128th, and one less: the largest unsigned 128-bit number.
+400-0000030@[2n, 128] -> two_128
+400-0000026@[two_128, 1n] -> u128_max
+100-0000001@[u128_max]
+
+# Read a bigint from text, then split it into whole and part with DIV_BIG and
+# MOD_BIG, which truncate toward zero exactly as DIV and MOD do.
+400-0000031@["-98765432109876543210987654321", 0n] -> amount
+400-0000028@[amount, 1000000000n] -> billions
+400-0000029@[amount, 1000000000n] -> rest
+100-0000001@[billions]
+100-0000001@[rest]
