@@ -97,6 +97,12 @@
     "400-0000048": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::parse_dec" }] },
     "400-0000049": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::dec_to_float" }] },
     "400-0000050": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::float_to_dec" }] },
+    "400-0000060": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::number_equals", "inline": "({0} == {1})" }] },
+    "400-0000061": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::number_not_equals", "inline": "({0} != {1})" }] },
+    "400-0000062": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::less_or_equal", "inline": "({0} <= {1})" }] },
+    "400-0000063": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::greater_or_equal", "inline": "({0} >= {1})" }] },
+    "400-0000064": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::compare" }] },
+    "400-0000065": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::close_to" }] },
 
     "500-0000001": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "io_::read_text_file" }] },
     "500-0000002": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "io_::write_text_file" }] },

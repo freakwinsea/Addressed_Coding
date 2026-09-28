@@ -899,6 +899,56 @@ b
                10000000000000000.
              ! Never fails: a float has at most 17 significant digits and E
                is between -324 and 308, inside both decimal ceilings.
+
+400-0000060  NUMBER_EQUALS(a: T, b: T) -> bool
+             True when two numbers of the same type are equal
+             ! Both arguments have the same type: an int is never compared
+               with a float.
+             ! EXACT. For floats this is equality of the binary value, so 0.1
+               + 0.2 does not equal 0.3. Use CLOSE_TO (400-0000065) for
+               computed floats.
+             ! There is one zero and no NaN, so every float equals itself and
+               nothing else is equal to it.
+
+400-0000061  NUMBER_NOT_EQUALS(a: T, b: T) -> bool
+             True when two numbers of the same type are different
+             ! Exactly the opposite of NUMBER_EQUALS (400-0000060), with the
+               same exactness for floats.
+
+400-0000062  LESS_OR_EQUAL(a: T, b: T) -> bool
+             True when the first number is less than or equal to the second
+             ! Numeric order, the same order as LESS_THAN (600-0000005). Both
+               arguments have the same type.
+             ! True exactly when LESS_THAN(a, b) or NUMBER_EQUALS(a, b) is
+               true.
+
+400-0000063  GREATER_OR_EQUAL(a: T, b: T) -> bool
+             True when the first number is greater than or equal to the second
+             ! Numeric order, the same order as GREATER_THAN (600-0000006).
+               Both arguments have the same type.
+             ! True exactly when GREATER_THAN(a, b) or NUMBER_EQUALS(a, b) is
+               true.
+
+400-0000064  COMPARE(a: T, b: T) -> int
+             Compare two numbers: -1 if the first is smaller, 0 if equal, 1 if larger
+             ! Returns exactly -1, 0, or 1, never another negative or
+               positive number. Never fails.
+             ! Numeric order, the same order as LESS_THAN (600-0000005). 0
+               means NUMBER_EQUALS (400-0000060) is true.
+             ! Python has no cmp() and Rust's cmp returns an Ordering, not a
+               number; the contract picks the integers.
+
+400-0000065  CLOSE_TO(a: float, b: float, tolerance: float) -> bool
+             True when two floats are within a tolerance of each other
+             ! ABSOLUTE tolerance: true when |a - b| <= tolerance, with a - b
+               rounded to the nearest float. Not Python's math.isclose, which
+               is relative by default.
+             ! The tolerance is included, so a tolerance of 0.0 is exact
+               equality.
+             ! A negative tolerance is never met: the result is false. Never
+               fails.
+             ! When a - b is too large to be finite the two are not close:
+               the result is false, not an overflow error.
 ```
 
 ### 500 — Input / output — the only addresses with effects

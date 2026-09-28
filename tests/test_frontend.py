@@ -300,6 +300,14 @@ def test_decimals_are_comparable_but_not_keyable(registry):
           registry, "keyable")
 
 
+def test_number_comparisons_take_numbers_only(registry):
+    """NUMBER_EQUALS takes ints and floats, never text, and never one of each."""
+    build("400-0000060@[0.5, 0.5] -> same\n100-0000001@[same]\n", registry)
+    build("400-0000064@[1, 2] -> order\n100-0000001@[order]\n", registry)
+    fails('400-0000062@["a", "b"] -> le\n100-0000001@[le]\n', registry, "not numeric")
+    fails("400-0000060@[1, 1.0] -> same\n100-0000001@[same]\n", registry, "expected int, got float")
+
+
 def test_contract_version_mismatch(registry):
     fails('100-0000001@contract:99@["hi"]\n', registry, "contract v")
 

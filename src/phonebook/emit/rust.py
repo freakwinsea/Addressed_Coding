@@ -9,7 +9,7 @@ Two rules keep the borrow checker out of the contracts:
 
 The result clones more than hand-written Rust would. That is the honest cost of
 a registry that describes values rather than memory, and it is the reason the
-same 92 addresses can drive a garbage-collected backend and a borrow-checked
+same 98 addresses can drive a garbage-collected backend and a borrow-checked
 one without either leaking into the other.
 """
 
@@ -191,8 +191,13 @@ class _Emitter:
                 # Rust has no literal wider than i128, so a bigint is read from
                 # its digits. The parser already checked they fit the ceiling.
                 rendered = f'rt::BigInt::literal("{arg.value}")'
-            else:
+            elif -(2**31) <= arg.value < 2**31:
                 rendered = str(arg.value)
+            else:
+                # A generic call whose arguments are all literals leaves Rust
+                # to infer the integer type, and it picks i32. That is harmless
+                # inside the i32 range and a compile error outside it.
+                rendered = f"{arg.value}i64"
         elif isinstance(arg, Ref):
             rendered = names[arg.name]
             if clone:

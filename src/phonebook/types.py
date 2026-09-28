@@ -23,6 +23,11 @@ COMPARABLE = {"int", "bigint", "float", "decimal", "text", "bool"}
 #: it is. decimal is not, because 0.3 and 0.30 are equal but print differently,
 #: so which of the two a map kept as its key would be up to the host.
 KEYABLE = {"int", "bigint", "text", "bool"}
+#: Number types, for the comparisons in area 400. float is here even though it
+#: is not keyable: a program that asks whether two floats are equal gets exact
+#: equality, and CLOSE_TO is there for the computed-float case.
+NUMERIC = {"int", "float"}
+CONSTRAINTS = {"comparable": COMPARABLE, "keyable": KEYABLE, "numeric": NUMERIC}
 
 _VAR = re.compile(r"^[A-Z][A-Z0-9]*$")
 
@@ -197,7 +202,7 @@ def unify(declared: Type, actual: Type, subs: Substitution) -> Type:
 
 
 def check_constraint(var: str, kind: str, subs: Substitution) -> None:
-    """Enforce a `comparable` / `keyable` constraint once the variable resolves.
+    """Enforce a `comparable` / `keyable` / `numeric` constraint once the variable resolves.
 
     Unresolved variables pass: nothing concrete has been chosen yet, so there is
     nothing to reject.
@@ -208,7 +213,7 @@ def check_constraint(var: str, kind: str, subs: Substitution) -> None:
     resolved = substitute(resolved, subs)
     if resolved.is_var or resolved.name == "any":
         return
-    allowed = COMPARABLE if kind == "comparable" else KEYABLE
+    allowed = CONSTRAINTS[kind]
     if resolved.name not in allowed:
         raise CheckError(
             f"{resolved} is not {kind}",
