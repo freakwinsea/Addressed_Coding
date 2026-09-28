@@ -308,6 +308,15 @@ def test_number_comparisons_take_numbers_only(registry):
     fails("400-0000060@[1, 1.0] -> same\n100-0000001@[same]\n", registry, "expected int, got float")
 
 
+def test_number_comparisons_take_the_exact_types_too(registry):
+    """bigint, decimal and fraction are numeric; mixing two of them still fails."""
+    build("400-0000060@[1n, 2n] -> same\n100-0000001@[same]\n", registry)
+    build("400-0000064@[0.3d, 0.30d] -> order\n100-0000001@[order]\n", registry)
+    build("400-0000080@[1, 3] -> third\n400-0000062@[third, third] -> le\n100-0000001@[le]\n",
+          registry)
+    fails("400-0000060@[1n, 1d] -> same\n100-0000001@[same]\n", registry, "expected bigint, got decimal")
+
+
 def test_fractions_are_their_own_type(registry):
     build("400-0000080@[1, 3] -> third\n400-0000081@[third, third] -> both\n100-0000001@[both]\n", registry)
     fails("400-0000080@[1, 3] -> third\n400-0000001@[third, 1] -> x\n100-0000001@[x]\n", registry, "expected int, got fraction")

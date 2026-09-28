@@ -497,3 +497,46 @@ class TestDecimalAgainstFractions:
         for a, _ in self.operands(9):
             assert Decimal.parse(a.text()).text() == a.text()
             assert self.exact(Decimal.parse(a.text())) == self.exact(a)
+
+
+class TestConversionsBetweenTheExactTypes:
+    """400-0000100..105: the crossings between bigint, decimal, fraction and float."""
+
+    def test_float_to_big_is_the_exact_binary_value(self):
+        from phonebook_rt.numbers_ import float_to_big
+
+        assert float_to_big(1e23) == 99999999999999991611392
+        assert float_to_big(-0.999) == 0
+        assert float_to_big(1.7976931348623157e308) == int(1.7976931348623157e308)
+
+    def test_decimal_and_fraction_round_trip(self):
+        from phonebook_rt.numbers_ import dec_to_fraction, fraction_to_dec
+
+        for text in ["0.75", "-0.10", "19.99", "12", "0.000000000000000001"]:
+            value = Decimal.literal(text)
+            assert fraction_to_dec(dec_to_fraction(value), value.scale).text() == text
+
+    def test_decimal_to_fraction_overflows_rather_than_rounds(self):
+        from phonebook_rt.numbers_ import dec_to_fraction
+
+        with pytest.raises(PhonebookFault) as excinfo:
+            dec_to_fraction(Decimal.literal("0.1234567890123456789012"))
+        assert excinfo.value.code == "overflow"
+
+    def test_fraction_to_dec_rounds_halves_away_from_zero(self):
+        from phonebook_rt.numbers_ import fraction_to_dec, make_fraction
+
+        assert fraction_to_dec(make_fraction(1, 8), 2).text() == "0.13"
+        assert fraction_to_dec(make_fraction(-1, 8), 2).text() == "-0.13"
+        assert fraction_to_dec(make_fraction(-2, 3), 0).text() == "-1"
+        with pytest.raises(PhonebookFault) as excinfo:
+            fraction_to_dec(make_fraction(1, 3), -1)
+        assert excinfo.value.code == "invalid_places"
+
+    def test_big_to_fraction_needs_64_bits(self):
+        from phonebook_rt.numbers_ import big_to_fraction
+
+        assert big_to_fraction(-(2**63)).numerator == -(2**63)
+        with pytest.raises(PhonebookFault) as excinfo:
+            big_to_fraction(2**63)
+        assert excinfo.value.code == "overflow"
