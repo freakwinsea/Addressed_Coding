@@ -6,6 +6,8 @@ its test live in the same file and move together.
 
 from __future__ import annotations
 
+from fractions import Fraction
+
 import pytest
 from phonebook.registry import Registry
 from phonebook_rt import IMPLEMENTATIONS, PhonebookFault
@@ -499,6 +501,96 @@ class TestDecimalAgainstFractions:
             assert self.exact(Decimal.parse(a.text())) == self.exact(a)
 
 
+class TestConversionsBetweenTheExactTypes:
+    """400-0000100..105: the crossings between bigint, decimal, fraction and float."""
+
+    def test_float_to_big_is_the_exact_binary_value(self):
+        from phonebook_rt.numbers_ import float_to_big
+
+        assert float_to_big(1e23) == 99999999999999991611392
+        assert float_to_big(-0.999) == 0
+        assert float_to_big(1.7976931348623157e308) == int(1.7976931348623157e308)
+
+    def test_decimal_and_fraction_round_trip(self):
+        from phonebook_rt.numbers_ import dec_to_fraction, fraction_to_dec
+
+        for text in ["0.75", "-0.10", "19.99", "12", "0.000000000000000001"]:
+            value = Decimal.literal(text)
+            assert fraction_to_dec(dec_to_fraction(value), value.scale).text() == text
+
+    def test_decimal_to_fraction_overflows_rather_than_rounds(self):
+        from phonebook_rt.numbers_ import dec_to_fraction
+
+        with pytest.raises(PhonebookFault) as excinfo:
+            dec_to_fraction(Decimal.literal("0.1234567890123456789012"))
+        assert excinfo.value.code == "overflow"
+
+    def test_fraction_to_dec_rounds_halves_away_from_zero(self):
+        from phonebook_rt.numbers_ import fraction_to_dec, make_fraction
+
+        assert fraction_to_dec(make_fraction(1, 8), 2).text() == "0.13"
+        assert fraction_to_dec(make_fraction(-1, 8), 2).text() == "-0.13"
+        assert fraction_to_dec(make_fraction(-2, 3), 0).text() == "-1"
+        with pytest.raises(PhonebookFault) as excinfo:
+            fraction_to_dec(make_fraction(1, 3), -1)
+        assert excinfo.value.code == "invalid_places"
+
+    def test_big_to_fraction_needs_64_bits(self):
+        from phonebook_rt.numbers_ import big_to_fraction
+
+        assert big_to_fraction(-(2**63)).numerator == -(2**63)
+        with pytest.raises(PhonebookFault) as excinfo:
+            big_to_fraction(2**63)
+        assert excinfo.value.code == "overflow"
+class TestPrintingAgainstFractions:
+    """FORMAT_FLOAT, FORMAT_DEC and FORMAT_FRACTION against the standard
+    library's exact `Fraction`, used here only, never by a runtime."""
+
+    @staticmethod
+    def expected(value, places: int) -> str:
+        """Half away from zero on the exact value, printed with `places` places."""
+        import math
+
+        scaled = abs(value) * 10**places
+        whole = math.floor(scaled + Fraction(1, 2))
+        digits = str(whole).rjust(places + 1, "0")
+        if places:
+            digits = digits[:-places] + "." + digits[-places:]
+        return ("-" if value < 0 and whole else "") + digits
+
+    def test_floats_round_their_shown_digits(self):
+        import random
+
+        from phonebook_rt import numbers_
+
+        rng = random.Random(3)
+        for _ in range(2000):
+            value = rng.choice([-1, 1]) * rng.random() * 10 ** rng.randint(-12, 12)
+            places = rng.choice([0, 1, 2, 3, 8, 20])
+            shown = Fraction(repr(value))  # repr is the shortest digits, as TO_TEXT
+            assert numbers_.format_float(value, places) == self.expected(shown, places)
+
+    def test_fractions_round_their_exact_value(self):
+        import random
+
+        from phonebook_rt import numbers_
+
+        rng = random.Random(4)
+        for _ in range(2000):
+            top = rng.randint(-(2**63), 2**63 - 1)
+            bottom = rng.choice([rng.randint(1, 20), rng.randint(1, 2**63 - 1)])
+            places = rng.choice([0, 1, 2, 5, 30])
+            value = numbers_.make_fraction(top, bottom)
+            assert numbers_.format_fraction(value, places) == self.expected(
+                Fraction(top, bottom), places
+            )
+
+    def test_decimals_match_round_dec(self):
+        from phonebook_rt import numbers_
+
+        for a, _ in TestDecimalAgainstFractions.operands(5):
+            for places in (0, 2, 9):
+                assert numbers_.format_dec(a, places) == numbers_.round_dec(a, places).text()
 class TestRootsAndRemainders:
     """SQRT and SQRT_DEC are worked out by hand, so each gets an oracle used
     only here: `math.sqrt` for the float, which IEEE 754 requires to be

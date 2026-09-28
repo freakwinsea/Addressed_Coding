@@ -10,7 +10,7 @@ from phonebook.types import parse_type
 
 
 def test_loads_every_area(registry: Registry):
-    assert len(registry) == 123
+    assert len(registry) == 132
     assert {e.area for e in registry} == {"100", "200", "300", "400", "500", "600"}
 
 

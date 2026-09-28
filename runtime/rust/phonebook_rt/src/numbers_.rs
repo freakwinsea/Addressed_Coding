@@ -950,6 +950,160 @@ pub fn fraction_text(value: &Fraction) -> String {
 }
 
 // --------------------------------------------------------------------------
+// conversions between the exact types
+// --------------------------------------------------------------------------
+
+/// 400-0000100 DEC_TO_BIG — truncates toward zero, as DEC_TO_INT does; never fails.
+pub fn dec_to_big(value: &Decimal) -> BigInt {
+    value.coefficient().div_rem(&BigInt::pow10(value.scale())).0
+}
+
+/// 400-0000101 BIG_TO_FLOAT — the nearest float, ties to even.
+///
+/// `str::parse::<f64>` of the bigint's text, as DEC_TO_FLOAT reads a
+/// decimal's, so both backends round the same digits the same way.
+pub fn big_to_float(value: &BigInt) -> f64 {
+    match value.to_string().parse::<f64>() {
+        Ok(parsed) => finite(parsed, "BIG_TO_FLOAT"),
+        Err(_) => unreachable!("a bigint's text is always a valid float"),
+    }
+}
+
+/// 400-0000102 FLOAT_TO_BIG — the float's exact binary value, truncated
+/// toward zero.
+///
+/// NOT `as i128`, which saturates. A finite float is mantissa x 2^exponent
+/// with a 53-bit mantissa, so the whole part is the mantissa shifted right
+/// (dropping the fraction bits) or multiplied up by a power of two.
+pub fn float_to_big(value: &f64) -> BigInt {
+    let bits = value.to_bits();
+    let exponent_bits = ((bits >> 52) & 0x7ff) as i64;
+    if exponent_bits == 0 {
+        // Zero or subnormal: always less than 1 in size.
+        return BigInt::from_i64(0);
+    }
+    let mantissa = ((bits & ((1u64 << 52) - 1)) | (1u64 << 52)) as i64;
+    let exponent = exponent_bits - 1075;
+    let mut magnitude = if exponent >= 0 {
+        let mut result = BigInt::from_i64(mantissa);
+        let mut left = exponent;
+        while left > 0 {
+            let step = left.min(62);
+            result = result.mul(&BigInt::from_i64(1i64 << step));
+            left -= step;
+        }
+        result
+    } else if exponent > -53 {
+        BigInt::from_i64(mantissa >> -exponent)
+    } else {
+        BigInt::from_i64(0)
+    };
+    if *value < 0.0 {
+        magnitude = magnitude.neg();
+    }
+    magnitude
+}
+
+/// Euclid's algorithm on bigints, both not negative.
+fn gcd_big(mut a: BigInt, mut b: BigInt) -> BigInt {
+    while !b.is_zero() {
+        let rest = a.div_rem(&b).1;
+        a = b;
+        b = rest;
+    }
+    a
+}
+
+/// 400-0000103 DEC_TO_FRACTION — exact: coefficient / 10^scale, reduced.
+///
+/// The coefficient can have 4000 digits, far past `fraction`'s i128 working,
+/// so this reduces in bigints first and only then asks whether the parts fit.
+pub fn dec_to_fraction(value: &Decimal) -> Fraction {
+    let top = value.coefficient().clone();
+    let bottom = BigInt::pow10(value.scale());
+    let divisor = gcd_big(top.abs(), bottom.clone());
+    let top = top.div_rem(&divisor).0;
+    let bottom = bottom.div_rem(&divisor).0;
+    match (top.to_i64(), bottom.to_i64()) {
+        (Some(numerator), Some(denominator)) => Fraction {
+            numerator,
+            denominator,
+        },
+        _ => crate::fault(
+            "overflow",
+            "DEC_TO_FRACTION result does not fit in a 64-bit fraction",
+        ),
+    }
+}
+
+/// 400-0000104 FRACTION_TO_DEC — rounded once to `places`, halves away from zero.
+///
+/// numerator * 10^places / denominator, rounded to a whole number, is the
+/// coefficient. The denominator is always positive, as divide_rounded needs.
+pub fn fraction_to_dec(value: &Fraction, places: &i64) -> Decimal {
+    let places = checked_places(*places, "FRACTION_TO_DEC");
+    let numerator = BigInt::from_i64(value.numerator).mul(&BigInt::pow10(places));
+    Decimal::new(
+        divide_rounded(&numerator, &BigInt::from_i64(value.denominator)),
+        places,
+    )
+}
+
+/// 400-0000105 BIG_TO_FRACTION — the value over 1; overflow past 64 bits.
+pub fn big_to_fraction(value: &BigInt) -> Fraction {
+    match value.to_i64() {
+        Some(numerator) => Fraction {
+            numerator,
+            denominator: 1,
+        },
+        None => crate::fault(
+            "overflow",
+            "BIG_TO_FRACTION value does not fit in a 64-bit fraction",
+        ),
+    }
+}
+// printing
+// --------------------------------------------------------------------------
+//
+// Each of these prints a number with exactly `places` digits after the point,
+// rounding halves away from zero, as ROUND and ROUND_DEC do. None uses
+// `format!("{:.2}")`: that decides on a float's exact binary value and sends
+// halves to even, so 2.675 is `2.67`. The contract rounds the digits TO_TEXT
+// prints, so 2.675 is `2.68`. Every result is plain digits, never an exponent,
+// and never a negative zero.
+
+/// coefficient x 10^-places as text, the way a decimal prints: `-0.05`.
+fn fixed(coefficient: BigInt, places: usize) -> String {
+    Decimal::new(coefficient, places).to_string()
+}
+
+/// 400-0000120 FORMAT_FLOAT — the float's shortest digits, rounded to `places`.
+///
+/// FLOAT_TO_DEC gives exactly the digits TO_TEXT prints, and ROUND_DEC's rule
+/// rounds those. NOT `format!("{:.N}")`, which rounds the binary value half to even.
+pub fn format_float(value: &f64, places: &i64) -> String {
+    let places = checked_places(*places, "FORMAT_FLOAT");
+    fixed(float_to_dec(value).rescaled(places), places)
+}
+
+/// 400-0000121 FORMAT_DEC — ROUND_DEC then TO_TEXT, without the 4000-digit ceiling.
+pub fn format_dec(value: &Decimal, places: &i64) -> String {
+    let places = checked_places(*places, "FORMAT_DEC");
+    fixed(value.rescaled(places), places)
+}
+
+/// 400-0000122 FORMAT_FRACTION — the exact value, rounded once to `places`.
+///
+/// n/d at `places` places is n x 10^places / d rounded to a whole number, so
+/// 1/3 to 4 places is 3333 / 10^4. Nothing is rounded before that division.
+pub fn format_fraction(value: &Fraction, places: &i64) -> String {
+    let places = checked_places(*places, "FORMAT_FRACTION");
+    let scaled = BigInt::from_i64(value.numerator).mul(&BigInt::pow10(places));
+    fixed(
+        divide_rounded(&scaled, &BigInt::from_i64(value.denominator)),
+        places,
+    )
+}
 // roots, floors, ceilings and remainders
 // --------------------------------------------------------------------------
 //

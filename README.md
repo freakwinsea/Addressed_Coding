@@ -235,7 +235,7 @@ today ([KI-1](docs/KNOWN-ISSUES.md)).
 ```bash
 pip install -e .
 
-dial registry list                   # the whole phonebook, 123 addresses
+dial registry list                   # the whole phonebook, 132 addresses
 dial show FILTER --backends          # one entry, and how each target keeps it
 dial search "remove duplicates"
 dial check    examples/word_freq.phone
@@ -269,7 +269,7 @@ sketched in [docs/SPEC.md](docs/SPEC.md) §8. v0 does not chase it.
 ## Layout
 
 ```
-phonebook/         the registry: 123 addresses, a JSON schema, the frozen ledger
+phonebook/         the registry: 132 addresses, a JSON schema, the frozen ledger
 backends/          how python and rust keep each contract
 runtime/python/    one function per address  ← the interpreter calls these too
 runtime/rust/      one function per address  ← the independent implementation

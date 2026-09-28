@@ -9,7 +9,7 @@ Two rules keep the borrow checker out of the contracts:
 
 The result clones more than hand-written Rust would. That is the honest cost of
 a registry that describes values rather than memory, and it is the reason the
-same 123 addresses can drive a garbage-collected backend and a borrow-checked
+same 132 addresses can drive a garbage-collected backend and a borrow-checked
 one without either leaking into the other.
 """
 

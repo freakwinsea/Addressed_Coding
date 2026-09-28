@@ -755,6 +755,92 @@ def fraction_text(value: Fraction) -> str:
 
 
 # --------------------------------------------------------------------------
+# conversions between the exact types
+# --------------------------------------------------------------------------
+
+
+def dec_to_big(value: Decimal) -> int:
+    """400-0000100 DEC_TO_BIG — truncates toward zero, as DEC_TO_INT does; never fails."""
+    whole = abs(value.coefficient) // 10**value.scale
+    return -whole if value.coefficient < 0 else whole
+
+
+def big_to_float(value: int) -> float:
+    """400-0000101 BIG_TO_FLOAT — the nearest float, ties to even.
+
+    `float()` of the bigint's text, as DEC_TO_FLOAT reads a decimal's, so both
+    backends round the same digits the same way. `float(int)` would round the
+    same, but raises its own OverflowError where this should fault.
+    """
+    return _finite(float(str(value)), "BIG_TO_FLOAT")
+
+
+def float_to_big(value: float) -> int:
+    """400-0000102 FLOAT_TO_BIG — the float's exact binary value, truncated
+    toward zero. `int()` of a float already does exactly that."""
+    return int(value)
+
+
+def dec_to_fraction(value: Decimal) -> Fraction:
+    """400-0000103 DEC_TO_FRACTION — exact: coefficient / 10^scale, reduced."""
+    return _fraction(value.coefficient, 10**value.scale, "DEC_TO_FRACTION")
+
+
+def fraction_to_dec(value: Fraction, places: int) -> Decimal:
+    """400-0000104 FRACTION_TO_DEC — rounded once to `places`, halves away from zero.
+
+    numerator * 10^places / denominator, rounded to a whole number, is the
+    coefficient. The denominator is always positive, as divide_rounded needs.
+    """
+    _checked_places(places, "FRACTION_TO_DEC")
+    return Decimal(divide_rounded(value.numerator * 10**places, value.denominator), places)
+
+
+def big_to_fraction(value: int) -> Fraction:
+    """400-0000105 BIG_TO_FRACTION — the value over 1; overflow past 64 bits."""
+    if value < INT64_MIN or value > INT64_MAX:
+        raise PhonebookFault("overflow", "BIG_TO_FRACTION value does not fit in a 64-bit fraction")
+    return Fraction(value, 1)
+# printing
+# --------------------------------------------------------------------------
+#
+# Each of these prints a number with exactly `places` digits after the point,
+# rounding halves away from zero, as ROUND and ROUND_DEC do. None uses Python's
+# `format()` or f-strings: those decide on a float's exact binary value and send
+# halves to even, so f"{2.675:.2f}" is '2.67'. The contract rounds the digits
+# TO_TEXT prints, so 2.675 is '2.68'. Every result is plain digits, never an
+# exponent, and never a negative zero.
+
+
+def _fixed(coefficient: int, places: int) -> str:
+    """coefficient x 10^-places as text, the way a decimal prints: '-0.05'."""
+    return Decimal(coefficient, places).text()
+
+
+def format_float(value: float, places: int) -> str:
+    """400-0000120 FORMAT_FLOAT — the float's shortest digits, rounded to `places`.
+
+    FLOAT_TO_DEC gives exactly the digits TO_TEXT prints, and ROUND_DEC's rule
+    rounds those. NOT `format()`, which rounds the binary value half to even.
+    """
+    _checked_places(places, "FORMAT_FLOAT")
+    return _fixed(float_to_dec(value).rescaled(places), places)
+
+
+def format_dec(value: Decimal, places: int) -> str:
+    """400-0000121 FORMAT_DEC — ROUND_DEC then TO_TEXT, without the 4000-digit ceiling."""
+    _checked_places(places, "FORMAT_DEC")
+    return _fixed(value.rescaled(places), places)
+
+
+def format_fraction(value: Fraction, places: int) -> str:
+    """400-0000122 FORMAT_FRACTION — the exact value, rounded once to `places`.
+
+    n/d at `places` places is n x 10^places / d rounded to a whole number, so
+    1/3 to 4 places is 3333 / 10^4. Nothing is rounded before that division.
+    """
+    _checked_places(places, "FORMAT_FRACTION")
+    return _fixed(divide_rounded(value.numerator * 10**places, value.denominator), places)
 # roots, floors, ceilings and remainders
 # --------------------------------------------------------------------------
 #
