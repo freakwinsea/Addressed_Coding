@@ -96,7 +96,7 @@ markers. Refresh with `dial brief --write`; a test fails if it is stale.
 ## Layout
 
 ```
-phonebook/areas/*.json    the registry — data, not code. 111 addresses.
+phonebook/areas/*.json    the registry — data, not code. 114 addresses.
 phonebook/frozen.json     the immutability ledger. Machine-managed.
 backends/*/mappings.json  address -> runtime function (+ optional inline template)
 runtime/python/           one function per address

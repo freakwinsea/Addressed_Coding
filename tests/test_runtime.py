@@ -6,6 +6,8 @@ its test live in the same file and move together.
 
 from __future__ import annotations
 
+from fractions import Fraction
+
 import pytest
 from phonebook.registry import Registry
 from phonebook_rt import IMPLEMENTATIONS, PhonebookFault
@@ -497,3 +499,54 @@ class TestDecimalAgainstFractions:
         for a, _ in self.operands(9):
             assert Decimal.parse(a.text()).text() == a.text()
             assert self.exact(Decimal.parse(a.text())) == self.exact(a)
+
+
+class TestPrintingAgainstFractions:
+    """FORMAT_FLOAT, FORMAT_DEC and FORMAT_FRACTION against the standard
+    library's exact `Fraction`, used here only, never by a runtime."""
+
+    @staticmethod
+    def expected(value, places: int) -> str:
+        """Half away from zero on the exact value, printed with `places` places."""
+        import math
+
+        scaled = abs(value) * 10**places
+        whole = math.floor(scaled + Fraction(1, 2))
+        digits = str(whole).rjust(places + 1, "0")
+        if places:
+            digits = digits[:-places] + "." + digits[-places:]
+        return ("-" if value < 0 and whole else "") + digits
+
+    def test_floats_round_their_shown_digits(self):
+        import random
+
+        from phonebook_rt import numbers_
+
+        rng = random.Random(3)
+        for _ in range(2000):
+            value = rng.choice([-1, 1]) * rng.random() * 10 ** rng.randint(-12, 12)
+            places = rng.choice([0, 1, 2, 3, 8, 20])
+            shown = Fraction(repr(value))  # repr is the shortest digits, as TO_TEXT
+            assert numbers_.format_float(value, places) == self.expected(shown, places)
+
+    def test_fractions_round_their_exact_value(self):
+        import random
+
+        from phonebook_rt import numbers_
+
+        rng = random.Random(4)
+        for _ in range(2000):
+            top = rng.randint(-(2**63), 2**63 - 1)
+            bottom = rng.choice([rng.randint(1, 20), rng.randint(1, 2**63 - 1)])
+            places = rng.choice([0, 1, 2, 5, 30])
+            value = numbers_.make_fraction(top, bottom)
+            assert numbers_.format_fraction(value, places) == self.expected(
+                Fraction(top, bottom), places
+            )
+
+    def test_decimals_match_round_dec(self):
+        from phonebook_rt import numbers_
+
+        for a, _ in TestDecimalAgainstFractions.operands(5):
+            for places in (0, 2, 9):
+                assert numbers_.format_dec(a, places) == numbers_.round_dec(a, places).text()

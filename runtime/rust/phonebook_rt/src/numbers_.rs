@@ -948,3 +948,47 @@ pub fn fraction_text(value: &Fraction) -> String {
         format!("{}/{}", value.numerator, value.denominator)
     }
 }
+
+// --------------------------------------------------------------------------
+// printing
+// --------------------------------------------------------------------------
+//
+// Each of these prints a number with exactly `places` digits after the point,
+// rounding halves away from zero, as ROUND and ROUND_DEC do. None uses
+// `format!("{:.2}")`: that decides on a float's exact binary value and sends
+// halves to even, so 2.675 is `2.67`. The contract rounds the digits TO_TEXT
+// prints, so 2.675 is `2.68`. Every result is plain digits, never an exponent,
+// and never a negative zero.
+
+/// coefficient x 10^-places as text, the way a decimal prints: `-0.05`.
+fn fixed(coefficient: BigInt, places: usize) -> String {
+    Decimal::new(coefficient, places).to_string()
+}
+
+/// 400-0000120 FORMAT_FLOAT — the float's shortest digits, rounded to `places`.
+///
+/// FLOAT_TO_DEC gives exactly the digits TO_TEXT prints, and ROUND_DEC's rule
+/// rounds those. NOT `format!("{:.N}")`, which rounds the binary value half to even.
+pub fn format_float(value: &f64, places: &i64) -> String {
+    let places = checked_places(*places, "FORMAT_FLOAT");
+    fixed(float_to_dec(value).rescaled(places), places)
+}
+
+/// 400-0000121 FORMAT_DEC — ROUND_DEC then TO_TEXT, without the 4000-digit ceiling.
+pub fn format_dec(value: &Decimal, places: &i64) -> String {
+    let places = checked_places(*places, "FORMAT_DEC");
+    fixed(value.rescaled(places), places)
+}
+
+/// 400-0000122 FORMAT_FRACTION — the exact value, rounded once to `places`.
+///
+/// n/d at `places` places is n x 10^places / d rounded to a whole number, so
+/// 1/3 to 4 places is 3333 / 10^4. Nothing is rounded before that division.
+pub fn format_fraction(value: &Fraction, places: &i64) -> String {
+    let places = checked_places(*places, "FORMAT_FRACTION");
+    let scaled = BigInt::from_i64(value.numerator).mul(&BigInt::pow10(places));
+    fixed(
+        divide_rounded(&scaled, &BigInt::from_i64(value.denominator)),
+        places,
+    )
+}

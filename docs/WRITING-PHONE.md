@@ -1071,6 +1071,56 @@ b
              ! The result is in lowest terms: '2/4' reads as 1/2. Whatever
                TO_TEXT (100-0000005) prints for a fraction reads back as the
                same fraction.
+
+400-0000120  FORMAT_FLOAT(value: float, places: int) -> text
+             Print a float with a set number of places, like 3.14
+             ! ROUNDS THE PRINTED DIGITS, not the binary value: the float's
+               shortest digits, exactly what TO_TEXT (100-0000005) and
+               FLOAT_TO_DEC (400-0000050) give, are rounded to `places`.
+               2.675 to 2 places is 2.68. A Python backend must NOT use
+               format() or an f-string, and a Rust backend must NOT use
+               {:.N}.
+             ! HALVES AWAY FROM ZERO, as ROUND_DEC (400-0000047): 0.125 to 2
+               places is 0.13 and -0.125 is -0.13. 2.5 to 0 places is 3. More
+               places than the float has pads with zeros: 3.0 to 2 places is
+               3.00.
+             ! Always plain digits with exactly `places` digits after the
+               point and no point when `places` is 0. NEVER an exponent:
+               1e+20 to 1 place is 100000000000000000000.0. NEVER a negative
+               zero: a value that rounds to zero prints without a minus sign.
+             ! `places` must be between 0 and 1000, or it is an
+               invalid_places error.
+             errors: invalid_places
+
+400-0000121  FORMAT_DEC(value: decimal, places: int) -> text
+             Print a decimal with a set number of places, like 19.99
+             ! HALVES AWAY FROM ZERO: 2.345 to 2 places is 2.35, -2.345 is
+               -2.35, and 2.5 to 0 places is 3. More places pads with zeros:
+               5 to 2 places is 5.00.
+             ! Always plain digits with exactly `places` digits after the
+               point and no point when `places` is 0. NEVER an exponent:
+               1e+20 to 1 place is 100000000000000000000.0. NEVER a negative
+               zero: a value that rounds to zero prints without a minus sign.
+               Never an overflow: unlike ROUND_DEC the result is text, so it
+               has no 4000-digit ceiling.
+             ! `places` must be between 0 and 1000, or it is an
+               invalid_places error.
+             errors: invalid_places
+
+400-0000122  FORMAT_FRACTION(value: fraction, places: int) -> text
+             Print a fraction as a decimal with a set number of places, like 0.33
+             ! EXACT, ROUNDED ONCE: the result is the fraction's exact value
+               rounded to `places`, never via a float. 1/3 to 4 places is
+               0.3333 and 2/3 is 0.6667.
+             ! HALVES AWAY FROM ZERO, as ROUND_FRACTION (400-0000091): 1/8 to
+               2 places is 0.13 and -1/8 is -0.13. 5/2 to 0 places is 3.
+             ! Always plain digits with exactly `places` digits after the
+               point and no point when `places` is 0. NEVER an exponent:
+               1e+20 to 1 place is 100000000000000000000.0. NEVER a negative
+               zero: a value that rounds to zero prints without a minus sign.
+             ! `places` must be between 0 and 1000, or it is an
+               invalid_places error.
+             errors: invalid_places
 ```
 
 ### 500 — Input / output — the only addresses with effects

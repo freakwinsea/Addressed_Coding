@@ -1781,6 +1781,138 @@
       "examples": ["400-0000092@[cell, zero] -> share"],
       "status": "active",
       "since": "0.2.0"
+    },
+    {
+      "address": "400-0000120",
+      "name": "FORMAT_FLOAT",
+      "summary": "Print a float with a set number of places, like 3.14",
+      "description": "Python's format() and Rust's {:.2} both round a float's exact binary value, halves to even, so 2.675 prints as 2.67 (its binary value is just below 2.675). This address rounds the digits TO_TEXT shows instead, halves away from zero, so what you see is what gets rounded: 2.675 prints as 2.68.",
+      "keywords": ["format", "print", "places", "decimal places", "fixed", "round", "float", "text", "display"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "float" }, { "name": "places", "type": "int" }],
+        "output": { "name": "text", "type": "text" },
+        "effects": [],
+        "errors": ["invalid_places"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "ROUNDS THE PRINTED DIGITS, not the binary value: the float's shortest digits, exactly what TO_TEXT (100-0000005) and FLOAT_TO_DEC (400-0000050) give, are rounded to `places`. 2.675 to 2 places is 2.68. A Python backend must NOT use format() or an f-string, and a Rust backend must NOT use {:.N}.",
+          "HALVES AWAY FROM ZERO, as ROUND_DEC (400-0000047): 0.125 to 2 places is 0.13 and -0.125 is -0.13. 2.5 to 0 places is 3. More places than the float has pads with zeros: 3.0 to 2 places is 3.00.",
+          "Always plain digits with exactly `places` digits after the point and no point when `places` is 0. NEVER an exponent: 1e+20 to 1 place is 100000000000000000000.0. NEVER a negative zero: a value that rounds to zero prints without a minus sign.",
+          "`places` must be between 0 and 1000, or it is an invalid_places error."
+        ]
+      },
+      "examples": ["400-0000120@[average, 2] -> shown"],
+      "status": "active",
+      "since": "0.2.0",
+      "conformance": [
+        { "id": "format_float.pi", "args": [3.14159, 2], "expect": "3.14" },
+        { "id": "format_float.printed_digits", "args": [2.675, 2], "expect": "2.68" },
+        { "id": "format_float.half_away_negative", "args": [-0.125, 2], "expect": "-0.13" },
+        { "id": "format_float.no_point", "args": [2.5, 0], "expect": "3" },
+        { "id": "format_float.pads", "args": [3.0, 2], "expect": "3.00" },
+        { "id": "format_float.carries", "args": [9.999, 2], "expect": "10.00" },
+        {
+          "id": "format_float.no_exponent",
+          "args": [1e+20, 1],
+          "expect": "100000000000000000000.0"
+        },
+        { "id": "format_float.small", "args": [1.5e-05, 6], "expect": "0.000015" },
+        { "id": "format_float.no_negative_zero", "args": [-0.001, 2], "expect": "0.00" },
+        {
+          "id": "format_float.bad_places",
+          "args": [1.0, -1],
+          "expect": null,
+          "raises": "invalid_places"
+        }
+      ]
+    },
+    {
+      "address": "400-0000121",
+      "name": "FORMAT_DEC",
+      "summary": "Print a decimal with a set number of places, like 19.99",
+      "description": "The same as ROUND_DEC (400-0000047) followed by TO_TEXT, halves away from zero, NOT Python's round() or decimal default, which send halves to even.",
+      "keywords": [
+        "format",
+        "print",
+        "places",
+        "decimal places",
+        "fixed",
+        "round",
+        "decimal",
+        "money",
+        "cents",
+        "text",
+        "display"
+      ],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "decimal" }, { "name": "places", "type": "int" }],
+        "output": { "name": "text", "type": "text" },
+        "effects": [],
+        "errors": ["invalid_places"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "HALVES AWAY FROM ZERO: 2.345 to 2 places is 2.35, -2.345 is -2.35, and 2.5 to 0 places is 3. More places pads with zeros: 5 to 2 places is 5.00.",
+          "Always plain digits with exactly `places` digits after the point and no point when `places` is 0. NEVER an exponent: 1e+20 to 1 place is 100000000000000000000.0. NEVER a negative zero: a value that rounds to zero prints without a minus sign. Never an overflow: unlike ROUND_DEC the result is text, so it has no 4000-digit ceiling.",
+          "`places` must be between 0 and 1000, or it is an invalid_places error."
+        ]
+      },
+      "examples": ["400-0000121@[total, 2] -> shown"],
+      "status": "active",
+      "since": "0.2.0",
+      "conformance": [
+        { "id": "format_dec.half_away", "args": ["2.345", 2], "expect": "2.35" },
+        { "id": "format_dec.half_away_negative", "args": ["-2.345", 2], "expect": "-2.35" },
+        { "id": "format_dec.not_to_even", "args": ["2.5", 0], "expect": "3" },
+        { "id": "format_dec.pads", "args": ["5", 2], "expect": "5.00" },
+        { "id": "format_dec.carries", "args": ["9.99", 1], "expect": "10.0" },
+        { "id": "format_dec.no_negative_zero", "args": ["-0.004", 2], "expect": "0.00" },
+        {
+          "id": "format_dec.too_many_places",
+          "args": ["1", 1001],
+          "expect": null,
+          "raises": "invalid_places"
+        }
+      ]
+    },
+    {
+      "address": "400-0000122",
+      "name": "FORMAT_FRACTION",
+      "summary": "Print a fraction as a decimal with a set number of places, like 0.33",
+      "description": "Prints the fraction's exact value as a decimal, rounded once. 1/3 to 2 places is 0.33, and 2/3 is 0.67. Nothing goes through a float, so 1/3 to 30 places is thirty 3s.",
+      "keywords": [
+        "format",
+        "print",
+        "places",
+        "decimal places",
+        "fixed",
+        "round",
+        "fraction",
+        "ratio",
+        "text",
+        "display"
+      ],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "fraction" }, { "name": "places", "type": "int" }],
+        "output": { "name": "text", "type": "text" },
+        "effects": [],
+        "errors": ["invalid_places"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "EXACT, ROUNDED ONCE: the result is the fraction's exact value rounded to `places`, never via a float. 1/3 to 4 places is 0.3333 and 2/3 is 0.6667.",
+          "HALVES AWAY FROM ZERO, as ROUND_FRACTION (400-0000091): 1/8 to 2 places is 0.13 and -1/8 is -0.13. 5/2 to 0 places is 3.",
+          "Always plain digits with exactly `places` digits after the point and no point when `places` is 0. NEVER an exponent: 1e+20 to 1 place is 100000000000000000000.0. NEVER a negative zero: a value that rounds to zero prints without a minus sign.",
+          "`places` must be between 0 and 1000, or it is an invalid_places error."
+        ]
+      },
+      "examples": ["400-0000122@[share, 2] -> shown"],
+      "status": "active",
+      "since": "0.2.0"
     }
   ]
 }
