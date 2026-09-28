@@ -72,6 +72,11 @@
     "400-0000020": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_.to_int" }] },
     "400-0000021": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_.round_" }] },
     "400-0000022": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_.parse_float" }] },
+    "400-0000032": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_.gcd", "notes": "no inline: math.gcd would return 2**63 instead of faulting" }] },
+    "400-0000033": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_.lcm", "notes": "no inline: math.lcm would not overflow" }] },
+    "400-0000034": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_.product", "notes": "no inline: math.prod would not overflow" }] },
+    "400-0000035": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_.is_even" }] },
+    "400-0000036": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_.is_odd" }] },
 
     "500-0000001": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "io_.read_text_file" }] },
     "500-0000002": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "io_.write_text_file" }] },
