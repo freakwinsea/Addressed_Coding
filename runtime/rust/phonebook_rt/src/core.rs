@@ -24,6 +24,12 @@ impl PbText for crate::BigInt {
     }
 }
 
+impl PbText for crate::Decimal {
+    fn pb_text(&self) -> String {
+        self.to_string()
+    }
+}
+
 impl PbText for f64 {
     fn pb_text(&self) -> String {
         crate::numbers_::float_text(self)

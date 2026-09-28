@@ -843,6 +843,326 @@
       ],
       "status": "active",
       "since": "0.2.0"
+    },
+    {
+      "address": "400-0000040",
+      "name": "TO_DEC",
+      "summary": "Widen an int to a decimal",
+      "keywords": ["decimal", "dec", "widen", "convert", "money", "exact"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "int" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The result has no places: 12 becomes 12, not 12.0. ROUND_DEC (400-0000047) gives it places.",
+          "Never fails and never changes the value.",
+          "int and decimal never mix: ADD takes two ints and ADD_DEC takes two decimals. This is how an int crosses over."
+        ]
+      },
+      "examples": ["400-0000040@[count] -> amount"],
+      "conformance": [
+        { "id": "to_dec.positive", "args": [42], "expect": "42" },
+        { "id": "to_dec.min", "args": [-9223372036854775808], "expect": "-9223372036854775808" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000041",
+      "name": "BIG_TO_DEC",
+      "summary": "Widen a bigint to a decimal",
+      "keywords": ["decimal", "dec", "bigint", "big", "widen", "convert"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "bigint" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The result has no places. Never fails: a bigint has at most 4000 digits, and so may a decimal."
+        ]
+      },
+      "examples": ["400-0000041@[total] -> amount"],
+      "conformance": [
+        { "id": "big_to_dec.past_int64", "args": [123456789012345678901234567890], "expect": "123456789012345678901234567890" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000042",
+      "name": "DEC_TO_INT",
+      "summary": "Drop a decimal's fractional part to get an int",
+      "keywords": ["decimal", "int", "integer", "truncate", "convert", "whole"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "decimal" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "TRUNCATES TOWARD ZERO, as TO_INT (400-0000020) does: 2.9 is 2 and -2.9 is -2. Use ROUND_DEC with 0 places first for nearest.",
+          "A value whose truncation does not fit a 64-bit signed integer is an overflow error. It never wraps or saturates."
+        ]
+      },
+      "examples": ["400-0000042@[price] -> whole"],
+      "conformance": [
+        { "id": "dec_to_int.truncates", "args": ["2.99"], "expect": 2 },
+        { "id": "dec_to_int.negative_truncates", "args": ["-2.99"], "expect": -2 },
+        { "id": "dec_to_int.overflow", "args": ["9223372036854775808.5"], "expect": null, "raises": "overflow" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000043",
+      "name": "ADD_DEC",
+      "summary": "Add two decimals exactly",
+      "keywords": ["add", "plus", "sum", "decimal", "money", "exact", "currency"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "decimal" }, { "name": "b", "type": "decimal" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "decimal is an exact base-10 number: a whole-number coefficient and a scale, the count of digits after the point. 0.10 + 0.20 is exactly 0.30.",
+          "The result's scale is the larger of the two: 1.5 + 0.25 is 1.75, and 0.10 + 0.20 is 0.30, never 0.3.",
+          "A result with more than 4000 digits, or more than 1000 of them after the point, is an overflow error. Every decimal address that can grow checks this."
+        ]
+      },
+      "examples": ["400-0000043@[price, tax] -> total"],
+      "conformance": [
+        { "id": "add_dec.exact", "args": ["0.10", "0.20"], "expect": "0.30" },
+        { "id": "add_dec.scales", "args": ["1.5", "0.25"], "expect": "1.75" },
+        { "id": "add_dec.to_zero", "args": ["-1.50", "1.5"], "expect": "0.00" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000044",
+      "name": "SUB_DEC",
+      "summary": "Subtract the second decimal from the first, exactly",
+      "keywords": ["subtract", "minus", "difference", "decimal", "money", "change"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "decimal" }, { "name": "b", "type": "decimal" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The result's scale is the larger of the two: 1 - 0.01 is 0.99.",
+          "A result with more than 4000 digits, or more than 1000 of them after the point, is an overflow error.",
+          "Zero has one sign: 0.5 - 0.5 is 0.0, never -0.0."
+        ]
+      },
+      "examples": ["400-0000044@[paid, price] -> change"],
+      "conformance": [
+        { "id": "sub_dec.borrow", "args": ["1", "0.01"], "expect": "0.99" },
+        { "id": "sub_dec.no_negative_zero", "args": ["0.5", "0.5"], "expect": "0.0" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000045",
+      "name": "MUL_DEC",
+      "summary": "Multiply two decimals exactly",
+      "keywords": ["multiply", "times", "product", "decimal", "money", "exact"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "decimal" }, { "name": "b", "type": "decimal" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "EXACT: nothing is rounded. The scales add, so 1.5 x 0.25 is 0.375 and 19.99 x 3 is 59.97. Use ROUND_DEC (400-0000047) to get back to a number of places.",
+          "A result with more than 4000 digits, or more than 1000 of them after the point, is an overflow error."
+        ]
+      },
+      "examples": ["400-0000045@[price, quantity] -> line_total"],
+      "conformance": [
+        { "id": "mul_dec.scales_add", "args": ["1.5", "0.25"], "expect": "0.375" },
+        { "id": "mul_dec.money", "args": ["19.99", "3"], "expect": "59.97" },
+        { "id": "mul_dec.signs", "args": ["-0.5", "-0.5"], "expect": "0.25" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000046",
+      "name": "DIV_DEC",
+      "summary": "Divide two decimals, rounded to a number of places",
+      "description": "Most quotients have no exact decimal form (1 / 3), so this address takes the number of places to keep and rounds once, halves away from zero, as ROUND does.",
+      "keywords": ["divide", "division", "quotient", "decimal", "money", "split", "share"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "a", "type": "decimal" },
+          { "name": "b", "type": "decimal" },
+          { "name": "places", "type": "int" }
+        ],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": ["division_by_zero", "invalid_places", "overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The exact quotient a / b, rounded ONCE to exactly `places` digits after the point. HALVES AWAY FROM ZERO: 1 / 8 to 2 places is 0.13, and -1 / 8 is -0.13.",
+          "The result always has `places` places, even when the quotient is exact: 1 / 4 to 3 places is 0.250.",
+          "`places` must be between 0 and 1000, or it is an invalid_places error. A zero divisor is a division_by_zero error.",
+          "A result with more than 4000 digits is an overflow error."
+        ]
+      },
+      "examples": ["400-0000046@[bill, people, 2] -> each"],
+      "conformance": [
+        { "id": "div_dec.third", "args": ["1", "3", 4], "expect": "0.3333" },
+        { "id": "div_dec.half_away", "args": ["1", "8", 2], "expect": "0.13" },
+        { "id": "div_dec.half_away_negative", "args": ["-1", "8", 2], "expect": "-0.13" },
+        { "id": "div_dec.pads", "args": ["1", "4", 3], "expect": "0.250" },
+        { "id": "div_dec.scales", "args": ["10.00", "0.4", 1], "expect": "25.0" },
+        { "id": "div_dec.by_zero", "args": ["1", "0.00", 2], "expect": null, "raises": "division_by_zero" },
+        { "id": "div_dec.negative_places", "args": ["1", "3", -1], "expect": null, "raises": "invalid_places" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000047",
+      "name": "ROUND_DEC",
+      "summary": "Round a decimal to a number of places, halves away from zero",
+      "description": "Sets a decimal's places: fewer rounds, more pads with zeros. Rounding is pinned to halves away from zero, the same as ROUND (400-0000021), NOT Python's round() or decimal default, which send halves to even.",
+      "keywords": ["round", "places", "decimal", "money", "cents", "precision", "scale"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "decimal" }, { "name": "places", "type": "int" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": ["invalid_places", "overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The result has exactly `places` digits after the point. HALVES AWAY FROM ZERO: 2.345 to 2 places is 2.35, -2.345 is -2.35, and 2.5 to 0 places is 3.",
+          "More places than the value has pads with zeros, exactly: 5 to 2 places is 5.00.",
+          "`places` must be between 0 and 1000, or it is an invalid_places error.",
+          "Rounding can add a digit (9.99 to 1 place is 10.0), so a result with more than 4000 digits is an overflow error.",
+          "NO NEGATIVE ZERO: -0.004 to 2 places is 0.00."
+        ]
+      },
+      "examples": ["400-0000047@[total, 2] -> cents"],
+      "conformance": [
+        { "id": "round_dec.half_away", "args": ["2.345", 2], "expect": "2.35" },
+        { "id": "round_dec.half_away_negative", "args": ["-2.345", 2], "expect": "-2.35" },
+        { "id": "round_dec.not_to_even", "args": ["2.5", 0], "expect": "3" },
+        { "id": "round_dec.pads", "args": ["5", 2], "expect": "5.00" },
+        { "id": "round_dec.carries", "args": ["9.99", 1], "expect": "10.0" },
+        { "id": "round_dec.no_negative_zero", "args": ["-0.004", 2], "expect": "0.00" },
+        { "id": "round_dec.too_many_places", "args": ["1", 1001], "expect": null, "raises": "invalid_places" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000048",
+      "name": "PARSE_DEC",
+      "summary": "Read a decimal from text, with a fallback",
+      "keywords": ["parse", "read", "convert", "text to number", "decimal", "money", "price"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }, { "name": "fallback", "type": "decimal" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Never fails; unparseable text returns the fallback.",
+          "Grammar: optional leading '-' or '+', ASCII digits, then optionally '.' and more ASCII digits, with surrounding whitespace trimmed first. '.5', '5.', exponents, underscores and thousands separators are rejected.",
+          "The places are kept as written: '1.50' is 1.50, not 1.5.",
+          "Leading zeros do not count toward the 4000-digit ceiling. More than 4000 digits after them, or more than 1000 after the point, returns the fallback."
+        ]
+      },
+      "examples": ["400-0000048@[cell, 0.00d] -> price"],
+      "conformance": [
+        { "id": "parse_dec.keeps_places", "args": [" 1.50 ", "0"], "expect": "1.50" },
+        { "id": "parse_dec.negative", "args": ["-0.05", "0"], "expect": "-0.05" },
+        { "id": "parse_dec.plus_and_zeros", "args": ["+007", "0"], "expect": "7" },
+        { "id": "parse_dec.bare_point", "args": [".5", "-1"], "expect": "-1" },
+        { "id": "parse_dec.exponent", "args": ["1e5", "-1"], "expect": "-1" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000049",
+      "name": "DEC_TO_FLOAT",
+      "summary": "Convert a decimal to the nearest float",
+      "keywords": ["decimal", "float", "convert", "approximate"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "decimal" }],
+        "output": { "name": "result", "type": "float" },
+        "effects": [],
+        "errors": ["overflow"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The float nearest the decimal's exact value, ties to even, the way PARSE_FLOAT reads its digits. 0.1 becomes the float that prints as 0.1.",
+          "A value too large to be a finite float is an overflow error. A value too small becomes 0.0, never -0.0."
+        ]
+      },
+      "examples": ["400-0000049@[price] -> approximate"],
+      "conformance": [
+        { "id": "dec_to_float.tenth", "args": ["0.1"], "expect": 0.1 },
+        { "id": "dec_to_float.places", "args": ["2.50"], "expect": 2.5 },
+        { "id": "dec_to_float.no_negative_zero", "args": ["-0.00"], "expect": 0.0 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000050",
+      "name": "FLOAT_TO_DEC",
+      "summary": "Convert a float to the decimal it prints as",
+      "keywords": ["float", "decimal", "convert", "exact"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "float" }],
+        "output": { "name": "result", "type": "decimal" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The result is the float's SHORTEST DIGITS, the ones TO_TEXT prints, never its exact binary value: 0.1 becomes 0.1, not 0.1000000000000000055511151231257827021181583404541015625.",
+          "With those digits d1...dn and exponent E, the result is d1...dn x 10^(E-n+1), with no places when that power is not negative: 2.5 is 2.5, 100.0 is 100, and 1e+16 is 10000000000000000.",
+          "Never fails: a float has at most 17 significant digits and E is between -324 and 308, inside both decimal ceilings."
+        ]
+      },
+      "examples": ["400-0000050@[measured] -> exact"],
+      "conformance": [
+        { "id": "float_to_dec.tenth", "args": [0.1], "expect": "0.1" },
+        { "id": "float_to_dec.whole", "args": [100.0], "expect": "100" },
+        { "id": "float_to_dec.negative", "args": [-1.5e-05], "expect": "-0.000015" },
+        { "id": "float_to_dec.large", "args": [1e16], "expect": "10000000000000000" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
     }
   ]
 }

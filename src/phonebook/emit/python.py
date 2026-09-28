@@ -106,6 +106,9 @@ class _Emitter:
 
     def render_arg(self, arg: Arg, names: dict[str, str]) -> str:
         if isinstance(arg, Literal):
+            if arg.type.name == "decimal":
+                # The runtime's own decimal, read from the literal's digits.
+                return f'_pb_numbers.Decimal.literal("{arg.value}")'
             if isinstance(arg.value, bool):
                 return "True" if arg.value else "False"
             if isinstance(arg.value, str):

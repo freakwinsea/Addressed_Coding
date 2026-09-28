@@ -18,6 +18,7 @@ from __future__ import annotations
 import math
 import re
 
+from .decimal_ import MAX_SCALE, Decimal, divide_rounded
 from .faults import PhonebookFault
 
 INT64_MIN = -(2**63)
@@ -357,3 +358,119 @@ def parse_big(value: str, fallback: int) -> int:
         return fallback
     parsed = int(digits) if digits else 0
     return -parsed if negative else parsed
+
+
+# --------------------------------------------------------------------------
+# decimals
+# --------------------------------------------------------------------------
+#
+# The type itself is in decimal_.py. What the functions below add is the
+# contract around it: which scale a result has, the one rounding rule (halves
+# away from zero, as ROUND), and the ceilings, which every result that can grow
+# passes through `Decimal.checked` to meet.
+
+
+def _checked_places(places: int, operation: str) -> int:
+    if places < 0 or places > MAX_SCALE:
+        raise PhonebookFault(
+            "invalid_places", f"{operation} places {places} is not between 0 and {MAX_SCALE}"
+        )
+    return places
+
+
+def to_dec(value: int) -> Decimal:
+    """400-0000040 TO_DEC — an int as a decimal with no places; never fails."""
+    return Decimal(value, 0)
+
+
+def big_to_dec(value: int) -> Decimal:
+    """400-0000041 BIG_TO_DEC — a bigint as a decimal with no places; never fails."""
+    return Decimal(value, 0)
+
+
+def dec_to_int(value: Decimal) -> int:
+    """400-0000042 DEC_TO_INT — truncates toward zero, as TO_INT does."""
+    whole = abs(value.coefficient) // 10**value.scale
+    whole = -whole if value.coefficient < 0 else whole
+    if whole < INT64_MIN or whole > INT64_MAX:
+        raise PhonebookFault("overflow", "DEC_TO_INT value does not fit in a 64-bit signed integer")
+    return whole
+
+
+def add_dec(a: Decimal, b: Decimal) -> Decimal:
+    """400-0000043 ADD_DEC — the result has the larger of the two scales."""
+    scale = max(a.scale, b.scale)
+    return Decimal(a.rescaled(scale) + b.rescaled(scale), scale).checked("ADD_DEC")
+
+
+def sub_dec(a: Decimal, b: Decimal) -> Decimal:
+    """400-0000044 SUB_DEC — the result has the larger of the two scales."""
+    scale = max(a.scale, b.scale)
+    return Decimal(a.rescaled(scale) - b.rescaled(scale), scale).checked("SUB_DEC")
+
+
+def mul_dec(a: Decimal, b: Decimal) -> Decimal:
+    """400-0000045 MUL_DEC — exact; the scales add, so 1.5 x 0.25 is 0.375."""
+    return Decimal(a.coefficient * b.coefficient, a.scale + b.scale).checked("MUL_DEC")
+
+
+def div_dec(a: Decimal, b: Decimal, places: int) -> Decimal:
+    """400-0000046 DIV_DEC — the exact quotient, rounded once to `places`.
+
+    a / b = (ca / 10^sa) / (cb / 10^sb), so the quotient at `places` places is
+    ca * 10^(sb + places) / (cb * 10^sa), rounded to a whole number. Both
+    exponents are never negative, so nothing is rounded before that division.
+    """
+    _checked_places(places, "DIV_DEC")
+    if b.coefficient == 0:
+        raise PhonebookFault("division_by_zero", "DIV_DEC by zero")
+    numerator = a.coefficient * 10 ** (b.scale + places)
+    denominator = b.coefficient * 10**a.scale
+    if denominator < 0:
+        numerator, denominator = -numerator, -denominator
+    return Decimal(divide_rounded(numerator, denominator), places).checked("DIV_DEC")
+
+
+def round_dec(value: Decimal, places: int) -> Decimal:
+    """400-0000047 ROUND_DEC — to exactly `places` places, halves away from zero.
+
+    Fewer places than the value has rounds; more pads with zeros, so
+    ROUND_DEC(5, 2) is 5.00. NOT `round()`, which sends halves to even.
+    """
+    _checked_places(places, "ROUND_DEC")
+    return Decimal(value.rescaled(places), places).checked("ROUND_DEC")
+
+
+def parse_dec(value: str, fallback: Decimal) -> Decimal:
+    """400-0000048 PARSE_DEC — never fails; unparseable text yields the fallback."""
+    parsed = Decimal.parse(value.strip(WHITESPACE))
+    return fallback if parsed is None else parsed
+
+
+def dec_to_float(value: Decimal) -> float:
+    """400-0000049 DEC_TO_FLOAT — the nearest float, ties to even.
+
+    `float()` of the decimal's own text is correctly rounded however many
+    digits it has, as Rust's `str::parse::<f64>` is, so both backends read the
+    same digits the same way.
+    """
+    return _finite(float(value.text()), "DEC_TO_FLOAT")
+
+
+def float_to_dec(value: float) -> Decimal:
+    """400-0000050 FLOAT_TO_DEC — the float's shortest digits, as TO_TEXT
+    prints them, never its exact binary value: 0.1 is 0.1, not
+    0.1000000000000000055511151231257827021181583404541015625.
+
+    With digits d1...dn and exponent E, the value is d1...dn x 10^(E-n+1).
+    A float has at most 17 significant digits and E is between -324 and 308,
+    so the result is always inside both ceilings.
+    """
+    digits, exponent = _shortest_digits(abs(value))
+    power = exponent - len(digits) + 1
+    coefficient = int(digits)
+    if value < 0:
+        coefficient = -coefficient
+    if power >= 0:
+        return Decimal(coefficient * 10**power, 0)
+    return Decimal(coefficient, -power)

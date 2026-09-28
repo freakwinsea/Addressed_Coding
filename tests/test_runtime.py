@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 from phonebook.registry import Registry
 from phonebook_rt import IMPLEMENTATIONS, PhonebookFault
+from phonebook_rt.decimal_ import Decimal
 
 
 def normalize(value):
@@ -19,6 +20,8 @@ def normalize(value):
     """
     if isinstance(value, float):
         return ("float", value)
+    if isinstance(value, Decimal):
+        return ("decimal", value.text())
     if isinstance(value, tuple):
         return [normalize(v) for v in value]
     if isinstance(value, list):
@@ -32,18 +35,28 @@ def collect_cases():
     registry = Registry.load()
     for entry in registry:
         for case in entry.conformance:
-            yield pytest.param(entry.address, case, id=f"{entry.name}:{case['id']}")
+            yield pytest.param(entry, case, id=f"{entry.name}:{case['id']}")
 
 
-@pytest.mark.parametrize("address,case", list(collect_cases()))
-def test_registry_conformance_case(address: str, case: dict):
-    implementation = IMPLEMENTATIONS[address]
+def decimals_from_text(types, values):
+    """JSON has no decimal, so a case writes one as its text: "0.30"."""
+    return [
+        Decimal.literal(value) if index < len(types) and types[index].name == "decimal" else value
+        for index, value in enumerate(values)
+    ]
+
+
+@pytest.mark.parametrize("entry,case", list(collect_cases()))
+def test_registry_conformance_case(entry, case: dict):
+    implementation = IMPLEMENTATIONS[entry.address]
+    args = decimals_from_text([i.type for i in entry.contract.inputs], case["args"])
     if case.get("raises"):
         with pytest.raises(PhonebookFault) as excinfo:
-            implementation(*case["args"])
+            implementation(*args)
         assert excinfo.value.code == case["raises"]
         return
-    assert normalize(implementation(*case["args"])) == normalize(case["expect"])
+    (expect,) = decimals_from_text([entry.contract.output.type], [case["expect"]])
+    assert normalize(implementation(*args)) == normalize(expect)
 
 
 def test_every_address_has_a_python_implementation(registry: Registry):
@@ -277,3 +290,74 @@ class TestCsvStateMachine:
         with pytest.raises(PhonebookFault) as excinfo:
             io_.read_csv(str(source))
         assert excinfo.value.code == "malformed_csv"
+
+
+class TestDecimalAgainstFractions:
+    """The Python decimal is hand-written, so it gets an oracle of its own:
+    the standard library's exact `Fraction`, used here only, never by a runtime.
+    The conformance suite then holds Rust to whatever Python prints."""
+
+    @staticmethod
+    def operands(seed: int, count: int = 300):
+        import random
+
+        rng = random.Random(seed)
+        for _ in range(count):
+            pair = []
+            for _ in range(2):
+                scale = rng.choice([0, 1, 2, 3, 9, 10, 25])
+                coefficient = rng.choice(
+                    [0, 5, 10**9 - 1, 10**9, rng.randrange(10**30), 5 * 10 ** rng.randrange(20)]
+                )
+                pair.append(Decimal(-coefficient if rng.random() < 0.5 else coefficient, scale))
+            yield pair
+
+    @staticmethod
+    def exact(value: Decimal):
+        from fractions import Fraction
+
+        return Fraction(value.coefficient, 10**value.scale)
+
+    @staticmethod
+    def rounded(value, places: int):
+        """Half away from zero, the contract's rule, done on a Fraction."""
+        import math
+        from fractions import Fraction
+
+        scaled = abs(value) * 10**places
+        whole = math.floor(scaled + Fraction(1, 2))
+        return Fraction(-whole if value < 0 else whole, 10**places)
+
+    def test_arithmetic(self):
+        from phonebook_rt import numbers_
+
+        for a, b in self.operands(1):
+            scale = max(a.scale, b.scale)
+            for function, expected in (
+                (numbers_.add_dec, self.exact(a) + self.exact(b)),
+                (numbers_.sub_dec, self.exact(a) - self.exact(b)),
+            ):
+                result = function(a, b)
+                assert (self.exact(result), result.scale) == (expected, scale)
+            product = numbers_.mul_dec(a, b)
+            assert self.exact(product) == self.exact(a) * self.exact(b)
+            assert product.scale == a.scale + b.scale
+
+    def test_division_and_rounding(self):
+        from phonebook_rt import numbers_
+
+        for places in (0, 1, 2, 7):
+            for a, b in self.operands(places + 2):
+                rounded = numbers_.round_dec(a, places)
+                assert rounded.scale == places
+                assert self.exact(rounded) == self.rounded(self.exact(a), places)
+                if b.coefficient == 0:
+                    continue
+                quotient = numbers_.div_dec(a, b, places)
+                assert quotient.scale == places
+                assert self.exact(quotient) == self.rounded(self.exact(a) / self.exact(b), places)
+
+    def test_text_round_trips(self):
+        for a, _ in self.operands(9):
+            assert Decimal.parse(a.text()).text() == a.text()
+            assert self.exact(Decimal.parse(a.text())) == self.exact(a)

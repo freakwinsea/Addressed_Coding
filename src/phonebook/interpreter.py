@@ -11,6 +11,7 @@ import sys
 from dataclasses import dataclass
 
 from phonebook_rt import PhonebookFault, resolve as resolve_runtime
+from phonebook_rt.decimal_ import Decimal
 
 from .checker import CheckedCall, CheckedExtension, CheckedProgram
 from .nodes import LATEST, AddressRef, Arg, Literal, Ref
@@ -88,6 +89,10 @@ class Interpreter:
 
     def value_of(self, arg: Arg, bindings: dict[str, object]) -> object:
         if isinstance(arg, Literal):
+            if arg.type.name == "decimal":
+                # The parser keeps a decimal literal as its digits; the value
+                # is the runtime's, so there is still only one implementation.
+                return Decimal.literal(arg.value)
             return arg.value
         if isinstance(arg, Ref):
             return bindings[arg.name]

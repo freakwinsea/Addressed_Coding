@@ -266,6 +266,40 @@ def test_bigints_are_comparable_and_keyable(registry):
     build("600-0000004@[2n, 1n] -> same\n100-0000001@[same]\n", registry)
 
 
+def test_decimal_literals(registry):
+    checked = build(
+        "400-0000043@[0.10d, -0.00d] -> a\n400-0000043@[007.50d, -3d] -> b\n"
+        "100-0000001@[a]\n100-0000001@[b]\n",
+        registry,
+    )
+    args = checked.body[0].call.args + checked.body[1].call.args
+    # Kept as canonical digits: places stay, leading zeros and the sign of zero go.
+    assert [arg.value for arg in args] == ["0.10", "0.00", "7.50", "-3"]
+    assert all(arg.type.name == "decimal" for arg in args)
+
+
+def test_decimal_literal_has_ceilings(registry):
+    build(f"400-0000043@[{'9' * 3000}.{'9' * 1000}d, 1d] -> a\n100-0000001@[a]\n", registry)
+    fails(f"400-0000043@[{'9' * 3001}.{'9' * 1000}d, 1d] -> a\n100-0000001@[a]\n", registry,
+          "4001 digits")
+    fails(f"400-0000043@[0.{'0' * 1001}d, 1d] -> a\n100-0000001@[a]\n", registry,
+          "1001 digits after the point")
+
+
+def test_decimal_does_not_mix(registry):
+    fails("400-0000043@[1d, 2] -> a\n100-0000001@[a]\n", registry, "expected decimal, got int")
+    fails("400-0000043@[1d, 2.0] -> a\n100-0000001@[a]\n", registry, "expected decimal, got float")
+    fails("400-0000015@[1.0, 2.0d] -> a\n100-0000001@[a]\n", registry, "expected float, got decimal")
+
+
+def test_decimals_are_comparable_but_not_keyable(registry):
+    build("300-0000001@[0.2d, 0.1d] -> xs\n300-0000005@[xs] -> ys\n100-0000001@[ys]\n", registry)
+    build("600-0000005@[0.2d, 0.1d] -> less\n100-0000001@[less]\n", registry)
+    fails("600-0000004@[0.2d, 0.20d] -> same\n100-0000001@[same]\n", registry, "keyable")
+    fails("300-0000001@[0.2d, 0.1d] -> xs\n300-0000008@[xs] -> ys\n100-0000001@[ys]\n",
+          registry, "keyable")
+
+
 def test_contract_version_mismatch(registry):
     fails('100-0000001@contract:99@["hi"]\n', registry, "contract v")
 
@@ -276,7 +310,7 @@ def test_contract_version_mismatch(registry):
 
 
 @pytest.mark.parametrize(
-    "name", ["line_count", "word_freq", "records", "audit_demo", "big_numbers"]
+    "name", ["line_count", "word_freq", "records", "audit_demo", "big_numbers", "money"]
 )
 def test_examples_check(name, registry, root):
     from phonebook.parser import parse_file

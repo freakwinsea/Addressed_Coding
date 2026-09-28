@@ -98,7 +98,7 @@
       "summary": "Sort a list into ascending order",
       "keywords": ["sort", "order", "ascending", "arrange", "rank"],
       "contract": {
-        "version": 3,
+        "version": 4,
         "inputs": [{ "name": "sequence", "type": "list<T>" }],
         "output": { "name": "sorted", "type": "list<T>" },
         "constraints": { "T": "comparable" },
@@ -111,7 +111,8 @@
           "int sorts numerically; text sorts by Unicode scalar value, which is not locale-aware and is identical in every backend.",
           "bool sorts false before true.",
           "float sorts numerically. Every float is finite and there is no negative zero, so the order is total.",
-          "bigint sorts numerically."
+          "bigint sorts numerically.",
+          "decimal sorts numerically, by value: 0.3 and 0.30 are equal, so they keep their original order."
         ]
       },
       "examples": ["300-0000005@[names] -> ordered"],

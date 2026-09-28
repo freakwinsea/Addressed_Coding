@@ -23,7 +23,7 @@ SRC = ROOT / "src"
 RUNTIME_PY = ROOT / "runtime" / "python"
 RUST_PROJECT = ROOT / "generated" / "rust"
 
-EXAMPLES = ["line_count", "word_freq", "records", "audit_demo", "big_numbers"]
+EXAMPLES = ["line_count", "word_freq", "records", "audit_demo", "big_numbers", "money"]
 
 sys.path[:0] = [str(SRC), str(RUNTIME_PY)]
 
