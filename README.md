@@ -235,7 +235,7 @@ today ([KI-1](docs/KNOWN-ISSUES.md)).
 ```bash
 pip install -e .
 
-dial registry list                   # the whole phonebook, 54 addresses
+dial registry list                   # the whole phonebook, 62 addresses
 dial show FILTER --backends          # one entry, and how each target keeps it
 dial search "remove duplicates"
 dial check    examples/word_freq.phone
@@ -252,8 +252,8 @@ pytest                               # 225 tests, including the ledger
 
 ## What is deliberately not here
 
-v0 has no mutation, no loops, no objects, no concurrency, no floats, and no
-network. Iteration exists only as `MAP` / `FILTER` / `REDUCE` / `SORT` /
+v0 has no mutation, no loops, no objects, no concurrency, no arbitrary-precision
+decimals, and no network. Iteration exists only as `MAP` / `FILTER` / `REDUCE` / `SORT` /
 `UNIQUE`, and every value is immutable.
 
 That is not a to-do list. A pure, immutable, first-order kernel is precisely why
@@ -269,7 +269,7 @@ sketched in [docs/SPEC.md](docs/SPEC.md) §8. v0 does not chase it.
 ## Layout
 
 ```
-phonebook/         the registry: 54 addresses, a JSON schema, the frozen ledger
+phonebook/         the registry: 62 addresses, a JSON schema, the frozen ledger
 backends/          how python and rust keep each contract
 runtime/python/    one function per address  ← the interpreter calls these too
 runtime/rust/      one function per address  ← the independent implementation

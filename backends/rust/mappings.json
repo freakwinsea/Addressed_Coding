@@ -4,6 +4,7 @@
   "description": "How each address is kept in Rust. Compare 400-0000004 and 400-0000005 with the Python table: Rust keeps those contracts with its own operators while Python has to implement them by hand, and 200-0000011 is the reverse. The address never notices which side had to work harder.",
   "type_map": {
     "int": "i64",
+    "float": "f64",
     "bool": "bool",
     "text": "String",
     "unit": "()",
@@ -16,7 +17,7 @@
     "100-0000002": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "core::print_lines" }] },
     "100-0000003": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "core::select" }] },
     "100-0000004": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "core::identity", "inline": "{0}.clone()" }] },
-    "100-0000005": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "core::to_text" }] },
+    "100-0000005": { "contract": 2, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "core::to_text" }] },
     "100-0000006": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "core::assert_" }] },
 
     "200-0000001": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "text::split_lines" }] },
@@ -36,7 +37,7 @@
     "300-0000002": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::filter_seq", "inline": "{0}.iter().cloned().filter(|_pb_x| {1}(_pb_x)).collect::<Vec<_>>()" }] },
     "300-0000003": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::map_seq", "inline": "{0}.iter().map(|_pb_x| {1}(_pb_x)).collect::<Vec<_>>()" }] },
     "300-0000004": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::reduce_seq" }] },
-    "300-0000005": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::sort_seq" }] },
+    "300-0000005": { "contract": 2, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::sort_seq" }] },
     "300-0000006": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::sort_by" }] },
     "300-0000007": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::reverse_seq", "inline": "{0}.iter().rev().cloned().collect::<Vec<_>>()" }] },
     "300-0000008": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::unique" }] },
@@ -58,6 +59,14 @@
     "400-0000007": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "numbers_::max_" }] },
     "400-0000008": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "numbers_::sum_" }] },
     "400-0000009": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "numbers_::parse_int" }] },
+    "400-0000010": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::add_float" }] },
+    "400-0000011": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::sub_float" }] },
+    "400-0000012": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::mul_float" }] },
+    "400-0000013": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::div_float" }] },
+    "400-0000014": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::to_float" }] },
+    "400-0000015": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::to_int" }] },
+    "400-0000016": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::round_" }] },
+    "400-0000017": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::parse_float" }] },
 
     "500-0000001": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "io_::read_text_file" }] },
     "500-0000002": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "io_::write_text_file" }] },
@@ -68,7 +77,7 @@
     "600-0000002": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::and_", "inline": "({0} && {1})" }] },
     "600-0000003": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::or_", "inline": "({0} || {1})" }] },
     "600-0000004": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::equals", "inline": "({0} == {1})" }] },
-    "600-0000005": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::less_than", "inline": "({0} < {1})" }] },
+    "600-0000005": { "contract": 2, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::less_than", "inline": "({0} < {1})" }] },
     "600-0000006": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::greater_than", "inline": "({0} > {1})" }] },
     "600-0000007": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::is_empty", "inline": "{0}.is_empty()" }] }
   }

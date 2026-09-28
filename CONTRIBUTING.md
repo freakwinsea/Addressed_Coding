@@ -31,7 +31,7 @@ working. The fix is a version bump.
 
 ## Adding a new address
 
-1. **Argue that it belongs.** v0 is 54 addresses across six areas. Anything that
+1. **Argue that it belongs.** v0 is 62 addresses across six areas. Anything that
    can be built out of existing addresses should be — that is what `000` local
    extensions are for. New global addresses are for capabilities that genuinely
    cannot be expressed.

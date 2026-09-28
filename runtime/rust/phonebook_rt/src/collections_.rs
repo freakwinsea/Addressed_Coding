@@ -5,6 +5,7 @@
 //! has to sort explicitly, since its dicts iterate in insertion order. Neither
 //! backend gets to decide; the contract did.
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// 300-0000002 FILTER — order preserved, predicate applied once per item.
@@ -41,11 +42,20 @@ where
     accumulator
 }
 
+/// The order SORT and SORT_BY use; LESS_THAN (600-0000005) is `<` on the same.
+///
+/// `PartialOrd` rather than `Ord` so that `f64` qualifies. The contract keeps
+/// NaN out of existence, so every comparable pair has an answer and the
+/// fallback below is never taken.
+fn order<T: PartialOrd>(a: &T, b: &T) -> Ordering {
+    a.partial_cmp(b).unwrap_or(Ordering::Equal)
+}
+
 /// 300-0000005 SORT — stable; `String` orders by byte, which for UTF-8 is
 /// exactly code-point order, so this agrees with Python without special care.
-pub fn sort_seq<T: Clone + Ord>(sequence: &[T]) -> Vec<T> {
+pub fn sort_seq<T: Clone + PartialOrd>(sequence: &[T]) -> Vec<T> {
     let mut out = sequence.to_vec();
-    out.sort();
+    out.sort_by(order);
     out
 }
 
@@ -57,14 +67,14 @@ pub fn sort_seq<T: Clone + Ord>(sequence: &[T]) -> Vec<T> {
 pub fn sort_by<T, K, F>(sequence: &[T], key: F, descending: &bool) -> Vec<T>
 where
     T: Clone,
-    K: Ord,
+    K: PartialOrd,
     F: Fn(&T) -> K,
 {
     let mut out = sequence.to_vec();
     if *descending {
-        out.sort_by_key(|item| std::cmp::Reverse(key(item)));
+        out.sort_by(|a, b| order(&key(b), &key(a)));
     } else {
-        out.sort_by_key(&key);
+        out.sort_by(|a, b| order(&key(a), &key(b)));
     }
     out
 }
