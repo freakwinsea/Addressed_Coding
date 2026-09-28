@@ -98,7 +98,7 @@
       "summary": "True when the first value orders before the second",
       "keywords": ["less", "lt", "smaller", "before", "under", "below"],
       "contract": {
-        "version": 2,
+        "version": 4,
         "inputs": [{ "name": "a", "type": "T" }, { "name": "b", "type": "T" }],
         "output": { "name": "result", "type": "bool" },
         "constraints": { "T": "comparable" },
@@ -108,7 +108,9 @@
         "determinism": "deterministic",
         "notes": [
           "Ordering matches SORT (300-0000005): numeric for int, Unicode scalar value for text, false before true for bool.",
-          "float compares numerically, and an int is never compared with a float: both arguments have the same type."
+          "float compares numerically, and an int is never compared with a float: both arguments have the same type.",
+          "bigint compares numerically, and an int is never compared with a bigint either.",
+          "decimal compares numerically, by value: 0.3 is not less than 0.30."
         ]
       },
       "examples": ["600-0000005@[age, 18] -> is_minor"],

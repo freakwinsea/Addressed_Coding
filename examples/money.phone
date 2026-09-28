@@ -1,0 +1,40 @@
+phonebook 0.1
+
+# Money, exactly, in both backends.
+#
+# A float cannot hold 0.10, so ten of them add up to 0.9999999999999999. A
+# decimal holds 0.10 exactly and keeps its two places, so a receipt adds up to
+# the cent. Python keeps the promise with the runtime's own Decimal, Rust with
+# its own; neither uses a library, and they print the same digits.
+
+ext 000-0000001 PLUS (acc: decimal, x: decimal) -> decimal {
+  400-0000043@[acc, x] -> next       # ADD_DEC
+  return next
+}
+
+# Three lines on a receipt: price times quantity is exact.
+400-0000045@[19.99d, 3d] -> books    # MUL_DEC
+400-0000045@[0.10d, 7d] -> stamps
+400-0000048@["4.05", 0.00d] -> fee   # PARSE_DEC, as if read from a file
+300-0000001@[books, stamps, fee] -> lines
+300-0000004@[lines, 000-0000001, 0.00d] -> subtotal
+100-0000001@[subtotal]
+
+# 8.25% tax: exact, then rounded to the cent, halves away from zero.
+400-0000045@[subtotal, 0.0825d] -> tax_exact
+400-0000047@[tax_exact, 2] -> tax    # ROUND_DEC
+400-0000043@[subtotal, tax] -> total
+100-0000001@[tax_exact]
+100-0000001@[total]
+
+# Split three ways. DIV_DEC rounds to the places asked for.
+400-0000046@[total, 3d, 2] -> each   # DIV_DEC
+100-0000001@[each]
+
+# Ten dimes: a decimal dollar, and the float that is not quite one.
+300-0000001@[0.10d, 0.10d, 0.10d, 0.10d, 0.10d, 0.10d, 0.10d, 0.10d, 0.10d, 0.10d] -> dimes
+300-0000004@[dimes, 000-0000001, 0.00d] -> dollar
+100-0000001@[dollar]
+300-0000001@[0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1] -> float_dimes
+300-0000004@[float_dimes, 400-0000015, 0.0] -> float_dollar   # ADD_FLOAT
+100-0000001@[float_dollar]

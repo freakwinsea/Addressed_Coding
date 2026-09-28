@@ -5,7 +5,7 @@ nobody can remember them. The answer is that you are not supposed to: you look
 them up. This module and `dial show` are that lookup, and they exist before any
 program can run for exactly that reason.
 
-Pure standard library on purpose. A dependency-free TF-IDF over a 78-entry
+Pure standard library on purpose. A dependency-free TF-IDF over a 98-entry
 corpus is both sufficient and auditable.
 """
 
