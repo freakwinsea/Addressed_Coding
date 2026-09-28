@@ -1,0 +1,110 @@
+phonebook 0.1
+
+# Square roots, floors, ceilings and remainders across float, int, bigint,
+# decimal and fraction. Neither runtime uses a host sqrt: both work the root
+# out on whole numbers and round it themselves, so this file is where the two
+# have to agree on the last bit, on negative zero, and on the sign of a
+# remainder.
+
+# SQRT rounds the exact root once, to the nearest float.
+400-0000140@[2.0] -> root_two                      # SQRT
+100-0000001@[root_two]
+400-0000140@[16.0] -> four
+100-0000001@[four]
+400-0000140@[0.01] -> tenth
+100-0000001@[tenth]
+400-0000140@[5e-324] -> tiny                       # smallest subnormal
+100-0000001@[tiny]
+400-0000140@[1.7976931348623157e308] -> huge       # largest float
+100-0000001@[huge]
+400-0000140@[-0.0] -> zero_root                    # -0.0 is zero -> 0.0
+100-0000001@[zero_root]
+
+# FLOOR and CEIL go toward -inf and +inf, and never give -0.0.
+400-0000141@[2.7] -> floor_up                      # FLOOR
+100-0000001@[floor_up]
+400-0000141@[-2.3] -> floor_down
+100-0000001@[floor_down]
+400-0000142@[2.3] -> ceil_up                       # CEIL
+100-0000001@[ceil_up]
+400-0000142@[-0.5] -> ceil_zero                    # -0.0 -> 0.0
+100-0000001@[ceil_zero]
+400-0000142@[1e300] -> ceil_big
+100-0000001@[ceil_big]
+
+# MOD_FLOAT takes the dividend's sign, like MOD. Python's % would not.
+400-0000143@[7.5, 2.0] -> fmod_basic               # MOD_FLOAT
+100-0000001@[fmod_basic]
+400-0000143@[-7.5, 2.0] -> fmod_neg
+100-0000001@[fmod_neg]
+400-0000143@[7.5, -2.0] -> fmod_neg_divisor
+100-0000001@[fmod_neg_divisor]
+400-0000143@[-4.0, 2.0] -> fmod_zero               # -0.0 -> 0.0
+100-0000001@[fmod_zero]
+400-0000143@[0.1, 0.03] -> fmod_exact
+100-0000001@[fmod_exact]
+
+# Whole-number roots round down and never pass through a float.
+400-0000144@[17] -> isqrt_17                       # ISQRT
+100-0000001@[isqrt_17]
+400-0000144@[9223372036854775807] -> isqrt_max
+100-0000001@[isqrt_max]
+400-0000144@[4503599761588225] -> isqrt_square     # (2^26 + 1)^2, exact
+100-0000001@[isqrt_square]
+400-0000145@[99999999999999999999999999999999999999999n] -> isqrt_big  # ISQRT_BIG
+100-0000001@[isqrt_big]
+400-0000145@[0n] -> isqrt_big_zero
+100-0000001@[isqrt_big_zero]
+
+# SQRT_DEC rounds once, to the places asked for, halves away from zero.
+400-0000146@[2d, 10] -> dec_root_two               # SQRT_DEC
+100-0000001@[dec_root_two]
+400-0000146@[2.25d, 0] -> dec_half                 # 1.5 -> 2
+100-0000001@[dec_half]
+400-0000146@[0.0025d, 1] -> dec_half_small         # 0.05 -> 0.1
+100-0000001@[dec_half_small]
+400-0000146@[4d, 2] -> dec_padded                  # exact, still 2 places
+100-0000001@[dec_padded]
+400-0000146@[0.00d, 3] -> dec_zero
+100-0000001@[dec_zero]
+
+# FLOOR_DEC and CEIL_DEC give a whole decimal with no places.
+400-0000147@[-2.3d] -> floor_dec                   # FLOOR_DEC
+100-0000001@[floor_dec]
+400-0000147@[5.00d] -> floor_dec_whole
+100-0000001@[floor_dec_whole]
+400-0000148@[-0.5d] -> ceil_dec_zero               # CEIL_DEC, no -0
+100-0000001@[ceil_dec_zero]
+400-0000148@[9.1d] -> ceil_dec_carry
+100-0000001@[ceil_dec_carry]
+
+# MOD_DEC is exact, keeps the larger scale, and takes the dividend's sign.
+400-0000149@[7.50d, 2d] -> mod_dec                 # MOD_DEC
+100-0000001@[mod_dec]
+400-0000149@[-7.5d, 2d] -> mod_dec_neg
+100-0000001@[mod_dec_neg]
+400-0000149@[7.5d, -2.25d] -> mod_dec_neg_divisor
+100-0000001@[mod_dec_neg_divisor]
+400-0000149@[0.3d, 0.1d] -> mod_dec_exact          # a float would give 0.09999999999999998
+100-0000001@[mod_dec_exact]
+
+# CEIL_FRACTION and MOD_FRACTION.
+400-0000080@[7, 2] -> seven_halves
+400-0000080@[-7, 2] -> minus_seven_halves
+400-0000080@[1, 3] -> third
+400-0000080@[-1, 3] -> minus_third
+400-0000150@[seven_halves] -> ceil_frac            # CEIL_FRACTION
+100-0000001@[ceil_frac]
+400-0000150@[minus_seven_halves] -> ceil_frac_neg
+100-0000001@[ceil_frac_neg]
+400-0000080@[-9223372036854775807, 2] -> near_min
+400-0000150@[near_min] -> ceil_near_min
+100-0000001@[ceil_near_min]
+400-0000151@[seven_halves, third] -> mod_frac      # MOD_FRACTION
+100-0000001@[mod_frac]
+400-0000151@[minus_seven_halves, third] -> mod_frac_neg
+100-0000001@[mod_frac_neg]
+400-0000151@[seven_halves, minus_third] -> mod_frac_neg_divisor
+100-0000001@[mod_frac_neg_divisor]
+400-0000151@[seven_halves, seven_halves] -> mod_frac_zero
+100-0000001@[mod_frac_zero]

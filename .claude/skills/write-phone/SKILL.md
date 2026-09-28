@@ -5,7 +5,7 @@ description: Write, debug, or review a .phone program — the Phonebook semantic
 
 # Writing `.phone`
 
-`.phone` programs route calls to numbered addresses from a fixed registry of 111
+`.phone` programs route calls to numbered addresses from a fixed registry of 123
 operations. You cannot write one from intuition about other languages — the
 constraints are unusual and the address numbers are not guessable. Load the
 reference first, every time.
@@ -76,7 +76,7 @@ hide. It does not claim those extensions are safe; read them.
 
 ## When something cannot be expressed
 
-The registry is 111 addresses and deliberately small. If a task seems to need
+The registry is 123 addresses and deliberately small. If a task seems to need
 something absent, it is almost always buildable:
 
 | Missing | Build it from |

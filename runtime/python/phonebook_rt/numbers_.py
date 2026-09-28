@@ -752,3 +752,151 @@ def fraction_text(value: Fraction) -> str:
     if value.denominator == 1:
         return str(value.numerator)
     return f"{value.numerator}/{value.denominator}"
+
+
+# --------------------------------------------------------------------------
+# roots, floors, ceilings and remainders
+# --------------------------------------------------------------------------
+#
+# Square roots are worked out on whole numbers, never with a host `sqrt`, so
+# both backends follow one written-down method and agree bit for bit. A whole
+# number's square root rounded down is a single right answer, so Python's
+# `math.isqrt` is safe to use for it; the Rust runtime writes the same thing
+# out by hand. Everything else (the rounding of the float and the decimal) is
+# spelled out here and there, step for step.
+
+
+def _no_negative_root(negative: bool, operation: str) -> None:
+    if negative:
+        raise PhonebookFault("negative_root", f"{operation} of a negative number")
+
+
+def sqrt_(value: float) -> float:
+    """400-0000140 SQRT — the exact square root, rounded once to the nearest
+    float, ties to even. NOT `math.sqrt`: the same answer, but written out so
+    the two runtimes share a method instead of trusting two maths libraries.
+
+    value = m x 2^e with m a whole number. Make e even, then scale m up by a
+    power of four until its root has at least 55 bits. That root, rounded to
+    53 bits with the bits it drops and whether it was exact, is the answer.
+    """
+    _no_negative_root(value < 0.0, "SQRT")
+    if value == 0.0:
+        return 0.0
+    fraction, exponent = math.frexp(value)
+    mantissa = int(math.ldexp(fraction, 53))
+    exponent -= 53
+    if exponent % 2:
+        mantissa <<= 1
+        exponent -= 1
+    shift = max(0, (111 - mantissa.bit_length()) // 2)
+    scaled = mantissa << (2 * shift)
+    root = math.isqrt(scaled)
+    inexact = root * root != scaled
+    drop = root.bit_length() - 53
+    kept, rest = root >> drop, root & ((1 << drop) - 1)
+    half = 1 << (drop - 1)
+    if rest > half or (rest == half and (inexact or kept & 1)):
+        kept += 1
+    return math.ldexp(kept, exponent // 2 - shift + drop)
+
+
+def floor_(value: float) -> float:
+    """400-0000141 FLOOR — the largest whole float not above the value."""
+    return _finite(float(math.floor(value)), "FLOOR")
+
+
+def ceil_(value: float) -> float:
+    """400-0000142 CEIL — the smallest whole float not below the value. `_finite`
+    turns CEIL(-0.5), which is -0.0, into 0.0."""
+    return _finite(float(math.ceil(value)), "CEIL")
+
+
+def mod_float(a: float, b: float) -> float:
+    """400-0000143 MOD_FLOAT — sign of the dividend, like MOD. `math.fmod` and
+    Rust's `%` are both the exact IEEE remainder; Python's `%` is not."""
+    if b == 0.0:
+        raise PhonebookFault("division_by_zero", "MOD_FLOAT by zero")
+    return _finite(math.fmod(a, b), "MOD_FLOAT")
+
+
+def isqrt(value: int) -> int:
+    """400-0000144 ISQRT — the square root rounded down."""
+    _no_negative_root(value < 0, "ISQRT")
+    return math.isqrt(value)
+
+
+def isqrt_big(value: int) -> int:
+    """400-0000145 ISQRT_BIG — the square root rounded down; never grows."""
+    _no_negative_root(value < 0, "ISQRT_BIG")
+    return math.isqrt(value)
+
+
+def sqrt_dec(value: Decimal, places: int) -> Decimal:
+    """400-0000146 SQRT_DEC — the exact root, rounded once to `places`,
+    halves away from zero.
+
+    The answer's coefficient is sqrt(c x 10^(2p - s)) rounded, which is
+    sqrt(top / bottom) with both whole. q = isqrt(top // bottom) is that root
+    rounded down, and it rounds up when the root is at least q + 1/2, that is
+    when 4 x top >= bottom x (2q + 1)^2.
+    """
+    _checked_places(places, "SQRT_DEC")
+    _no_negative_root(value.coefficient < 0, "SQRT_DEC")
+    power = 2 * places - value.scale
+    top = value.coefficient * 10 ** max(power, 0)
+    bottom = 10 ** max(-power, 0)
+    root = math.isqrt(top // bottom)
+    if 4 * top >= bottom * (2 * root + 1) ** 2:
+        root += 1
+    return Decimal(root, places).checked("SQRT_DEC")
+
+
+def _whole_dec(value: Decimal, up: bool, operation: str) -> Decimal:
+    """The decimal's whole number toward -inf (FLOOR) or +inf (CEIL), 0 places."""
+    whole, remainder = divmod(value.coefficient, 10**value.scale)
+    if up and remainder:
+        whole += 1
+    return Decimal(whole, 0).checked(operation)
+
+
+def floor_dec(value: Decimal) -> Decimal:
+    """400-0000147 FLOOR_DEC — down to a whole number, with no places."""
+    return _whole_dec(value, False, "FLOOR_DEC")
+
+
+def ceil_dec(value: Decimal) -> Decimal:
+    """400-0000148 CEIL_DEC — up to a whole number, with no places."""
+    return _whole_dec(value, True, "CEIL_DEC")
+
+
+def _truncated_remainder(a: int, b: int) -> int:
+    """a - b x trunc(a / b): the remainder with the dividend's sign, as MOD."""
+    remainder = abs(a) % abs(b)
+    return -remainder if a < 0 else remainder
+
+
+def mod_dec(a: Decimal, b: Decimal) -> Decimal:
+    """400-0000149 MOD_DEC — exact, sign of the dividend, the larger scale."""
+    if b.coefficient == 0:
+        raise PhonebookFault("division_by_zero", "MOD_DEC by zero")
+    scale = max(a.scale, b.scale)
+    remainder = _truncated_remainder(a.rescaled(scale), b.rescaled(scale))
+    return Decimal(remainder, scale).checked("MOD_DEC")
+
+
+def ceil_fraction(a: Fraction) -> int:
+    """400-0000150 CEIL_FRACTION — toward positive infinity."""
+    return -(-a.numerator // a.denominator)
+
+
+def mod_fraction(a: Fraction, b: Fraction) -> Fraction:
+    """400-0000151 MOD_FRACTION — exact, sign of the dividend.
+
+    Over the shared denominator a.den x b.den, the two numerators are
+    a.num x b.den and b.num x a.den, and the remainder is theirs.
+    """
+    if b.numerator == 0:
+        raise PhonebookFault("division_by_zero", "MOD_FRACTION by zero")
+    remainder = _truncated_remainder(a.numerator * b.denominator, b.numerator * a.denominator)
+    return _fraction(remainder, a.denominator * b.denominator, "MOD_FRACTION")
