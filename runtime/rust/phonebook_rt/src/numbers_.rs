@@ -97,6 +97,84 @@ pub fn parse_int(value: &str, fallback: &i64) -> i64 {
     candidate.parse::<i64>().unwrap_or(*fallback)
 }
 
+/// 400-0000010 ABS — the smallest i64 has no positive twin, so it overflows.
+pub fn abs_(a: &i64) -> i64 {
+    match a.checked_abs() {
+        Some(value) => value,
+        None => crate::fault("overflow", "ABS overflowed a 64-bit signed integer"),
+    }
+}
+
+/// 400-0000011 NEGATE — the smallest i64 overflows, as in ABS.
+pub fn negate(a: &i64) -> i64 {
+    match a.checked_neg() {
+        Some(value) => value,
+        None => crate::fault("overflow", "NEGATE overflowed a 64-bit signed integer"),
+    }
+}
+
+/// 400-0000012 POW — squares step by step, the same algorithm as the Python
+/// runtime. Not `checked_pow`: that takes a `u32` exponent, and the contract's
+/// exponent is any non-negative i64. The base is only squared again when more
+/// exponent bits remain, so a result that fits never trips on a square it did
+/// not need.
+pub fn pow_(base: &i64, exponent: &i64) -> i64 {
+    if *exponent < 0 {
+        crate::fault(
+            "negative_exponent",
+            &format!("POW exponent {exponent} is negative"),
+        );
+    }
+    let mut base = *base;
+    let mut exponent = *exponent;
+    let mut result: i64 = 1;
+    while exponent > 0 {
+        if exponent & 1 == 1 {
+            result = match result.checked_mul(base) {
+                Some(value) => value,
+                None => crate::fault("overflow", "POW overflowed a 64-bit signed integer"),
+            };
+        }
+        exponent >>= 1;
+        if exponent > 0 {
+            base = match base.checked_mul(base) {
+                Some(value) => value,
+                None => crate::fault("overflow", "POW overflowed a 64-bit signed integer"),
+            };
+        }
+    }
+    result
+}
+
+/// 400-0000013 CLAMP — both ends included; low above high is an error.
+/// Not `i64::clamp`, which panics on a reversed range instead of faulting.
+pub fn clamp(value: &i64, low: &i64, high: &i64) -> i64 {
+    if low > high {
+        crate::fault(
+            "invalid_range",
+            &format!("CLAMP low {low} is above high {high}"),
+        );
+    }
+    if value < low {
+        *low
+    } else if value > high {
+        *high
+    } else {
+        *value
+    }
+}
+
+/// 400-0000014 SIGN — exactly -1, 0, or 1.
+pub fn sign(a: &i64) -> i64 {
+    if *a < 0 {
+        -1
+    } else if *a > 0 {
+        1
+    } else {
+        0
+    }
+}
+
 // --------------------------------------------------------------------------
 // floats
 // --------------------------------------------------------------------------

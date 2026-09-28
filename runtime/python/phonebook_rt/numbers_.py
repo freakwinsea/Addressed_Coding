@@ -96,6 +96,56 @@ def parse_int(value: str, fallback: int) -> int:
     return parsed
 
 
+def abs_(a: int) -> int:
+    """400-0000010 ABS — the smallest int64 has no positive twin, so it overflows."""
+    return _checked(-a if a < 0 else a)
+
+
+def negate(a: int) -> int:
+    """400-0000011 NEGATE — the smallest int64 overflows, as in ABS."""
+    return _checked(-a)
+
+
+def pow_(base: int, exponent: int) -> int:
+    """400-0000012 POW — squares step by step so overflow is caught, not bignum'd.
+
+    NOT Python's `**`, which would happily build a million-digit number before
+    anything noticed it was too big. The base is only squared again when more
+    exponent bits remain, so a result that fits never trips on a square it did
+    not need.
+    """
+    if exponent < 0:
+        raise PhonebookFault("negative_exponent", f"POW exponent {exponent} is negative")
+    result = 1
+    while exponent > 0:
+        if exponent & 1:
+            result = _checked(result * base)
+        exponent >>= 1
+        if exponent > 0:
+            base = _checked(base * base)
+    return result
+
+
+def clamp(value: int, low: int, high: int) -> int:
+    """400-0000013 CLAMP — both ends included; low above high is an error."""
+    if low > high:
+        raise PhonebookFault("invalid_range", f"CLAMP low {low} is above high {high}")
+    if value < low:
+        return low
+    if value > high:
+        return high
+    return value
+
+
+def sign(a: int) -> int:
+    """400-0000014 SIGN — exactly -1, 0, or 1."""
+    if a < 0:
+        return -1
+    if a > 0:
+        return 1
+    return 0
+
+
 # --------------------------------------------------------------------------
 # floats
 # --------------------------------------------------------------------------

@@ -134,3 +134,55 @@ def _env(root):
     )
     env["PYTHONIOENCODING"] = "utf-8"
     return env
+
+
+# Each program should fault with the given code. The conformance suite compares
+# stdout, so it cannot see a fault; this is where Rust's error paths are held to
+# the contract. The Python runtime's are covered by the registry's own cases.
+RUST_FAULTS = {
+    # The smallest int64 has no literal of its own; SUB reaches it.
+    "abs_min": ("400-0000002@[-9223372036854775807, 1] -> a\n"
+                "400-0000010@[a] -> b\n100-0000001@[b]\n", "overflow"),
+    "negate_min": ("400-0000002@[-9223372036854775807, 1] -> a\n"
+                   "400-0000011@[a] -> b\n100-0000001@[b]\n", "overflow"),
+    "pow_overflow": ("400-0000012@[2, 63] -> a\n100-0000001@[a]\n", "overflow"),
+    "pow_huge_exponent": (
+        "400-0000012@[10, 9223372036854775807] -> a\n100-0000001@[a]\n",
+        "overflow",
+    ),
+    "pow_negative_exponent": ("400-0000012@[2, -1] -> a\n100-0000001@[a]\n", "negative_exponent"),
+    "clamp_reversed": ("400-0000013@[5, 10, 0] -> a\n100-0000001@[a]\n", "invalid_range"),
+}
+
+
+def test_rust_faults_carry_the_contracted_code(has_cargo, registry, rust_backend, tmp_path):
+    if not has_cargo:
+        pytest.skip("cargo is not installed")
+    import os
+
+    from phonebook.conformance import RUST_PROJECT_TOML, child_env, repo_root
+
+    runtime = (repo_root() / "runtime" / "rust" / "phonebook_rt").as_posix()
+    project = tmp_path / "rust"
+    (project / "src" / "bin").mkdir(parents=True)
+    (project / "Cargo.toml").write_text(RUST_PROJECT_TOML.format(runtime=runtime), encoding="utf-8")
+    for name, (body, _) in RUST_FAULTS.items():
+        source = tmp_path / f"{name}.phone"
+        source.write_text("phonebook 0.1\n\n" + body, encoding="utf-8")
+        emitted = emit_rust(check(parse_file(source), registry), rust_backend)
+        (project / "src" / "bin" / f"{name}.rs").write_text(emitted, encoding="utf-8")
+
+    env = child_env()
+    env.setdefault("CARGO_TARGET_DIR", str(tmp_path / "target"))
+    built = subprocess.run(
+        ["cargo", "build", "--quiet"], cwd=str(project), capture_output=True, text=True, env=env
+    )
+    assert built.returncode == 0, built.stderr
+
+    for name, (_, code) in RUST_FAULTS.items():
+        suffix = ".exe" if os.name == "nt" else ""
+        executable = os.path.join(env["CARGO_TARGET_DIR"], "debug", name + suffix)
+        result = subprocess.run([executable], capture_output=True, text=True)
+        assert result.returncode == 1, (name, result.stdout, result.stderr)
+        assert result.stdout == "", name
+        assert result.stderr.startswith(f"fault: {code}"), (name, result.stderr)

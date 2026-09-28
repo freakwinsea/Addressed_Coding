@@ -46,6 +46,10 @@ FLOAT_RE = re.compile(r"^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$")
 NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 ADDRESS_RE = re.compile(rf"^{ADDRESS}$")
 
+# `int` is a 64-bit signed integer on every backend (SPEC: Rust `i64`).
+INT64_MIN = -(2**63)
+INT64_MAX = 2**63 - 1
+
 
 def parse_file(path: Path | str) -> Program:
     path = Path(path)
@@ -238,7 +242,14 @@ class _Parser:
         if text in ("true", "false"):
             return Literal(text == "true", BOOL, label)
         if INT_RE.match(text):
-            return Literal(int(text), INT, label)
+            value = int(text)
+            if value < INT64_MIN or value > INT64_MAX:
+                self.fail(
+                    f"integer literal {text} does not fit in a 64-bit signed integer "
+                    f"({INT64_MIN} to {INT64_MAX})",
+                    line_no,
+                )
+            return Literal(value, INT, label)
         if FLOAT_RE.match(text):
             value = float(text)
             if not math.isfinite(value):

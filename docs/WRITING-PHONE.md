@@ -533,6 +533,48 @@ b
                surrounding whitespace trimmed first. Underscores, other digit
                systems, and other bases are rejected.
 
+400-0000010  ABS(a: int) -> int
+             The distance of an integer from zero
+             ! The absolute value of the smallest 64-bit integer does not
+               fit, so ABS(-9223372036854775808) is an overflow error.
+               Python's abs would quietly return a bigger number; Rust's abs
+               would panic or wrap by build profile.
+             errors: overflow
+
+400-0000011  NEGATE(a: int) -> int
+             Flip the sign of an integer
+             ! NEGATE(-9223372036854775808) is an overflow error, for the
+               same reason as ABS (400-0000010).
+             ! NEGATE(0) is 0; there is no negative zero.
+             errors: overflow
+
+400-0000012  POW(base: int, exponent: int) -> int
+             Raise an integer to a whole-number power
+             ! POW(x, 0) is 1 for every x, including POW(0, 0).
+             ! A negative exponent is an error, not a fraction: v0 has no
+               floating point.
+             ! Overflow is an error whenever the true result does not fit in
+               64 bits. POW(-2, 63) is -9223372036854775808 and fits; POW(2,
+               63) does not.
+             ! A backend must not raise overflow for a result that fits, and
+               must not build a huge intermediate before noticing one that
+               does not.
+             errors: negative_exponent, overflow
+
+400-0000013  CLAMP(value: int, low: int, high: int) -> int
+             Hold an integer inside a range, both ends included
+             ! Arguments are value, low, high, in that order.
+             ! Both ends are included: CLAMP(value, low, high) is low when
+               value < low, high when value > high, and value otherwise.
+             ! low greater than high is an invalid_range error. low equal to
+               high is allowed and always returns that number. Rust's clamp
+               would panic here; Python has no clamp.
+             errors: invalid_range
+
+400-0000014  SIGN(a: int) -> int
+             Whether an integer is negative, zero, or positive
+             ! Returns exactly -1, 0, or 1. Never fails.
+
 400-0000015  ADD_FLOAT(a: float, b: float) -> float
              Add two floats
              ! float is IEEE 754 binary64. The result is the exact sum
