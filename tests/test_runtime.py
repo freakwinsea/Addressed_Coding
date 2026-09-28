@@ -98,6 +98,43 @@ class TestContractsThatOverrideTheHostLanguage:
             numbers_.add(numbers_.INT64_MAX, 1)
         assert excinfo.value.code == "overflow"
 
+    @pytest.mark.parametrize("name", ["abs_", "negate"])
+    def test_abs_and_negate_overflow_on_the_smallest_int(self, name):
+        from phonebook_rt import numbers_
+
+        with pytest.raises(PhonebookFault) as excinfo:
+            getattr(numbers_, name)(numbers_.INT64_MIN)
+        assert excinfo.value.code == "overflow"
+        assert abs(numbers_.INT64_MIN) == numbers_.INT64_MAX + 1  # Python would not
+
+    def test_pow_agrees_with_python_wherever_the_result_fits(self):
+        from phonebook_rt import numbers_
+
+        for base in range(-12, 13):
+            for exponent in range(0, 70):
+                true = base**exponent
+                if numbers_.INT64_MIN <= true <= numbers_.INT64_MAX:
+                    assert numbers_.pow_(base, exponent) == true, (base, exponent)
+                else:
+                    with pytest.raises(PhonebookFault) as excinfo:
+                        numbers_.pow_(base, exponent)
+                    assert excinfo.value.code == "overflow", (base, exponent)
+
+    def test_pow_fails_fast_instead_of_building_a_bignum(self):
+        from phonebook_rt import numbers_
+
+        # Python's ** would try to build a number with ~2.8e18 digits.
+        with pytest.raises(PhonebookFault) as excinfo:
+            numbers_.pow_(10, numbers_.INT64_MAX)
+        assert excinfo.value.code == "overflow"
+
+    def test_clamp_with_a_reversed_range_is_a_contract_error(self):
+        from phonebook_rt import numbers_
+
+        with pytest.raises(PhonebookFault) as excinfo:
+            numbers_.clamp(5, 10, 0)
+        assert excinfo.value.code == "invalid_range"
+
 
 class TestOrderingPromises:
     def test_entries_sorts_by_key(self):

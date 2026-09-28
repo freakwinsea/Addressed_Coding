@@ -40,3 +40,42 @@ phonebook 0.1
 100-0000001@[smaller]
 400-0000007@[3, 9] -> larger       # MAX
 100-0000001@[larger]
+
+# ABS and NEGATE: Python's abs and unary minus never overflow, Rust's panic or
+# wrap. The contract makes the smallest int64 a fault in both; these are the
+# values either side of that edge.
+400-0000010@[-5] -> l              # ABS
+100-0000001@[l]
+400-0000010@[-9223372036854775807] -> m
+100-0000001@[m]
+400-0000011@[5] -> n               # NEGATE
+100-0000001@[n]
+400-0000011@[9223372036854775807] -> o
+100-0000001@[o]
+
+# POW squares step by step in both runtimes. -2 to the 63rd is exactly the
+# smallest int64: it fits, even though 2 to the 63rd does not.
+400-0000012@[2, 10] -> p           # POW
+100-0000001@[p]
+400-0000012@[-3, 3] -> q
+100-0000001@[q]
+400-0000012@[0, 0] -> r            # 1 by contract
+100-0000001@[r]
+400-0000012@[-2, 63] -> s
+100-0000001@[s]
+400-0000012@[-1, 9223372036854775807] -> t
+100-0000001@[t]
+
+400-0000013@[-5, 0, 10] -> u       # CLAMP, below
+100-0000001@[u]
+400-0000013@[15, 0, 10] -> v       # above
+100-0000001@[v]
+400-0000013@[3, 7, 7] -> w         # a one-number range
+100-0000001@[w]
+
+400-0000014@[-42] -> x             # SIGN
+100-0000001@[x]
+400-0000014@[0] -> y
+100-0000001@[y]
+400-0000014@[42] -> z
+100-0000001@[z]
