@@ -1,0 +1,47 @@
+phonebook 0.1
+
+# GCD, LCM, PRODUCT, IS_EVEN and IS_ODD.
+#
+# Signs are where the hosts drift. GCD and LCM are never negative. IS_ODD must
+# not test the remainder against 1, because Rust's -3 % 2 is -1 while Python's
+# is 1. The last GCD case reaches the smallest int64, whose magnitude does not
+# fit in an i64: the Rust runtime works on u64 magnitudes to get there.
+
+400-0000032@[12, 18] -> a            # GCD
+100-0000001@[a]
+400-0000032@[-12, 18] -> b           # never negative
+100-0000001@[b]
+400-0000032@[0, -7] -> c             # GCD(a, 0) is |a|
+100-0000001@[c]
+400-0000032@[0, 0] -> d
+100-0000001@[d]
+400-0000002@[-9223372036854775807, 1] -> smallest
+400-0000032@[smallest, 6] -> e       # 2
+100-0000001@[e]
+
+400-0000033@[4, 6] -> f              # LCM
+100-0000001@[f]
+400-0000033@[-4, 6] -> g             # never negative
+100-0000001@[g]
+400-0000033@[0, 9] -> h
+100-0000001@[h]
+400-0000033@[9223372036854775807, 1] -> i
+100-0000001@[i]
+
+300-0000001@[2, 3, 4] -> factors
+400-0000034@[factors] -> j           # PRODUCT
+100-0000001@[j]
+300-0000001@[-2, 3] -> signed
+400-0000034@[signed] -> k
+100-0000001@[k]
+
+400-0000035@[-4] -> l                # IS_EVEN
+100-0000001@[l]
+400-0000035@[7] -> m
+100-0000001@[m]
+400-0000035@[smallest] -> n          # the smallest int64 is even
+100-0000001@[n]
+400-0000036@[-3] -> o                # IS_ODD, the case Rust's % gets wrong
+100-0000001@[o]
+400-0000036@[0] -> p
+100-0000001@[p]
