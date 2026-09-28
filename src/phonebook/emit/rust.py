@@ -9,7 +9,7 @@ Two rules keep the borrow checker out of the contracts:
 
 The result clones more than hand-written Rust would. That is the honest cost of
 a registry that describes values rather than memory, and it is the reason the
-same 81 addresses can drive a garbage-collected backend and a borrow-checked
+same 92 addresses can drive a garbage-collected backend and a borrow-checked
 one without either leaking into the other.
 """
 
@@ -47,6 +47,8 @@ def rust_type(t: Type) -> str:
         return "i64"
     if t.name == "bigint":
         return "rt::BigInt"
+    if t.name == "decimal":
+        return "rt::Decimal"
     if t.name == "float":
         return "f64"
     if t.name == "bool":
@@ -172,7 +174,11 @@ class _Emitter:
             return f"rt::{implementation.runtime}"
 
         if isinstance(arg, Literal):
-            if isinstance(arg.value, bool):
+            if arg.type.name == "decimal":
+                # Read from its digits, as a bigint is. The parser already
+                # checked them against both ceilings.
+                rendered = f'rt::Decimal::literal("{arg.value}")'
+            elif isinstance(arg.value, bool):
                 rendered = "true" if arg.value else "false"
             elif isinstance(arg.value, str):
                 rendered = json.dumps(arg.value, ensure_ascii=False) + ".to_string()"

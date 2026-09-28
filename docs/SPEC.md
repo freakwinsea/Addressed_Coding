@@ -66,7 +66,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `100` | Core | 6 addresses |
 | `200` | Text | 12 |
 | `300` | Collections | 16 |
-| `400` | Numbers | 36 |
+| `400` | Numbers | 47 |
 | `500` | I/O — the only block that touches the filesystem | 4 |
 | `600` | Logic and comparison | 7 |
 | `700` | Reserved for future shared blocks | empty |
@@ -74,7 +74,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `900` | Rust-native escape hatch | reserved, empty |
 | `999` | Quarantine — unregistered or withdrawn. The checker rejects it. | reserved |
 
-81 global addresses in v0. That is the entire budget; adding one is meant to
+92 global addresses in v0. That is the entire budget; adding one is meant to
 feel expensive (see `CONTRIBUTING.md`).
 
 `000` is the inverse of "dial 9 for an outside line": it is the local
@@ -85,7 +85,7 @@ auditing tractable — see §7.
 ## 3. Types
 
 ```
-int  bigint  float  bool  text  unit  list<T>  map<K,V>  pair<K,V>  callable(T,...)->R  any
+int  bigint  float  decimal  bool  text  unit  list<T>  map<K,V>  pair<K,V>  callable(T,...)->R  any
 ```
 
 Generic variables `T`, `K`, `V`, `A`, `R` are unified at check time. `unit` is
@@ -96,14 +96,16 @@ reserved name with no v0 addresses.
 
 Some contracts constrain a generic: `comparable` (orderable by `SORT` and
 `LESS_THAN`) and `keyable` (usable as a map key or by `UNIQUE`). `comparable` is
-`int`, `bigint`, `float`, `text`, `bool`; `keyable` is `int`, `bigint`, `text`,
-`bool`. The
+`int`, `bigint`, `float`, `decimal`, `text`, `bool`; `keyable` is `int`,
+`bigint`, `text`, `bool`. The
 constraint is checked once the variable resolves to a concrete type.
 
 `int` and `float` never mix. There is no implicit conversion: `ADD` takes two
 `int`s, `ADD_FLOAT` takes two `float`s, and `TO_FLOAT` / `TO_INT` cross between
 them. `bigint` is the same: `ADD_BIG` takes two `bigint`s, and `TO_BIG` /
-`BIG_TO_INT` cross to and from `int`.
+`BIG_TO_INT` cross to and from `int`. `decimal` too: `ADD_DEC` takes two
+`decimal`s, and `TO_DEC`, `BIG_TO_DEC`, `DEC_TO_INT`, `DEC_TO_FLOAT` and
+`FLOAT_TO_DEC` cross over.
 
 ### 3.1 Floats
 
@@ -169,12 +171,44 @@ A bigint literal is an integer with an `n` suffix, as in JavaScript: `12n`,
 `scripts/gen_bigint_random.py`) holds seeded random operands for all five
 arithmetic operations, so the Rust arithmetic is checked against Python's.
 
+### 3.3 Decimals
+
+A `decimal` is an exact base-10 number: a whole-number **coefficient** and a
+**scale**, the count of digits after the point. `0.30` is (30, 2). It is for
+amounts that must add up exactly, such as money: `0.10 + 0.20` is `0.30`, where
+a float gives `0.30000000000000004`.
+
+Neither backend uses a library for it. Python's `decimal` module rounds to a
+context precision, has signed zeros, NaN and infinity, and prints in its own
+layout, so pinning it to match Rust would be harder than writing the type out.
+Each runtime carries its own, written side by side:
+`runtime/python/phonebook_rt/decimal_.py` holds the coefficient in a Python
+`int`, and `runtime/rust/phonebook_rt/src/decimal.rs` holds it in the Rust
+runtime's `BigInt`.
+
+| Question | Contract |
+|---|---|
+| How big | At most 4000 digits in the coefficient (the bigint ceiling), and at most 1000 of them after the point. Anything past either is an `overflow` error, and a literal past either is a parse error. |
+| Places | Kept, never normalized away: `0.10 + 0.20` prints `0.30`. `ADD_DEC` and `SUB_DEC` give the larger scale of the two, `MUL_DEC` the sum of both. |
+| Rounding | Only `DIV_DEC` and `ROUND_DEC` round, each to a number of places the program gives (0 to 1000, else `invalid_places`), and always **halves away from zero**, the same as `ROUND`. Not Python's `round()` or the `decimal` module's default, which go to even. |
+| Equality and order | By value: `0.3` and `0.30` are equal and sort as ties. That is also why `decimal` is comparable but not keyable: a map could not say which of the two it kept. |
+| Zero | Has one sign: `-0.00d` is `0.00`. |
+| Floats | `DEC_TO_FLOAT` reads the decimal's text the way `PARSE_FLOAT` would. `FLOAT_TO_DEC` takes the float's shortest digits, the ones `TO_TEXT` prints, so `0.1` becomes `0.1` rather than the float's exact binary value. |
+| Printing | Every digit, the point `scale` places from the right, at least one digit before it, no exponent, no suffix: `0.30`, `-0.05`, `12`. |
+
+A decimal literal is digits, an optional fraction, and a `d` suffix: `19.99d`,
+`-0.05d`, `3d`. `tests/conformance/decimal_random.phone` (written by
+`scripts/gen_decimal_random.py`) holds seeded random operands for the
+arithmetic, so each runtime's hand-written decimal is checked against the
+other's.
+
 Backend representations:
 
 | Phonebook | Python | Rust |
 |---|---|---|
 | `int` | `int` | `i64` |
 | `bigint` | `int` | `phonebook_rt::BigInt` |
+| `decimal` | `phonebook_rt.decimal_.Decimal` | `phonebook_rt::Decimal` |
 | `float` | `float` | `f64` |
 | `bool` | `bool` | `bool` |
 | `text` | `str` | `String` |
@@ -217,7 +251,7 @@ return      := "return" NAME
 call        := ADDRESS VERSIONSEL? "@[" args? "]" ("->" NAME)?
 args        := arg ("," arg)*
 arg         := (NAME "=")? (literal | NAME | ADDRESS)
-literal     := STRING | INT | BIGINT | FLOAT | "true" | "false"
+literal     := STRING | INT | BIGINT | DECIMAL | FLOAT | "true" | "false"
 comment     := "#" .* EOL
 ```
 
@@ -350,7 +384,7 @@ compiler0 (Python, this repo)
 ```
 
 That requires a semantic kernel covering parsing, syntax trees, and error
-handling — well beyond the 81 addresses of v0. v0 deliberately does not chase
+handling — well beyond the 92 addresses of v0. v0 deliberately does not chase
 it.
 
 ## 9. Out of scope in v0

@@ -5,7 +5,7 @@ description: Write, debug, or review a .phone program — the Phonebook semantic
 
 # Writing `.phone`
 
-`.phone` programs route calls to numbered addresses from a fixed registry of 81
+`.phone` programs route calls to numbered addresses from a fixed registry of 92
 operations. You cannot write one from intuition about other languages — the
 constraints are unusual and the address numbers are not guessable. Load the
 reference first, every time.
@@ -48,6 +48,7 @@ The constraints that trip people up:
 - **Every result must be bound**, and addresses returning nothing must not be.
 - **`int` and `float` never mix.** `ADD` is ints, `ADD_FLOAT` is floats; convert with `TO_FLOAT` / `TO_INT`.
 - **`bigint` is its own type too.** For whole numbers past the 64-bit range, up to 4000 digits. Literals end in `n` (`12n`); `ADD_BIG` etc. take bigints; convert with `TO_BIG` / `BIG_TO_INT`.
+- **`decimal` is exact base-10, for money.** Literals end in `d` (`19.99d`); `0.10d + 0.20d` is exactly `0.30`. Use `ADD_DEC`, `MUL_DEC`, `DIV_DEC` / `ROUND_DEC` (these take the places to keep); convert with `TO_DEC` / `DEC_TO_INT` / `DEC_TO_FLOAT` / `FLOAT_TO_DEC`.
 - **Every `ext` must be used**, and none may recurse.
 
 ## Step 4 — check before claiming it works
@@ -74,7 +75,7 @@ hide. It does not claim those extensions are safe; read them.
 
 ## When something cannot be expressed
 
-The registry is 81 addresses and deliberately small. If a task seems to need
+The registry is 92 addresses and deliberately small. If a task seems to need
 something absent, it is almost always buildable:
 
 | Missing | Build it from |

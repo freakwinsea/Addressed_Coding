@@ -14,7 +14,7 @@ from phonebook.emit.rust import rust_type
 from phonebook.parser import parse_file
 from phonebook.types import parse_type
 
-EXAMPLES = ["line_count", "word_freq", "records", "audit_demo", "big_numbers"]
+EXAMPLES = ["line_count", "word_freq", "records", "audit_demo", "big_numbers", "money"]
 
 
 def test_both_backends_cover_the_whole_registry(registry, python_backend, rust_backend):
@@ -53,6 +53,8 @@ def _latest():
         ("list<float>", "Vec<f64>"),
         ("bigint", "rt::BigInt"),
         ("map<bigint,int>", "BTreeMap<rt::BigInt, i64>"),
+        ("decimal", "rt::Decimal"),
+        ("list<decimal>", "Vec<rt::Decimal>"),
         ("list<text>", "Vec<String>"),
         ("map<text,int>", "BTreeMap<String, i64>"),
         ("pair<text,int>", "(String, i64)"),
@@ -177,6 +179,25 @@ RUST_FAULTS = {
         "300-0000001@[9223372036854775807, 2, 0] -> xs\n400-0000034@[xs] -> a\n100-0000001@[a]\n",
         "overflow",
     ),
+    "dec_to_int_overflow": ("400-0000042@[-9223372036854775809.5d] -> a\n100-0000001@[a]\n",
+                            "overflow"),
+    "div_dec_by_zero": ("400-0000046@[1d, 0.00d, 2] -> a\n100-0000001@[a]\n",
+                        "division_by_zero"),
+    "div_dec_negative_places": ("400-0000046@[1d, 3d, -1] -> a\n100-0000001@[a]\n",
+                                "invalid_places"),
+    "round_dec_too_many_places": ("400-0000047@[1d, 1001] -> a\n100-0000001@[a]\n",
+                                  "invalid_places"),
+    # 0.1 has one place; a thousand-place value times it has 1001.
+    "mul_dec_places_ceiling": ("400-0000047@[1d, 1000] -> a\n"
+                               "400-0000045@[a, 0.1d] -> b\n100-0000001@[b]\n", "overflow"),
+    # 10^3999 has 4000 digits; with one place, its coefficient has 4001.
+    "round_dec_digits_ceiling": ("400-0000030@[10n, 3999] -> a\n400-0000041@[a] -> b\n"
+                                 "400-0000047@[b, 1] -> c\n100-0000001@[c]\n", "overflow"),
+    "add_dec_digits_ceiling": ("400-0000030@[10n, 3999] -> a\n400-0000041@[a] -> b\n"
+                               "400-0000045@[b, 9d] -> c\n400-0000043@[b, c] -> d\n"
+                               "100-0000001@[d]\n", "overflow"),
+    "dec_to_float_overflow": ("400-0000030@[10n, 400] -> a\n400-0000041@[a] -> b\n"
+                              "400-0000049@[b] -> c\n100-0000001@[c]\n", "overflow"),
 }
 
 

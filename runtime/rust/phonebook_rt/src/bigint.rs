@@ -100,8 +100,15 @@ impl BigInt {
         }
     }
 
+    /// Ten to the given power: a one and `exponent` zeros.
+    pub fn pow10(exponent: usize) -> BigInt {
+        let mut limbs = vec![0u32; exponent / LIMB_DIGITS];
+        limbs.push(10u32.pow((exponent % LIMB_DIGITS) as u32));
+        BigInt::from_parts(false, limbs)
+    }
+
     /// How many decimal digits the magnitude has; zero has none.
-    fn digit_count(&self) -> usize {
+    pub fn digit_count(&self) -> usize {
         match self.limbs.last() {
             None => 0,
             Some(top) => (self.limbs.len() - 1) * LIMB_DIGITS + top.to_string().len(),
@@ -141,6 +148,10 @@ impl BigInt {
                 BigInt::from_parts(other.negative, sub_magnitudes(&other.limbs, &self.limbs))
             }
         }
+    }
+
+    pub fn abs(&self) -> BigInt {
+        BigInt::from_parts(false, self.limbs.clone())
     }
 
     pub fn neg(&self) -> BigInt {
@@ -343,6 +354,17 @@ mod tests {
         }
         assert_eq!(big("9223372036854775808").to_i64(), None);
         assert_eq!(big("-9223372036854775809").to_i64(), None);
+    }
+
+    #[test]
+    fn powers_of_ten() {
+        for exponent in [0, 1, 8, 9, 10, 17, 18, 19, 100] {
+            assert_eq!(
+                BigInt::pow10(exponent).to_string(),
+                format!("1{}", "0".repeat(exponent))
+            );
+            assert_eq!(BigInt::pow10(exponent).digit_count(), exponent + 1);
+        }
     }
 
     #[test]

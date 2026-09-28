@@ -1,0 +1,156 @@
+phonebook 0.1
+
+# decimal is an exact base-10 number: a coefficient and a count of places.
+# Neither backend uses a library for it; Python and Rust each carry their own,
+# so this file is where the two have to agree: kept places, the one rounding
+# rule, signs, the float crossings, and the ceilings.
+
+ext 000-0000001 PLUS (acc: decimal, x: decimal) -> decimal {
+  400-0000043@[acc, x] -> next
+  return next
+}
+
+# Literals keep their places and print without the d.
+100-0000001@[0.10d]
+100-0000001@[-0.05d]
+100-0000001@[12d]
+100-0000001@[-0.00d]                               # zero has one sign
+100-0000001@[007.50d]
+
+# The reason the type exists: 0.10 + 0.20 is exactly 0.30.
+400-0000043@[0.10d, 0.20d] -> thirty               # ADD_DEC
+100-0000001@[thirty]
+400-0000015@[0.1, 0.2] -> float_thirty             # ADD_FLOAT, for contrast
+100-0000001@[float_thirty]
+400-0000043@[1.5d, 0.25d] -> mixed_places          # larger scale wins
+100-0000001@[mixed_places]
+400-0000044@[1d, 0.01d] -> borrow                  # SUB_DEC
+100-0000001@[borrow]
+400-0000044@[0.5d, 0.50d] -> zero
+100-0000001@[zero]
+400-0000044@[0.01d, 1d] -> negative
+100-0000001@[negative]
+
+# MUL_DEC is exact and adds the places.
+400-0000045@[19.99d, 3d] -> three_items            # MUL_DEC
+100-0000001@[three_items]
+400-0000045@[1.5d, 0.25d] -> product
+100-0000001@[product]
+400-0000045@[-0.5d, 0.5d] -> signs
+100-0000001@[signs]
+
+# Adding ten dimes with REDUCE: one dollar, not 0.9999999999999999.
+300-0000001@[0.10d, 0.10d, 0.10d, 0.10d, 0.10d, 0.10d, 0.10d, 0.10d, 0.10d, 0.10d] -> dimes
+300-0000004@[dimes, 000-0000001, 0.00d] -> dollar
+100-0000001@[dollar]
+
+# DIV_DEC rounds once, to the places asked for, halves away from zero.
+400-0000046@[1d, 3d, 4] -> third                   # DIV_DEC
+100-0000001@[third]
+400-0000046@[2d, 3d, 0] -> two_thirds
+100-0000001@[two_thirds]
+400-0000046@[1d, 8d, 2] -> eighth                  # 0.125 -> 0.13
+100-0000001@[eighth]
+400-0000046@[-1d, 8d, 2] -> neg_eighth             # -0.125 -> -0.13
+100-0000001@[neg_eighth]
+400-0000046@[1d, -8d, 2] -> neg_divisor
+100-0000001@[neg_divisor]
+400-0000046@[100.00d, 7d, 2] -> share
+100-0000001@[share]
+400-0000046@[1d, 4d, 3] -> padded                  # exact, still 3 places
+100-0000001@[padded]
+400-0000046@[0.001d, 1000d, 0] -> tiny             # 0.000001 -> 0
+100-0000001@[tiny]
+400-0000046@[-0.001d, 1000d, 2] -> tiny_negative   # -0.000001 -> 0.00, not -0.00
+100-0000001@[tiny_negative]
+400-0000046@[123456789012345678901234567890.123d, 0.007d, 9] -> long
+100-0000001@[long]
+
+# ROUND_DEC sets the places: fewer rounds, more pads.
+400-0000047@[2.345d, 2] -> r1                      # ROUND_DEC
+100-0000001@[r1]
+400-0000047@[-2.345d, 2] -> r2
+100-0000001@[r2]
+400-0000047@[2.5d, 0] -> r3                        # 3, where round() gives 2
+100-0000001@[r3]
+400-0000047@[3.5d, 0] -> r4
+100-0000001@[r4]
+400-0000047@[9.99d, 1] -> r5                       # carries into a new digit
+100-0000001@[r5]
+400-0000047@[5d, 2] -> r6                          # pads
+100-0000001@[r6]
+400-0000047@[-0.004d, 2] -> r7                     # no negative zero
+100-0000001@[r7]
+400-0000047@[2.344999d, 2] -> r8                   # below half: down
+100-0000001@[r8]
+
+# Crossing over to and from int, bigint and float.
+400-0000040@[-9223372036854775808] -> from_int     # TO_DEC
+100-0000001@[from_int]
+400-0000041@[123456789012345678901234567890n] -> from_big  # BIG_TO_DEC
+100-0000001@[from_big]
+400-0000042@[-2.99d] -> truncated                  # DEC_TO_INT
+100-0000001@[truncated]
+400-0000042@[9223372036854775807.999d] -> top
+100-0000001@[top]
+400-0000049@[0.1d] -> tenth                        # DEC_TO_FLOAT
+100-0000001@[tenth]
+400-0000049@[0.30000000000000004d] -> near_third
+100-0000001@[near_third]
+400-0000049@[123456789012345678901234567890.5d] -> large_float
+100-0000001@[large_float]
+400-0000049@[-0.000d] -> float_zero
+100-0000001@[float_zero]
+400-0000050@[0.1] -> from_float                    # FLOAT_TO_DEC
+100-0000001@[from_float]
+400-0000050@[100.0] -> hundred
+100-0000001@[hundred]
+400-0000050@[-1.5e-05] -> small
+100-0000001@[small]
+400-0000050@[1e16] -> e16
+100-0000001@[e16]
+400-0000050@[5e-324] -> smallest
+400-0000049@[smallest] -> back                     # and back again, exactly
+100-0000001@[back]
+400-0000050@[0.30000000000000004] -> float_sum
+100-0000001@[float_sum]
+
+# PARSE_DEC keeps the places as written; other shapes give the fallback.
+400-0000048@["  1.50 ", 0d] -> p1                 # PARSE_DEC
+100-0000001@[p1]
+400-0000048@["-0.05", 0d] -> p2
+100-0000001@[p2]
+400-0000048@["+0007", 0d] -> p3
+100-0000001@[p3]
+400-0000048@[".5", -1d] -> p4
+100-0000001@[p4]
+400-0000048@["5.", -1d] -> p5
+100-0000001@[p5]
+400-0000048@["1e5", -1d] -> p6
+100-0000001@[p6]
+400-0000048@["1,000.00", -1d] -> p7
+100-0000001@[p7]
+
+# Comparable by value: 0.3 and 0.30 are equal and keep their order in SORT.
+300-0000001@[0.30d, -1d, 0.3d, 10.000d, -1.5d, 0.299d] -> amounts
+300-0000005@[amounts] -> sorted                    # SORT
+100-0000001@[sorted]
+600-0000005@[0.3d, 0.30d] -> not_less              # LESS_THAN
+100-0000001@[not_less]
+600-0000005@[-0.31d, -0.3d] -> less
+100-0000001@[less]
+600-0000006@[10d, 9.999d] -> greater               # GREATER_THAN
+100-0000001@[greater]
+
+# The ceilings: 1000 places is allowed, and 4000 digits.
+400-0000046@[1d, 3d, 1000] -> many_places
+100-0000005@[many_places] -> many_text
+200-0000011@[many_text] -> many_length             # LENGTH: "0." + 1000
+100-0000001@[many_length]
+400-0000030@[10n, 3999] -> big                     # POW_BIG
+400-0000041@[big] -> wide
+400-0000044@[wide, 1d] -> nines                    # 3999 nines
+400-0000047@[nines, 1] -> nines_point              # 4000 digits
+100-0000005@[nines_point] -> nines_text
+200-0000011@[nines_text] -> nines_length
+100-0000001@[nines_length]

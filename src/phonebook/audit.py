@@ -188,7 +188,9 @@ def render(report: Report, show_bodies: bool = True) -> str:
 def _args(call: CheckedCall) -> str:
     rendered = []
     for arg in call.call.args:
-        if isinstance(arg, Literal):
+        if isinstance(arg, Literal) and arg.type.name == "decimal":
+            rendered.append(f"{arg.value}d")  # kept as digits, never as text
+        elif isinstance(arg, Literal):
             rendered.append(_literal(arg.value))
         elif isinstance(arg, Ref):
             rendered.append(arg.name)

@@ -532,3 +532,124 @@ pub fn pow_big(base: &BigInt, exponent: &i64) -> BigInt {
 pub fn parse_big(value: &str, fallback: &BigInt) -> BigInt {
     BigInt::parse(&crate::text::trim(value)).unwrap_or_else(|| fallback.clone())
 }
+
+// --------------------------------------------------------------------------
+// decimals
+// --------------------------------------------------------------------------
+//
+// The type itself is in `crate::decimal`. What the functions below add is the
+// contract around it: which scale a result has, the one rounding rule (halves
+// away from zero, as ROUND), and the ceilings, which every result that can
+// grow passes through `Decimal::checked` to meet.
+
+use crate::decimal::{divide_rounded, Decimal, MAX_SCALE};
+
+fn checked_places(places: i64, operation: &str) -> usize {
+    if places < 0 || places > MAX_SCALE as i64 {
+        crate::fault(
+            "invalid_places",
+            &format!("{operation} places {places} is not between 0 and {MAX_SCALE}"),
+        );
+    }
+    places as usize
+}
+
+/// 400-0000040 TO_DEC — an int as a decimal with no places; never fails.
+pub fn to_dec(value: &i64) -> Decimal {
+    Decimal::new(BigInt::from_i64(*value), 0)
+}
+
+/// 400-0000041 BIG_TO_DEC — a bigint as a decimal with no places; never fails.
+pub fn big_to_dec(value: &BigInt) -> Decimal {
+    Decimal::new(value.clone(), 0)
+}
+
+/// 400-0000042 DEC_TO_INT — truncates toward zero, as TO_INT does.
+pub fn dec_to_int(value: &Decimal) -> i64 {
+    let whole = value.coefficient().div_rem(&BigInt::pow10(value.scale())).0;
+    match whole.to_i64() {
+        Some(whole) => whole,
+        None => crate::fault(
+            "overflow",
+            "DEC_TO_INT value does not fit in a 64-bit signed integer",
+        ),
+    }
+}
+
+/// 400-0000043 ADD_DEC — the result has the larger of the two scales.
+pub fn add_dec(a: &Decimal, b: &Decimal) -> Decimal {
+    let scale = a.scale().max(b.scale());
+    Decimal::new(a.rescaled(scale).add(&b.rescaled(scale)), scale).checked("ADD_DEC")
+}
+
+/// 400-0000044 SUB_DEC — the result has the larger of the two scales.
+pub fn sub_dec(a: &Decimal, b: &Decimal) -> Decimal {
+    let scale = a.scale().max(b.scale());
+    Decimal::new(a.rescaled(scale).sub(&b.rescaled(scale)), scale).checked("SUB_DEC")
+}
+
+/// 400-0000045 MUL_DEC — exact; the scales add, so 1.5 x 0.25 is 0.375.
+pub fn mul_dec(a: &Decimal, b: &Decimal) -> Decimal {
+    Decimal::new(a.coefficient().mul(b.coefficient()), a.scale() + b.scale()).checked("MUL_DEC")
+}
+
+/// 400-0000046 DIV_DEC — the exact quotient, rounded once to `places`.
+///
+/// a / b = (ca / 10^sa) / (cb / 10^sb), so the quotient at `places` places is
+/// ca * 10^(sb + places) / (cb * 10^sa), rounded to a whole number. Both
+/// exponents are never negative, so nothing is rounded before that division.
+pub fn div_dec(a: &Decimal, b: &Decimal, places: &i64) -> Decimal {
+    let places = checked_places(*places, "DIV_DEC");
+    if b.coefficient().is_zero() {
+        crate::fault("division_by_zero", "DIV_DEC by zero");
+    }
+    let mut numerator = a.coefficient().mul(&BigInt::pow10(b.scale() + places));
+    let mut denominator = b.coefficient().mul(&BigInt::pow10(a.scale()));
+    if denominator.is_negative() {
+        numerator = numerator.neg();
+        denominator = denominator.neg();
+    }
+    Decimal::new(divide_rounded(&numerator, &denominator), places).checked("DIV_DEC")
+}
+
+/// 400-0000047 ROUND_DEC — to exactly `places` places, halves away from zero.
+/// Fewer places than the value has rounds; more pads with zeros, so
+/// ROUND_DEC(5, 2) is 5.00.
+pub fn round_dec(value: &Decimal, places: &i64) -> Decimal {
+    let places = checked_places(*places, "ROUND_DEC");
+    Decimal::new(value.rescaled(places), places).checked("ROUND_DEC")
+}
+
+/// 400-0000048 PARSE_DEC — never fails; unparseable text yields the fallback.
+pub fn parse_dec(value: &str, fallback: &Decimal) -> Decimal {
+    Decimal::parse(&crate::text::trim(value)).unwrap_or_else(|| fallback.clone())
+}
+
+/// 400-0000049 DEC_TO_FLOAT — the nearest float, ties to even.
+///
+/// `str::parse::<f64>` of the decimal's own text is correctly rounded however
+/// many digits it has, as Python's `float()` is, so both backends read the
+/// same digits the same way.
+pub fn dec_to_float(value: &Decimal) -> f64 {
+    match value.to_string().parse::<f64>() {
+        Ok(parsed) => finite(parsed, "DEC_TO_FLOAT"),
+        Err(_) => unreachable!("a decimal's text is always a valid float"),
+    }
+}
+
+/// 400-0000050 FLOAT_TO_DEC — the float's shortest digits, as TO_TEXT prints
+/// them, never its exact binary value: 0.1 is 0.1.
+///
+/// With digits d1...dn and exponent E, the value is d1...dn x 10^(E-n+1). A
+/// float has at most 17 significant digits and E is between -324 and 308, so
+/// the result is always inside both ceilings.
+pub fn float_to_dec(value: &f64) -> Decimal {
+    let (digits, exponent) = shortest_digits(value.abs());
+    let power = exponent as i64 - digits.len() as i64 + 1;
+    let sign = if *value < 0.0 { "-" } else { "" };
+    let coefficient = BigInt::literal(&format!("{sign}{digits}"));
+    if power >= 0 {
+        return Decimal::new(coefficient.mul(&BigInt::pow10(power as usize)), 0);
+    }
+    Decimal::new(coefficient, (-power) as usize)
+}
