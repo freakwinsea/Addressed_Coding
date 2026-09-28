@@ -109,34 +109,34 @@ def _finite(value: float, operation: str) -> float:
 
 
 def add_float(a: float, b: float) -> float:
-    """400-0000010 ADD_FLOAT."""
+    """400-0000015 ADD_FLOAT."""
     return _finite(a + b, "ADD_FLOAT")
 
 
 def sub_float(a: float, b: float) -> float:
-    """400-0000011 SUB_FLOAT."""
+    """400-0000016 SUB_FLOAT."""
     return _finite(a - b, "SUB_FLOAT")
 
 
 def mul_float(a: float, b: float) -> float:
-    """400-0000012 MUL_FLOAT."""
+    """400-0000017 MUL_FLOAT."""
     return _finite(a * b, "MUL_FLOAT")
 
 
 def div_float(a: float, b: float) -> float:
-    """400-0000013 DIV_FLOAT — dividing by zero is an error, never inf or NaN."""
+    """400-0000018 DIV_FLOAT — dividing by zero is an error, never inf or NaN."""
     if b == 0.0:
         raise PhonebookFault("division_by_zero", "DIV_FLOAT by zero")
     return _finite(a / b, "DIV_FLOAT")
 
 
 def to_float(value: int) -> float:
-    """400-0000014 TO_FLOAT — nearest float, ties to even, as float() rounds."""
+    """400-0000019 TO_FLOAT — nearest float, ties to even, as float() rounds."""
     return float(value)
 
 
 def to_int(value: float) -> int:
-    """400-0000015 TO_INT — truncates toward zero; never saturates."""
+    """400-0000020 TO_INT — truncates toward zero; never saturates."""
     truncated = math.trunc(value)
     if truncated < INT64_MIN or truncated > INT64_MAX:
         raise PhonebookFault("overflow", f"{value!r} does not fit in a 64-bit signed integer")
@@ -144,7 +144,7 @@ def to_int(value: float) -> int:
 
 
 def round_(value: float) -> float:
-    """400-0000016 ROUND — halves away from zero. NOT Python's `round()`.
+    """400-0000021 ROUND — halves away from zero. NOT Python's `round()`.
 
     Decided on the exact binary value: `magnitude - whole` is exact because
     `whole` is `magnitude` with its fraction bits dropped, so there is no
@@ -158,7 +158,7 @@ def round_(value: float) -> float:
 
 
 def parse_float(value: str, fallback: float) -> float:
-    """400-0000017 PARSE_FLOAT — never fails; unparseable text yields the fallback."""
+    """400-0000022 PARSE_FLOAT — never fails; unparseable text yields the fallback."""
     candidate = value.strip(WHITESPACE)
     if not _FLOAT.match(candidate):
         return fallback

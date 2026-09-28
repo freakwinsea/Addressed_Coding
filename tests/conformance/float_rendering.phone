@@ -11,7 +11,7 @@ phonebook 0.1
 # one; the contract, like Python's repr, picks the one ending in an even digit.
 
 ext 000-0000001 ROUND_TRIP (cell: text) -> text {
-  400-0000017@[cell, 0.0] -> value      # PARSE_FLOAT
+  400-0000022@[cell, 0.0] -> value      # PARSE_FLOAT
   100-0000005@[value] -> rendered       # TO_TEXT
   return rendered
 }

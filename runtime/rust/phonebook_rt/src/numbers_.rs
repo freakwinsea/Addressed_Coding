@@ -116,22 +116,22 @@ fn finite(value: f64, operation: &str) -> f64 {
     }
 }
 
-/// 400-0000010 ADD_FLOAT
+/// 400-0000015 ADD_FLOAT
 pub fn add_float(a: &f64, b: &f64) -> f64 {
     finite(a + b, "ADD_FLOAT")
 }
 
-/// 400-0000011 SUB_FLOAT
+/// 400-0000016 SUB_FLOAT
 pub fn sub_float(a: &f64, b: &f64) -> f64 {
     finite(a - b, "SUB_FLOAT")
 }
 
-/// 400-0000012 MUL_FLOAT
+/// 400-0000017 MUL_FLOAT
 pub fn mul_float(a: &f64, b: &f64) -> f64 {
     finite(a * b, "MUL_FLOAT")
 }
 
-/// 400-0000013 DIV_FLOAT — dividing by zero is an error, never inf or NaN.
+/// 400-0000018 DIV_FLOAT — dividing by zero is an error, never inf or NaN.
 pub fn div_float(a: &f64, b: &f64) -> f64 {
     if *b == 0.0 {
         crate::fault("division_by_zero", "DIV_FLOAT by zero");
@@ -139,12 +139,12 @@ pub fn div_float(a: &f64, b: &f64) -> f64 {
     finite(a / b, "DIV_FLOAT")
 }
 
-/// 400-0000014 TO_FLOAT — nearest float, ties to even, as `as f64` rounds.
+/// 400-0000019 TO_FLOAT — nearest float, ties to even, as `as f64` rounds.
 pub fn to_float(value: &i64) -> f64 {
     *value as f64
 }
 
-/// 400-0000015 TO_INT — truncates toward zero; never saturates, unlike `as i64`.
+/// 400-0000020 TO_INT — truncates toward zero; never saturates, unlike `as i64`.
 pub fn to_int(value: &f64) -> i64 {
     let truncated = value.trunc();
     // -2^63 is a float exactly; 2^63 is the first value past the top.
@@ -161,7 +161,7 @@ pub fn to_int(value: &f64) -> i64 {
     truncated as i64
 }
 
-/// 400-0000016 ROUND — halves away from zero.
+/// 400-0000021 ROUND — halves away from zero.
 ///
 /// Written out rather than `f64::round`, to read side by side with the Python
 /// runtime, which cannot use its host's `round()`. `magnitude - whole` is exact
@@ -175,7 +175,7 @@ pub fn round_(value: &f64) -> f64 {
     finite(if *value < 0.0 { -whole } else { whole }, "ROUND")
 }
 
-/// 400-0000017 PARSE_FLOAT — never fails; unparseable text yields the fallback.
+/// 400-0000022 PARSE_FLOAT — never fails; unparseable text yields the fallback.
 pub fn parse_float(value: &str, fallback: &f64) -> f64 {
     let candidate = crate::text::trim(value);
     if !is_float_text(&candidate) {

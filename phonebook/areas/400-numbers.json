@@ -213,7 +213,7 @@
       "since": "0.1.0"
     },
     {
-      "address": "400-0000010",
+      "address": "400-0000015",
       "name": "ADD_FLOAT",
       "summary": "Add two floats",
       "keywords": ["add", "plus", "sum", "float", "decimal", "real"],
@@ -231,7 +231,7 @@
           "NO NEGATIVE ZERO: a result of -0.0 is 0.0."
         ]
       },
-      "examples": ["400-0000010@[price, tax] -> total"],
+      "examples": ["400-0000015@[price, tax] -> total"],
       "conformance": [
         { "id": "add_float.basic", "args": [1.5, 2.25], "expect": 3.75 },
         { "id": "add_float.binary_rounding", "args": [0.1, 0.2], "expect": 0.30000000000000004 },
@@ -241,7 +241,7 @@
       "since": "0.2.0"
     },
     {
-      "address": "400-0000011",
+      "address": "400-0000016",
       "name": "SUB_FLOAT",
       "summary": "Subtract the second float from the first",
       "keywords": ["subtract", "minus", "difference", "float", "decimal"],
@@ -258,7 +258,7 @@
           "NO NEGATIVE ZERO: 0.0 - 0.0 is 0.0, and so is any other difference that would be -0.0."
         ]
       },
-      "examples": ["400-0000011@[total, discount] -> due"],
+      "examples": ["400-0000016@[total, discount] -> due"],
       "conformance": [
         { "id": "sub_float.basic", "args": [5.5, 2.25], "expect": 3.25 },
         { "id": "sub_float.negative", "args": [1.0, 2.5], "expect": -1.5 },
@@ -268,7 +268,7 @@
       "since": "0.2.0"
     },
     {
-      "address": "400-0000012",
+      "address": "400-0000017",
       "name": "MUL_FLOAT",
       "summary": "Multiply two floats",
       "keywords": ["multiply", "times", "product", "scale", "float", "decimal"],
@@ -285,7 +285,7 @@
           "NO NEGATIVE ZERO: -2.0 * 0.0 is 0.0."
         ]
       },
-      "examples": ["400-0000012@[width, height] -> area"],
+      "examples": ["400-0000017@[width, height] -> area"],
       "conformance": [
         { "id": "mul_float.basic", "args": [1.5, 4.0], "expect": 6.0 },
         { "id": "mul_float.no_negative_zero", "args": [-2.0, 0.0], "expect": 0.0 },
@@ -295,7 +295,7 @@
       "since": "0.2.0"
     },
     {
-      "address": "400-0000013",
+      "address": "400-0000018",
       "name": "DIV_FLOAT",
       "summary": "Divide one float by another",
       "description": "True division. Unlike DIV (400-0000004) nothing is truncated; the quotient is rounded to the nearest float.",
@@ -314,7 +314,7 @@
           "A quotient too large to be finite is an overflow error. One too small to represent is 0.0, never -0.0."
         ]
       },
-      "examples": ["400-0000013@[total, count] -> mean"],
+      "examples": ["400-0000018@[total, count] -> mean"],
       "conformance": [
         { "id": "div_float.basic", "args": [7.0, 2.0], "expect": 3.5 },
         { "id": "div_float.negative", "args": [-7.0, 2.0], "expect": -3.5 },
@@ -326,7 +326,7 @@
       "since": "0.2.0"
     },
     {
-      "address": "400-0000014",
+      "address": "400-0000019",
       "name": "TO_FLOAT",
       "summary": "Convert an integer to a float",
       "keywords": ["float", "convert", "decimal", "real", "cast", "widen"],
@@ -342,7 +342,7 @@
           "Exact for every integer whose magnitude is at most 2^53. Larger integers round to the nearest float, ties to even: 9007199254740993 becomes 9007199254740992.0."
         ]
       },
-      "examples": ["400-0000014@[count] -> n"],
+      "examples": ["400-0000019@[count] -> n"],
       "conformance": [
         { "id": "to_float.basic", "args": [3], "expect": 3.0 },
         { "id": "to_float.negative", "args": [-7], "expect": -7.0 },
@@ -352,10 +352,10 @@
       "since": "0.2.0"
     },
     {
-      "address": "400-0000015",
+      "address": "400-0000020",
       "name": "TO_INT",
       "summary": "Convert a float to an integer, truncating toward zero",
-      "description": "Drops the fractional part, the same direction DIV (400-0000004) rounds. Use ROUND (400-0000016) first for nearest.",
+      "description": "Drops the fractional part, the same direction DIV (400-0000004) rounds. Use ROUND (400-0000021) first for nearest.",
       "keywords": ["int", "integer", "truncate", "convert", "cast", "whole", "float"],
       "contract": {
         "version": 1,
@@ -370,7 +370,7 @@
           "A value whose truncation does not fit a 64-bit signed integer is an overflow error. It never saturates, which is what Rust's `as i64` would do."
         ]
       },
-      "examples": ["400-0000015@[seconds] -> whole"],
+      "examples": ["400-0000020@[seconds] -> whole"],
       "conformance": [
         { "id": "to_int.basic", "args": [2.9], "expect": 2 },
         { "id": "to_int.negative_truncates", "args": [-2.9], "expect": -2 },
@@ -381,7 +381,7 @@
       "since": "0.2.0"
     },
     {
-      "address": "400-0000016",
+      "address": "400-0000021",
       "name": "ROUND",
       "summary": "Round a float to the nearest whole number, halves away from zero",
       "description": "The rounding direction is pinned by contract because the host languages disagree: Python's round() sends halves to the nearest even number, Rust's f64::round sends them away from zero. This address promises away from zero.",
@@ -397,10 +397,10 @@
         "notes": [
           "HALVES AWAY FROM ZERO: 2.5 is 3.0 and -2.5 is -3.0. A Python backend must NOT use round(), which would give 2.",
           "Decided on the exact binary value, never on its printed digits: 0.49999999999999994 is 0.0, because it is below one half.",
-          "The result is a float. Use TO_INT (400-0000015) to get an int. NO NEGATIVE ZERO: -0.4 rounds to 0.0."
+          "The result is a float. Use TO_INT (400-0000020) to get an int. NO NEGATIVE ZERO: -0.4 rounds to 0.0."
         ]
       },
-      "examples": ["400-0000016@[score] -> rounded"],
+      "examples": ["400-0000021@[score] -> rounded"],
       "conformance": [
         { "id": "round.half_up", "args": [2.5], "expect": 3.0 },
         { "id": "round.half_down_negative", "args": [-2.5], "expect": -3.0 },
@@ -412,7 +412,7 @@
       "since": "0.2.0"
     },
     {
-      "address": "400-0000017",
+      "address": "400-0000022",
       "name": "PARSE_FLOAT",
       "summary": "Read a float from text, or a fallback when it is not one",
       "keywords": ["parse", "float", "decimal", "number", "convert", "atof", "read number"],
@@ -434,7 +434,7 @@
           "A value too large to be finite returns the fallback. A value too small to represent is 0.0. '-0' is 0.0."
         ]
       },
-      "examples": ["400-0000017@[cell, 0.0] -> price"],
+      "examples": ["400-0000022@[cell, 0.0] -> price"],
       "conformance": [
         { "id": "parse_float.basic", "args": ["3.25", 0.0], "expect": 3.25 },
         { "id": "parse_float.integer", "args": ["42", 0.0], "expect": 42.0 },

@@ -533,7 +533,7 @@ b
                surrounding whitespace trimmed first. Underscores, other digit
                systems, and other bases are rejected.
 
-400-0000010  ADD_FLOAT(a: float, b: float) -> float
+400-0000015  ADD_FLOAT(a: float, b: float) -> float
              Add two floats
              ! float is IEEE 754 binary64. The result is the exact sum
                rounded to nearest, ties to even, which every backend gets
@@ -543,7 +543,7 @@ b
              ! NO NEGATIVE ZERO: a result of -0.0 is 0.0.
              errors: overflow
 
-400-0000011  SUB_FLOAT(a: float, b: float) -> float
+400-0000016  SUB_FLOAT(a: float, b: float) -> float
              Subtract the second float from the first
              ! Rounded to nearest, ties to even. A result too large to be
                finite is an overflow error.
@@ -551,7 +551,7 @@ b
                difference that would be -0.0.
              errors: overflow
 
-400-0000012  MUL_FLOAT(a: float, b: float) -> float
+400-0000017  MUL_FLOAT(a: float, b: float) -> float
              Multiply two floats
              ! Rounded to nearest, ties to even. A result too large to be
                finite is an overflow error; a result too small to represent
@@ -559,7 +559,7 @@ b
              ! NO NEGATIVE ZERO: -2.0 * 0.0 is 0.0.
              errors: overflow
 
-400-0000013  DIV_FLOAT(a: float, b: float) -> float
+400-0000018  DIV_FLOAT(a: float, b: float) -> float
              Divide one float by another
              ! Rounded to nearest, ties to even.
              ! DIVIDING BY ZERO IS AN ERROR, including 0.0 / 0.0. IEEE 754
@@ -569,13 +569,13 @@ b
                too small to represent is 0.0, never -0.0.
              errors: division_by_zero, overflow
 
-400-0000014  TO_FLOAT(value: int) -> float
+400-0000019  TO_FLOAT(value: int) -> float
              Convert an integer to a float
              ! Exact for every integer whose magnitude is at most 2^53.
                Larger integers round to the nearest float, ties to even:
                9007199254740993 becomes 9007199254740992.0.
 
-400-0000015  TO_INT(value: float) -> int
+400-0000020  TO_INT(value: float) -> int
              Convert a float to an integer, truncating toward zero
              ! TRUNCATES TOWARD ZERO: 2.9 is 2 and -2.9 is -2.
              ! A value whose truncation does not fit a 64-bit signed integer
@@ -583,17 +583,17 @@ b
                `as i64` would do.
              errors: overflow
 
-400-0000016  ROUND(value: float) -> float
+400-0000021  ROUND(value: float) -> float
              Round a float to the nearest whole number, halves away from zero
              ! HALVES AWAY FROM ZERO: 2.5 is 3.0 and -2.5 is -3.0. A Python
                backend must NOT use round(), which would give 2.
              ! Decided on the exact binary value, never on its printed
                digits: 0.49999999999999994 is 0.0, because it is below one
                half.
-             ! The result is a float. Use TO_INT (400-0000015) to get an int.
+             ! The result is a float. Use TO_INT (400-0000020) to get an int.
                NO NEGATIVE ZERO: -0.4 rounds to 0.0.
 
-400-0000017  PARSE_FLOAT(value: text, fallback: float) -> float
+400-0000022  PARSE_FLOAT(value: text, fallback: float) -> float
              Read a float from text, or a fallback when it is not one
              ! Never fails; unparseable text returns the fallback.
              ! Accepts, after trimming surrounding whitespace: an optional

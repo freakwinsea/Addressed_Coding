@@ -196,23 +196,23 @@ def test_constraints_are_enforced(registry):
 
 
 def test_float_literals(registry):
-    checked = build("400-0000010@[1.5, -2e3] -> total\n100-0000001@[total]\n", registry)
+    checked = build("400-0000015@[1.5, -2e3] -> total\n100-0000001@[total]\n", registry)
     literals = [arg.value for arg in checked.body[0].call.args]
     assert literals == [1.5, -2000.0]
     assert all(type(value) is float for value in literals)
 
 
 def test_float_literal_negative_zero_is_zero(registry):
-    checked = build("400-0000010@[-0.0, 1.0] -> total\n100-0000001@[total]\n", registry)
+    checked = build("400-0000015@[-0.0, 1.0] -> total\n100-0000001@[total]\n", registry)
     assert str(checked.body[0].call.args[0].value) == "0.0"
 
 
 def test_float_literal_must_be_finite(registry):
-    fails("400-0000010@[1e999, 1.0] -> total\n100-0000001@[total]\n", registry, "finite")
+    fails("400-0000015@[1e999, 1.0] -> total\n100-0000001@[total]\n", registry, "finite")
 
 
 def test_int_and_float_do_not_mix(registry):
-    fails("400-0000010@[1, 2.0] -> total\n100-0000001@[total]\n", registry, "expected float, got int")
+    fails("400-0000015@[1, 2.0] -> total\n100-0000001@[total]\n", registry, "expected float, got int")
     fails("400-0000001@[1, 2.0] -> total\n100-0000001@[total]\n", registry, "expected int, got float")
 
 
