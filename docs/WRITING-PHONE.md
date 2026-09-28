@@ -110,7 +110,7 @@ match what the address wants:
 |---|---|---|
 | `FILTER` | `callable(T)->bool` | one param, returns `bool` |
 | `MAP` | `callable(T)->R` | one param, returns anything |
-| `SORT_BY` | `callable(T)->K` | one param, returns `int`/`float`/`text`/`bool` |
+| `SORT_BY` | `callable(T)->K` | one param, returns `int`/`float`/`fraction`/`text`/`bool` |
 | `REDUCE` | `callable(A,T)->A` | **two** params: accumulator first, item second |
 
 You can also pass a registered address directly when its shape already fits —
@@ -120,7 +120,7 @@ is the normal answer.
 ## 4. Types
 
 ```
-int   float   bool   text   unit
+int   float   fraction   bool   text   unit
 list<T>   map<K,V>   pair<K,V>   callable(T,...)->R   any
 ```
 
@@ -129,13 +129,19 @@ list<T>   map<K,V>   pair<K,V>   callable(T,...)->R   any
 - `map<K,V>` comes from `READ_CSV` (one map per row) and `COUNT_OCCURRENCES`.
 - Generic variables (`T`, `K`, `V`, `A`, `R`) are resolved from your arguments.
 - Some addresses require a *comparable* or *keyable* type. Comparable is `int`,
-  `float`, `text`, or `bool`; keyable is the same without `float`. You cannot
-  sort a list of lists, and you cannot use a float as a map key or in `EQUALS`.
+  `float`, `fraction`, `text`, or `bool`; keyable is the same without `float`.
+  You cannot sort a list of lists, and you cannot use a float as a map key or
+  in `EQUALS`.
 - **`int` and `float` never mix.** `ADD` is for ints and `ADD_FLOAT` for floats;
   write `2.0`, not `2`, where a float is wanted. Cross with `TO_FLOAT` and
   `TO_INT` (which truncates; use `ROUND` first for nearest).
 - Floats are always finite. Dividing by zero is an error, not infinity.
   For money, whole cents in an `int` are still the exact choice.
+- **`fraction` is exact**: `1/3` stays `1/3`. There is no fraction literal;
+  build one with `MAKE_FRACTION@[1, 3]` or `PARSE_FRACTION`. It is its own
+  type, so use `ADD_FRACTION` rather than `ADD`, and leave it with
+  `FRACTION_TO_FLOAT`, `FLOOR_FRACTION` or `ROUND_FRACTION`. It prints as
+  `1/3`, or `2` when whole. Parts past 64 bits are an `overflow` error.
 
 ## 5. Patterns you will need
 
@@ -232,6 +238,7 @@ ext 000-0000006 TALLY_OF (entry: pair<text,int>) -> int {
 | Using `IS_EMPTY` on a list | it takes `text`; use `COUNT` and compare to 0 |
 | Expecting `PARSE_INT` to fail | it takes a fallback and always succeeds |
 | Mixing `int` and `float` | convert with `TO_FLOAT` / `TO_INT` |
+| Writing `1/3` as a literal | `MAKE_FRACTION@[1, 3] -> third` |
 | Comparing floats with `EQUALS` | not allowed; use `LESS_THAN` / `GREATER_THAN` |
 | An `ext` you never call | delete it, or use it |
 | Recursion | not allowed |
@@ -307,6 +314,10 @@ backend languages would otherwise disagree. Read those.
                Rust's Display, which writes 1e16 as '10000000000000000' and
                1.0 as '1'. There is no '-0.0', 'nan' or 'inf' to render:
                floats are finite and zero has one sign.
+             ! fraction renders in lowest terms as numerator, '/',
+               denominator, with any '-' on the numerator: '1/3', '-5/2'. A
+               whole fraction renders as its numerator alone: 4/2 renders as
+               '2'.
 
 100-0000006  ASSERT(condition: bool, message: text)
              Fail with a message unless a condition holds
@@ -430,6 +441,7 @@ b
              ! bool sorts false before true.
              ! float sorts numerically. Every float is finite and there is no
                negative zero, so the order is total.
+             ! fraction sorts numerically by exact value: 1/3 before 1/2.
 
 300-0000006  SORT_BY(sequence: list<T>, key: callable(T)->K, descending: bool) -> list<T>
              Sort a list by a derived key
@@ -647,6 +659,111 @@ b
                even, however many digits it has.
              ! A value too large to be finite returns the fallback. A value
                too small to represent is 0.0. '-0' is 0.0.
+
+400-0000080  MAKE_FRACTION(numerator: int, denominator: int) -> fraction
+             Build an exact fraction from a numerator and a denominator
+             ! EVERY FRACTION IS KEPT IN LOWEST TERMS WITH A POSITIVE
+               DENOMINATOR. 2/4 becomes 1/2, 3/-6 becomes -1/2, and 0/5
+               becomes 0/1, so each value has exactly one form.
+             ! A zero denominator is a division_by_zero error.
+             ! The numerator and denominator of the lowest-terms form must
+               each fit in a 64-bit signed integer, or it is an overflow
+               error: -9223372036854775808 / -1 overflows.
+             ! This applies to every fraction address: the working is exact,
+               and only the lowest-terms result has to fit.
+             errors: division_by_zero, overflow
+
+400-0000081  ADD_FRACTION(a: fraction, b: fraction) -> fraction
+             Add two fractions exactly
+             ! Exact: 1/10 + 2/10 is 3/10. The result is in lowest terms and
+               is an overflow error if that does not fit in 64 bits, as
+               MAKE_FRACTION (400-0000080) says.
+             errors: overflow
+
+400-0000082  SUB_FRACTION(a: fraction, b: fraction) -> fraction
+             Subtract one fraction from another exactly
+             ! a - b, exact. The result is in lowest terms and is an overflow
+               error if that does not fit in 64 bits, as MAKE_FRACTION
+               (400-0000080) says.
+             errors: overflow
+
+400-0000083  MUL_FRACTION(a: fraction, b: fraction) -> fraction
+             Multiply two fractions exactly
+             ! Exact. The result is in lowest terms and is an overflow error
+               if that does not fit in 64 bits, as MAKE_FRACTION
+               (400-0000080) says.
+             errors: overflow
+
+400-0000084  DIV_FRACTION(a: fraction, b: fraction) -> fraction
+             Divide one fraction by another exactly
+             ! a / b, exact: nothing is truncated or rounded. 1/1 divided by
+               3/1 is 1/3.
+             ! Dividing by a zero fraction is a division_by_zero error.
+             ! The result is in lowest terms and is an overflow error if that
+               does not fit in 64 bits, as MAKE_FRACTION (400-0000080) says.
+             errors: division_by_zero, overflow
+
+400-0000085  NEGATE_FRACTION(a: fraction) -> fraction
+             Flip the sign of a fraction
+             ! A fraction whose numerator is -9223372036854775808 has no
+               positive twin in 64 bits, so negating it is an overflow error,
+               as NEGATE (400-0000011) is for int.
+             errors: overflow
+
+400-0000086  ABS_FRACTION(a: fraction) -> fraction
+             The distance of a fraction from zero
+             ! A fraction whose numerator is -9223372036854775808 has no
+               positive twin in 64 bits, so its absolute value is an overflow
+               error, as ABS (400-0000010) is for int.
+             errors: overflow
+
+400-0000087  NUMERATOR(a: fraction) -> int
+             The top number of a fraction in lowest terms
+             ! Of the lowest-terms form, and it carries the sign: the
+               numerator of MAKE_FRACTION(2, -4) is -1.
+
+400-0000088  DENOMINATOR(a: fraction) -> int
+             The bottom number of a fraction in lowest terms
+             ! Of the lowest-terms form, so it is always at least 1: the
+               denominator of MAKE_FRACTION(2, -4) is 2, and of a whole
+               number it is 1.
+
+400-0000089  FRACTION_TO_FLOAT(a: fraction) -> float
+             The float nearest to a fraction
+             ! The exact value numerator / denominator, rounded once to the
+               nearest float, ties to even. NOT float(numerator) /
+               float(denominator), which rounds up to three times and can be
+               one step off when either part is past 2^53.
+             ! Never fails: every fraction is between -2^63 and 2^63, so the
+               float is finite. Zero is 0.0, never -0.0.
+
+400-0000090  FLOOR_FRACTION(a: fraction) -> int
+             The largest whole number not above a fraction
+             ! ROUNDS TOWARD NEGATIVE INFINITY, not toward zero: 7/2 gives 3
+               and -7/2 gives -4. That is Python's //, and NOT Rust's /,
+               which truncates. Never fails: the result is never further from
+               zero than the numerator.
+
+400-0000091  ROUND_FRACTION(a: fraction) -> int
+             Round a fraction to the nearest whole number
+             ! HALVES GO AWAY FROM ZERO, as in ROUND (400-0000021): 5/2 gives
+               3 and -5/2 gives -3. Python's round() would give 2 and -2.
+               Never fails: the result is never further from zero than the
+               numerator.
+
+400-0000092  PARSE_FRACTION(value: text, fallback: fraction) -> fraction
+             Read a fraction from text, or a fallback when it is not one
+             ! Never fails; unparseable text returns the fallback.
+             ! Accepts, after trimming surrounding whitespace: an optional
+               '+' or '-', one or more ASCII digits, and optionally '/'
+               followed by one or more ASCII digits. So '3', '-1/3' and '2/4'
+               parse; '1 / 3', '1/-3', '1.5', '/3' and '1/' do not.
+             ! The numerator as written and the denominator as written must
+               each fit in a 64-bit signed integer, and the denominator must
+               not be zero; otherwise the fallback is returned.
+             ! The result is in lowest terms: '2/4' reads as 1/2. Whatever
+               TO_TEXT (100-0000005) prints for a fraction reads back as the
+               same fraction.
 ```
 
 ### 500 — Input / output — the only addresses with effects
@@ -722,6 +839,8 @@ b
                scalar value for text, false before true for bool.
              ! float compares numerically, and an int is never compared with
                a float: both arguments have the same type.
+             ! fraction compares by exact value, never through a float: 1/3
+               is less than 1/2.
 
 600-0000006  GREATER_THAN(a: T, b: T) -> bool
              True when the first value orders after the second

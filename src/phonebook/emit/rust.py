@@ -47,6 +47,8 @@ def rust_type(t: Type) -> str:
         return "i64"
     if t.name == "float":
         return "f64"
+    if t.name == "fraction":
+        return "rt::numbers_::Fraction"
     if t.name == "bool":
         return "bool"
     if t.name == "unit":

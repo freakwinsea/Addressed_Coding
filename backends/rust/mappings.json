@@ -17,7 +17,7 @@
     "100-0000002": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "core::print_lines" }] },
     "100-0000003": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "core::select" }] },
     "100-0000004": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "core::identity", "inline": "{0}.clone()" }] },
-    "100-0000005": { "contract": 2, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "core::to_text" }] },
+    "100-0000005": { "contract": 3, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "core::to_text" }] },
     "100-0000006": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "core::assert_" }] },
 
     "200-0000001": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "text::split_lines" }] },
@@ -37,7 +37,7 @@
     "300-0000002": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::filter_seq", "inline": "{0}.iter().cloned().filter(|_pb_x| {1}(_pb_x)).collect::<Vec<_>>()" }] },
     "300-0000003": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::map_seq", "inline": "{0}.iter().map(|_pb_x| {1}(_pb_x)).collect::<Vec<_>>()" }] },
     "300-0000004": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::reduce_seq" }] },
-    "300-0000005": { "contract": 2, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::sort_seq" }] },
+    "300-0000005": { "contract": 3, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::sort_seq" }] },
     "300-0000006": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::sort_by" }] },
     "300-0000007": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::reverse_seq", "inline": "{0}.iter().rev().cloned().collect::<Vec<_>>()" }] },
     "300-0000008": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "collections_::unique" }] },
@@ -73,6 +73,20 @@
     "400-0000021": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::round_" }] },
     "400-0000022": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::parse_float" }] },
 
+    "400-0000080": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::make_fraction" }] },
+    "400-0000081": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::add_fraction" }] },
+    "400-0000082": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::sub_fraction" }] },
+    "400-0000083": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::mul_fraction" }] },
+    "400-0000084": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::div_fraction" }] },
+    "400-0000085": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::negate_fraction" }] },
+    "400-0000086": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::abs_fraction" }] },
+    "400-0000087": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::numerator" }] },
+    "400-0000088": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::denominator" }] },
+    "400-0000089": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::fraction_to_float" }] },
+    "400-0000090": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::floor_fraction" }] },
+    "400-0000091": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::round_fraction" }] },
+    "400-0000092": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.2.0", "runtime": "numbers_::parse_fraction" }] },
+
     "500-0000001": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "io_::read_text_file" }] },
     "500-0000002": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "io_::write_text_file" }] },
     "500-0000003": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "io_::read_csv" }] },
@@ -82,7 +96,7 @@
     "600-0000002": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::and_", "inline": "({0} && {1})" }] },
     "600-0000003": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::or_", "inline": "({0} || {1})" }] },
     "600-0000004": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::equals", "inline": "({0} == {1})" }] },
-    "600-0000005": { "contract": 2, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::less_than", "inline": "({0} < {1})" }] },
+    "600-0000005": { "contract": 3, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::less_than", "inline": "({0} < {1})" }] },
     "600-0000006": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::greater_than", "inline": "({0} > {1})" }] },
     "600-0000007": { "contract": 1, "implementations": [{ "impl": 1, "status": "active", "since": "0.1.0", "runtime": "logic_::is_empty", "inline": "{0}.is_empty()" }] }
   }

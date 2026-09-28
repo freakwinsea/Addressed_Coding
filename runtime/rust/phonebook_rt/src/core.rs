@@ -24,6 +24,12 @@ impl PbText for f64 {
     }
 }
 
+impl PbText for crate::numbers_::Fraction {
+    fn pb_text(&self) -> String {
+        crate::numbers_::fraction_text(self)
+    }
+}
+
 impl PbText for bool {
     fn pb_text(&self) -> String {
         if *self { "true" } else { "false" }.to_string()

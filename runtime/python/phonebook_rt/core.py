@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 
 from .faults import PhonebookFault
-from .numbers_ import float_text
+from .numbers_ import Fraction, float_text, fraction_text
 
 
 def to_text(value: object) -> str:
@@ -23,6 +23,8 @@ def to_text(value: object) -> str:
         return str(value)
     if isinstance(value, float):
         return float_text(value)
+    if isinstance(value, Fraction):
+        return fraction_text(value)
     if isinstance(value, tuple):
         return "(" + ", ".join(to_text(v) for v in value) + ")"
     if isinstance(value, list):

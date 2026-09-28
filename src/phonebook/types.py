@@ -12,15 +12,16 @@ from dataclasses import dataclass, field
 
 from .errors import CheckError
 
-PRIMITIVES = {"int", "float", "bool", "text", "unit", "any"}
+PRIMITIVES = {"int", "float", "fraction", "bool", "text", "unit", "any"}
 CONTAINERS = {"list": 1, "map": 2, "pair": 2}
 
 #: Types that can be ordered by SORT / LESS_THAN and friends. float is here
 #: because every float is finite and zero has one sign, so the order is total.
-COMPARABLE = {"int", "float", "text", "bool"}
+COMPARABLE = {"int", "float", "fraction", "text", "bool"}
 #: Types that can be a map key or deduplicated by UNIQUE. float is not: equality
-#: on computed floats is a trap, and Rust's f64 is not `Ord`.
-KEYABLE = {"int", "text", "bool"}
+#: on computed floats is a trap, and Rust's f64 is not `Ord`. fraction is: it is
+#: exact and always in lowest terms, so equal values have equal parts.
+KEYABLE = {"int", "fraction", "text", "bool"}
 
 _VAR = re.compile(r"^[A-Z][A-Z0-9]*$")
 

@@ -74,7 +74,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `900` | Rust-native escape hatch | reserved, empty |
 | `999` | Quarantine — unregistered or withdrawn. The checker rejects it. | reserved |
 
-67 global addresses in v0. That is the entire budget; adding one is meant to
+80 global addresses in v0. That is the entire budget; adding one is meant to
 feel expensive (see `CONTRIBUTING.md`).
 
 `000` is the inverse of "dial 9 for an outside line": it is the local
@@ -85,7 +85,7 @@ auditing tractable — see §7.
 ## 3. Types
 
 ```
-int  float  bool  text  unit  list<T>  map<K,V>  pair<K,V>  callable(T,...)->R  any
+int  float  fraction  bool  text  unit  list<T>  map<K,V>  pair<K,V>  callable(T,...)->R  any
 ```
 
 Generic variables `T`, `K`, `V`, `A`, `R` are unified at check time. `unit` is
@@ -96,12 +96,15 @@ reserved name with no v0 addresses.
 
 Some contracts constrain a generic: `comparable` (orderable by `SORT` and
 `LESS_THAN`) and `keyable` (usable as a map key or by `UNIQUE`). `comparable` is
-`int`, `float`, `text`, `bool`; `keyable` is `int`, `text`, `bool`. The
+`int`, `float`, `fraction`, `text`, `bool`; `keyable` is `int`, `fraction`,
+`text`, `bool`. The
 constraint is checked once the variable resolves to a concrete type.
 
 `int` and `float` never mix. There is no implicit conversion: `ADD` takes two
 `int`s, `ADD_FLOAT` takes two `float`s, and `TO_FLOAT` / `TO_INT` cross between
-them.
+them. `fraction` is its own type too: `ADD_FRACTION` takes two fractions,
+`MAKE_FRACTION` builds one from two ints, and `FRACTION_TO_FLOAT`,
+`FLOOR_FRACTION` and `ROUND_FRACTION` leave it.
 
 ### 3.1 Floats
 
@@ -144,12 +147,33 @@ where the hosts would otherwise disagree.
 A float literal in a program is written the same way `PARSE_FLOAT` reads one,
 without the leading `+`: `1.5`, `-0.25`, `2e10`, `6.02e23`.
 
+### 3.2 Fractions
+
+A `fraction` is an exact ratio of two 64-bit integers: `1/3` stays `1/3` and
+`1/10 + 2/10` is exactly `3/10`. Neither host's own fraction type is used —
+Python's `fractions.Fraction` grows without limit and Rust has none — so both
+runtimes write the same small algorithm by hand, with no library.
+
+| Question | Contract |
+|---|---|
+| Form | **Always lowest terms, denominator positive**, sign on the numerator. `MAKE_FRACTION(2, -4)` is `-1/2`; `0/5` is `0/1`. Every value has one form, so equality is exact. |
+| Size | The working is exact (wider than 64 bits in both runtimes); only the lowest-terms result must fit, numerator and denominator each in a 64-bit signed integer. Otherwise it is an `overflow` error. |
+| Zero | A zero denominator, or dividing by a zero fraction, is a `division_by_zero` error. |
+| Ordering and keys | By exact value, never through a float. `fraction` is both `comparable` and `keyable`. |
+| To a float | `FRACTION_TO_FLOAT` rounds the exact value once, to nearest, ties to even. Not `float(n) / float(d)`, which can round three times. |
+| To an int | `FLOOR_FRACTION` goes toward negative infinity (`-7/2` is `-4`; Rust's `/` would give `-3`). `ROUND_FRACTION` sends halves away from zero, like `ROUND`. |
+| Reading text | `PARSE_FRACTION` accepts `[+-]digits[/digits]` after trimming, and nothing else: not `1 / 3`, `1/-3`, `1.5`. Each part as written must fit in 64 bits; a zero denominator returns the fallback. |
+| Printing | `TO_TEXT` writes `n/d` in lowest terms (`-1/3`), or just `n` when the denominator is 1 (`4/2` prints `2`). `PARSE_FRACTION` reads every such string back to the same fraction. |
+
+There is no fraction literal; build one with `MAKE_FRACTION` or `PARSE_FRACTION`.
+
 Backend representations:
 
 | Phonebook | Python | Rust |
 |---|---|---|
 | `int` | `int` | `i64` |
 | `float` | `float` | `f64` |
+| `fraction` | `phonebook_rt.numbers_.Fraction` | `phonebook_rt::numbers_::Fraction` |
 | `bool` | `bool` | `bool` |
 | `text` | `str` | `String` |
 | `list<T>` | `list[T]` | `Vec<T>` |
@@ -242,6 +266,7 @@ conformance test:
 | Float NaN, infinity, negative zero | none of them exist (§3.1) |
 | Rounding halves (Python to even, Rust away from zero) | `ROUND` sends halves **away from zero** |
 | Float to int (Rust saturates) | `TO_INT` **truncates**, and out of range is an `overflow` error |
+| Fractions (Python's grow without limit, Rust has none) | always lowest terms, 64-bit parts, `overflow` past that (§3.2) |
 
 ## 6. Registry entries
 
@@ -324,7 +349,7 @@ compiler0 (Python, this repo)
 ```
 
 That requires a semantic kernel covering parsing, syntax trees, and error
-handling — well beyond the 67 addresses of v0. v0 deliberately does not chase
+handling — well beyond the 80 addresses of v0. v0 deliberately does not chase
 it.
 
 ## 9. Out of scope in v0

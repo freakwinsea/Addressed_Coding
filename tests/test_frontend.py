@@ -235,6 +235,21 @@ def test_floats_are_comparable_but_not_keyable(registry):
     )
 
 
+def test_fractions_are_their_own_type(registry):
+    build("400-0000080@[1, 3] -> third\n400-0000081@[third, third] -> both\n100-0000001@[both]\n", registry)
+    fails("400-0000080@[1, 3] -> third\n400-0000001@[third, 1] -> x\n100-0000001@[x]\n", registry, "expected int, got fraction")
+    fails("400-0000081@[1, 2] -> x\n100-0000001@[x]\n", registry, "expected fraction, got int")
+
+
+def test_fractions_are_comparable_and_keyable(registry):
+    build(
+        "400-0000080@[1, 3] -> a\n400-0000080@[1, 2] -> b\n300-0000001@[a, b] -> xs\n"
+        "300-0000005@[xs] -> ys\n300-0000008@[xs] -> zs\n600-0000004@[a, b] -> same\n"
+        "100-0000001@[ys]\n100-0000001@[zs]\n100-0000001@[same]\n",
+        registry,
+    )
+
+
 def test_contract_version_mismatch(registry):
     fails('100-0000001@contract:99@["hi"]\n', registry, "contract v")
 

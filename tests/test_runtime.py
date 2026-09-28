@@ -224,6 +224,110 @@ class TestFloatPromises:
         assert core.to_text(635057293855503.25) == "635057293855503.2"
 
 
+class TestFractionPromises:
+    """Exact, lowest terms, 64-bit parts. Python's own Fraction would grow without limit."""
+
+    def test_lowest_terms_with_the_sign_on_top(self):
+        from phonebook_rt import numbers_
+
+        half = numbers_.make_fraction(3, -6)
+        assert (numbers_.numerator(half), numbers_.denominator(half)) == (-1, 2)
+        zero = numbers_.make_fraction(0, -5)
+        assert (numbers_.numerator(zero), numbers_.denominator(zero)) == (0, 1)
+        assert numbers_.make_fraction(2, 4) == numbers_.make_fraction(-1, -2)
+
+    def test_arithmetic_is_exact(self):
+        from phonebook_rt import numbers_
+
+        tenth = numbers_.make_fraction(1, 10)
+        fifth = numbers_.make_fraction(2, 10)
+        assert numbers_.add_fraction(tenth, fifth) == numbers_.make_fraction(3, 10)
+        third = numbers_.make_fraction(1, 3)
+        assert numbers_.sub_fraction(third, third) == numbers_.make_fraction(0, 1)
+        assert numbers_.mul_fraction(third, numbers_.make_fraction(3, 1)) == numbers_.make_fraction(1, 1)
+        assert numbers_.div_fraction(third, numbers_.make_fraction(-1, 2)) == numbers_.make_fraction(-2, 3)
+
+    def test_zero_is_a_contract_error(self):
+        from phonebook_rt import numbers_
+
+        with pytest.raises(PhonebookFault) as excinfo:
+            numbers_.make_fraction(1, 0)
+        assert excinfo.value.code == "division_by_zero"
+        with pytest.raises(PhonebookFault) as excinfo:
+            numbers_.div_fraction(numbers_.make_fraction(1, 2), numbers_.make_fraction(0, 1))
+        assert excinfo.value.code == "division_by_zero"
+
+    def test_a_result_past_64_bits_overflows(self):
+        from phonebook_rt import numbers_
+
+        big = 2**63 - 1
+        near_one = numbers_.make_fraction(big - 1, big)
+        nearer = numbers_.make_fraction(big - 2, big - 1)
+        most_negative = numbers_.make_fraction(-(2**63), 1)
+        for failing in (
+            lambda: numbers_.make_fraction(-(2**63), -1),
+            lambda: numbers_.sub_fraction(near_one, nearer),  # 1 / (big * (big - 1))
+            lambda: numbers_.add_fraction(numbers_.make_fraction(big, 1), numbers_.make_fraction(1, 1)),
+            lambda: numbers_.negate_fraction(most_negative),
+            lambda: numbers_.abs_fraction(most_negative),
+        ):
+            with pytest.raises(PhonebookFault) as excinfo:
+                failing()
+            assert excinfo.value.code == "overflow"
+
+    def test_the_working_is_wider_than_64_bits(self):
+        from phonebook_rt import numbers_
+
+        big = 2**63 - 1
+        product = numbers_.mul_fraction(numbers_.make_fraction(big, 2), numbers_.make_fraction(2, big))
+        assert product == numbers_.make_fraction(1, 1)
+
+    def test_floor_goes_down_and_round_goes_away_from_zero(self):
+        from phonebook_rt import numbers_
+
+        assert numbers_.floor_fraction(numbers_.make_fraction(-7, 2)) == -4
+        assert numbers_.floor_fraction(numbers_.make_fraction(7, 2)) == 3
+        assert numbers_.round_fraction(numbers_.make_fraction(5, 2)) == 3  # round() says 2
+        assert numbers_.round_fraction(numbers_.make_fraction(-5, 2)) == -3
+        assert numbers_.round_fraction(numbers_.make_fraction(-(2**63), 1)) == -(2**63)
+
+    def test_to_float_rounds_once(self):
+        from phonebook_rt import numbers_
+
+        value = numbers_.make_fraction(9007199254740993, 7)
+        assert numbers_.fraction_to_float(value) == 1286742750677284.8
+        assert 9007199254740993.0 / 7.0 != 1286742750677284.8  # the float route is off
+        assert str(numbers_.fraction_to_float(numbers_.make_fraction(0, 1))) == "0.0"
+
+    def test_prints_in_lowest_terms_and_reads_back(self):
+        from phonebook_rt import core, numbers_
+
+        zero = numbers_.make_fraction(0, 1)
+        for n, d, text in ((1, 3, "1/3"), (-5, 2, "-5/2"), (4, 2, "2"), (0, 7, "0")):
+            value = numbers_.make_fraction(n, d)
+            assert core.to_text(value) == text
+            assert numbers_.parse_fraction(text, zero) == value
+        assert core.to_text([numbers_.make_fraction(1, 2)]) == "[1/2]"
+
+    def test_parse_accepts_only_the_pinned_shape(self):
+        from phonebook_rt import numbers_
+
+        fallback = numbers_.make_fraction(-1, 1)
+        assert numbers_.parse_fraction(" +2/4 ", fallback) == numbers_.make_fraction(1, 2)
+        for text in ("1 / 3", "1/-3", "1/0", "1.5", "/3", "1/", "", "1_0/3", "9223372036854775808/2", "١/٣"):
+            assert numbers_.parse_fraction(text, fallback) is fallback, text
+
+    def test_fractions_order_and_key_by_value(self):
+        from phonebook_rt import collections_, numbers_
+
+        half = numbers_.make_fraction(1, 2)
+        third = numbers_.make_fraction(1, 3)
+        assert collections_.sort_seq([half, third]) == [third, half]
+        assert numbers_.make_fraction(2, 4) in {half}
+        tallies = collections_.count_occurrences([half, third, numbers_.make_fraction(2, 4)])
+        assert collections_.entries(tallies) == [(third, 1), (half, 2)]
+
+
 class TestOrderingPromises:
     def test_entries_sorts_by_key(self):
         from phonebook_rt import collections_

@@ -1,4 +1,4 @@
-"""Area 400 — integer and floating-point arithmetic.
+"""Area 400 — integer, floating-point and fraction arithmetic.
 
 Two functions here exist purely to override Python's defaults. `DIV` must
 truncate toward zero, so it cannot use `//`; `MOD` must take the sign of the
@@ -254,3 +254,191 @@ def _layout(digits: str, exponent: int) -> str:
     mantissa = digits[0] + ("." + digits[1:] if len(digits) > 1 else "")
     sign = "+" if exponent >= 0 else "-"
     return f"{mantissa}e{sign}{abs(exponent):02d}"
+
+
+# --------------------------------------------------------------------------
+# fractions
+# --------------------------------------------------------------------------
+#
+# A fraction is an exact ratio of two 64-bit integers, always kept in lowest
+# terms with a positive denominator. That one rule makes every fraction have a
+# single spelling, so equality, ordering and printing need no further thought.
+#
+# Python's own `fractions` module is not used. Its numerator and denominator
+# grow without limit, where the contract says a fraction that no longer fits in
+# 64 bits is an overflow error; and the Rust runtime has no such module to lean
+# on, so both are written out the same way by hand. Intermediate products here
+# are unbounded Python ints; Rust does the same arithmetic in i128, which is
+# wide enough for every product of two 64-bit values, so the two agree.
+
+
+class Fraction:
+    """An exact fraction: numerator / denominator, in lowest terms, denominator > 0.
+
+    Build one with `_fraction`, never directly, so the invariant always holds.
+    """
+
+    __slots__ = ("numerator", "denominator")
+
+    def __init__(self, numerator: int, denominator: int):
+        object.__setattr__(self, "numerator", numerator)
+        object.__setattr__(self, "denominator", denominator)
+
+    def __setattr__(self, name, value):
+        raise AttributeError("fractions are immutable")
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Fraction):
+            return NotImplemented
+        return self.numerator == other.numerator and self.denominator == other.denominator
+
+    def __hash__(self) -> int:
+        return hash((self.numerator, self.denominator))
+
+    def _cross(self, other: "Fraction") -> tuple[int, int]:
+        return self.numerator * other.denominator, other.numerator * self.denominator
+
+    def __lt__(self, other: "Fraction") -> bool:
+        left, right = self._cross(other)
+        return left < right
+
+    def __le__(self, other: "Fraction") -> bool:
+        left, right = self._cross(other)
+        return left <= right
+
+    def __gt__(self, other: "Fraction") -> bool:
+        left, right = self._cross(other)
+        return left > right
+
+    def __ge__(self, other: "Fraction") -> bool:
+        left, right = self._cross(other)
+        return left >= right
+
+    def __repr__(self) -> str:
+        return f"Fraction({self.numerator}, {self.denominator})"
+
+
+def _gcd(a: int, b: int) -> int:
+    """Euclid's algorithm on non-negative integers, as the Rust runtime writes it."""
+    while b != 0:
+        a, b = b, a % b
+    return a
+
+
+def _fraction(numerator: int, denominator: int, operation: str) -> Fraction:
+    """Lowest terms, positive denominator, and both parts inside 64 bits.
+
+    `denominator` is never zero here; every caller has already checked.
+    """
+    if denominator < 0:
+        numerator, denominator = -numerator, -denominator
+    divisor = _gcd(abs(numerator), denominator)
+    numerator //= divisor
+    denominator //= divisor
+    if not (INT64_MIN <= numerator <= INT64_MAX and denominator <= INT64_MAX):
+        raise PhonebookFault(
+            "overflow", f"{operation} result does not fit in a 64-bit fraction"
+        )
+    return Fraction(numerator, denominator)
+
+
+def make_fraction(numerator: int, denominator: int) -> Fraction:
+    """400-0000080 MAKE_FRACTION — reduced to lowest terms, sign on the numerator."""
+    if denominator == 0:
+        raise PhonebookFault("division_by_zero", "MAKE_FRACTION with a zero denominator")
+    return _fraction(numerator, denominator, "MAKE_FRACTION")
+
+
+def add_fraction(a: Fraction, b: Fraction) -> Fraction:
+    """400-0000081 ADD_FRACTION."""
+    return _fraction(
+        a.numerator * b.denominator + b.numerator * a.denominator,
+        a.denominator * b.denominator,
+        "ADD_FRACTION",
+    )
+
+
+def sub_fraction(a: Fraction, b: Fraction) -> Fraction:
+    """400-0000082 SUB_FRACTION."""
+    return _fraction(
+        a.numerator * b.denominator - b.numerator * a.denominator,
+        a.denominator * b.denominator,
+        "SUB_FRACTION",
+    )
+
+
+def mul_fraction(a: Fraction, b: Fraction) -> Fraction:
+    """400-0000083 MUL_FRACTION."""
+    return _fraction(a.numerator * b.numerator, a.denominator * b.denominator, "MUL_FRACTION")
+
+
+def div_fraction(a: Fraction, b: Fraction) -> Fraction:
+    """400-0000084 DIV_FRACTION — dividing by a zero fraction is an error."""
+    if b.numerator == 0:
+        raise PhonebookFault("division_by_zero", "DIV_FRACTION by zero")
+    return _fraction(a.numerator * b.denominator, a.denominator * b.numerator, "DIV_FRACTION")
+
+
+def negate_fraction(a: Fraction) -> Fraction:
+    """400-0000085 NEGATE_FRACTION — the smallest int64 numerator overflows."""
+    return _fraction(-a.numerator, a.denominator, "NEGATE_FRACTION")
+
+
+def abs_fraction(a: Fraction) -> Fraction:
+    """400-0000086 ABS_FRACTION — the smallest int64 numerator overflows."""
+    return _fraction(abs(a.numerator), a.denominator, "ABS_FRACTION")
+
+
+def numerator(a: Fraction) -> int:
+    """400-0000087 NUMERATOR — of the lowest-terms form, carrying the sign."""
+    return a.numerator
+
+
+def denominator(a: Fraction) -> int:
+    """400-0000088 DENOMINATOR — of the lowest-terms form, always positive."""
+    return a.denominator
+
+
+def fraction_to_float(a: Fraction) -> float:
+    """400-0000089 FRACTION_TO_FLOAT — nearest float, ties to even.
+
+    `int / int` in Python divides the exact integers and rounds once, which is
+    what the contract asks for. Dividing two floats would round three times.
+    """
+    return a.numerator / a.denominator
+
+
+def floor_fraction(a: Fraction) -> int:
+    """400-0000090 FLOOR_FRACTION — toward negative infinity; `//` already does that."""
+    return a.numerator // a.denominator
+
+
+def round_fraction(a: Fraction) -> int:
+    """400-0000091 ROUND_FRACTION — halves away from zero, like ROUND."""
+    whole, remainder = divmod(abs(a.numerator), a.denominator)
+    if 2 * remainder >= a.denominator:
+        whole += 1
+    return -whole if a.numerator < 0 else whole
+
+
+_FRACTION = re.compile(r"[+-]?[0-9]+(?:/[0-9]+)?")
+
+
+def parse_fraction(value: str, fallback: Fraction) -> Fraction:
+    """400-0000092 PARSE_FRACTION — never fails; unparseable text yields the fallback."""
+    candidate = value.strip(WHITESPACE)
+    if not _FRACTION.fullmatch(candidate):
+        return fallback
+    top, _, bottom = candidate.partition("/")
+    top_value = int(top)
+    bottom_value = int(bottom) if bottom else 1
+    if not INT64_MIN <= top_value <= INT64_MAX or not 0 < bottom_value <= INT64_MAX:
+        return fallback
+    return _fraction(top_value, bottom_value, "PARSE_FRACTION")
+
+
+def fraction_text(value: Fraction) -> str:
+    """How TO_TEXT (100-0000005) renders a fraction: '-1/3', or '2' when whole."""
+    if value.denominator == 1:
+        return str(value.numerator)
+    return f"{value.numerator}/{value.denominator}"
