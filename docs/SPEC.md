@@ -66,7 +66,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `100` | Core | 6 addresses |
 | `200` | Text | 12 |
 | `300` | Collections | 16 |
-| `400` | Numbers | 87 |
+| `400` | Numbers | 109 |
 | `500` | I/O — the only block that touches the filesystem | 4 |
 | `600` | Logic and comparison | 7 |
 | `700` | Reserved for future shared blocks | empty |
@@ -74,7 +74,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `900` | Rust-native escape hatch | reserved, empty |
 | `999` | Quarantine — unregistered or withdrawn. The checker rejects it. | reserved |
 
-146 global addresses in v0. That is the entire budget; adding one is meant to
+154 global addresses in v0. That is the entire budget; adding one is meant to
 feel expensive (see `CONTRIBUTING.md`).
 
 `000` is the inverse of "dial 9 for an outside line": it is the local
@@ -241,7 +241,27 @@ none uses the host's formatter.
 | Fractions | The exact value, rounded once, never via a float: `1/3` to 30 places is thirty `3`s. |
 | Layout | Plain digits, never an exponent (`1e+20` to 1 place is `100000000000000000000.0`), and never a negative zero (`-0.001` to 2 places is `0.00`). |
 
-### 3.6 Bits and bases
+### 3.6 Repeatable random numbers
+
+`RANDOM_NEXT`, `RANDOM_RANGE`, `RANDOM_FLOAT`, `RANDOM_BOOL`, `RANDOM_INTS`,
+`RANDOM_FLOATS`, `SHUFFLE` and `PICK` (400-0000200..207) are seeded and pure.
+The state is an ordinary `int`: each call takes it and returns a pair of the
+result and the next state, so there is no hidden generator and the kernel stays
+free of mutation. The generator is SplitMix64, written by hand in both runtimes;
+neither Python's `random` module nor any Rust crate is used, because the
+sequence a seed gives is part of the contract.
+
+```phone
+400-0000201@[2026, 1, 6] -> roll        # RANDOM_RANGE: (value, next state)
+300-0000015@[roll] -> face              # PAIR_KEY
+300-0000016@[roll] -> state             # PAIR_VALUE, the seed for the next draw
+```
+
+Ranges are unbiased by rejection, floats take the top 53 bits of one draw, and
+`SHUFFLE` is Fisher-Yates from the back; the notes pin each exactly. None of
+this is fit for secrets.
+
+### 3.7 Bits and bases
 
 An `int` is a 64-bit two's complement pattern on both backends. Python's own
 ints have no width and Rust's shifts panic past 63, so the contracts pin what
@@ -363,8 +383,9 @@ conformance test:
 | Rounding halves (Python to even, Rust away from zero) | `ROUND` sends halves **away from zero** |
 | Float to int (Rust saturates) | `TO_INT` **truncates**, and out of range is an `overflow` error |
 | Fractions (Python's grow without limit, Rust has none) | always lowest terms, 64-bit parts, `overflow` past that (§3.4) |
-| Shifts (Python never drops a bit, Rust panics past 63) | `SHIFT_LEFT` drops bits past bit 63; a count of 64 or more shifts every bit out (§3.6) |
-| Negative numbers in hex (`-0xff` vs. the bit pattern) | `TO_BASE` writes a `-` and the magnitude; `TO_BASE_UNSIGNED` writes the pattern (§3.6) |
+| Random numbers (Mersenne Twister vs. whatever a crate picks) | hand-written SplitMix64 in both, state passed in and out (§3.6) |
+| Shifts (Python never drops a bit, Rust panics past 63) | `SHIFT_LEFT` drops bits past bit 63; a count of 64 or more shifts every bit out (§3.7) |
+| Negative numbers in hex (`-0xff` vs. the bit pattern) | `TO_BASE` writes a `-` and the magnitude; `TO_BASE_UNSIGNED` writes the pattern (§3.7) |
 
 ## 6. Registry entries
 
@@ -447,7 +468,7 @@ compiler0 (Python, this repo)
 ```
 
 That requires a semantic kernel covering parsing, syntax trees, and error
-handling — well beyond the 146 addresses of v0. v0 deliberately does not chase
+handling — well beyond the 154 addresses of v0. v0 deliberately does not chase
 it.
 
 ## 9. Out of scope in v0

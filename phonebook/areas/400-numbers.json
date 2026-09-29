@@ -2841,6 +2841,242 @@
       ],
       "status": "active",
       "since": "0.2.0"
+    },
+    {
+      "address": "400-0000200",
+      "name": "RANDOM_NEXT",
+      "summary": "Draw a repeatable random whole number from a seed, and the state to draw the next one from",
+      "description": "The seeded generator every other random address is built on. There is no hidden generator: the state is an ordinary int that goes in and comes back out, so the same seed gives the same numbers in every backend, every run.",
+      "keywords": ["random", "seed", "seeded", "repeatable", "rng", "prng", "next", "splitmix"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "state", "type": "int" }],
+        "output": { "name": "drawn", "type": "pair<int,int>" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "SPLITMIX64, EXACTLY. Read the state's 64 bits as unsigned; add 0x9E3779B97F4A7C15, wrapping at 2^64, to get the next state; then z = next; z = (z xor (z >> 30)) x 0xBF58476D1CE4E5B9; z = (z xor (z >> 27)) x 0x94D049BB133111EB; z = z xor (z >> 31), every multiply wrapping at 2^64. z is the output.",
+          "THE RESULT IS A PAIR: (value, next state). Both are ints carrying the 64 bits as a signed number, so the value covers the whole int range and every int, negative ones included, is a valid seed. Pass the next state to the next draw.",
+          "NOT FOR SECRETS. The sequence is fully predictable from the state by design; this is for simulations, tests and repeatable shuffles, not passwords or keys.",
+          "Neither host's own generator is used: Python's random module and Rust's rand crate produce different sequences, and the point of this address is that the sequence is part of the contract."
+        ]
+      },
+      "examples": ["400-0000200@[seed] -> drawn"],
+      "conformance": [
+        { "id": "random_next.reference", "args": [1234567], "expect": [6457827717110365317, -7046029254385118564] },
+        { "id": "random_next.zero_seed", "args": [0], "expect": [-2152535657050944081, -7046029254386353131] },
+        { "id": "random_next.negative_seed", "args": [-1], "expect": [-1956407806741107680, -7046029254386353132] }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000201",
+      "name": "RANDOM_RANGE",
+      "summary": "Draw a repeatable random whole number between two bounds, both included, with no bias",
+      "keywords": ["random", "seed", "range", "between", "dice", "roll", "uniform", "randint"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "state", "type": "int" },
+          { "name": "low", "type": "int" },
+          { "name": "high", "type": "int" }
+        ],
+        "output": { "name": "drawn", "type": "pair<int,int>" },
+        "effects": [],
+        "errors": ["invalid_range"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "BOTH BOUNDS ARE INCLUDED: low 1, high 6 is a die. low above high is an invalid_range error; low equal to high always gives low, and still uses one draw.",
+          "UNBIASED BY REJECTION, EXACTLY. span = high - low + 1, from 1 to 2^64. Draw SplitMix64 outputs as RANDOM_NEXT (400-0000200), read as unsigned; throw away any output at or above 2^64 - (2^64 mod span) and draw again; the value is low + (output mod span). When span is 2^64 nothing is thrown away.",
+          "The result is (value, next state), and the next state is the one after the last draw, rejected draws included."
+        ]
+      },
+      "examples": ["400-0000201@[seed, 1, 6] -> roll"],
+      "conformance": [
+        { "id": "random_range.die", "args": [42, 1, 6], "expect": [2, -7046029254386353089] },
+        { "id": "random_range.one_value", "args": [42, 5, 5], "expect": [5, -7046029254386353089] },
+        { "id": "random_range.rejects_then_redraws", "args": [0, -1, 9223372036854775807], "expect": [7960286522194355699, 4354685564936845354] },
+        { "id": "random_range.whole_int_range", "args": [42, -9223372036854775808, 9223372036854775807], "expect": [4456085495900499605, -7046029254386353089] },
+        { "id": "random_range.backwards", "args": [42, 6, 1], "raises": "invalid_range" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000202",
+      "name": "RANDOM_FLOAT",
+      "summary": "Draw a repeatable random float from 0 up to but not including 1",
+      "keywords": ["random", "seed", "float", "fraction", "probability", "uniform", "unit interval"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "state", "type": "int" }],
+        "output": { "name": "drawn", "type": "pair<float,int>" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "ONE DRAW, TOP 53 BITS. The value is (output >> 11) / 2^53 for one SplitMix64 output as RANDOM_NEXT (400-0000200) reads it as unsigned: exact in a float, at least 0.0, and never 1.0.",
+          "The result is (value, next state)."
+        ]
+      },
+      "examples": ["400-0000202@[seed] -> drawn"],
+      "conformance": [
+        { "id": "random_float.basic", "args": [42], "expect": [0.7415648787718233, -7046029254386353089] },
+        { "id": "random_float.negative_seed", "args": [-1], "expect": [0.8939429202831845, -7046029254386353132] }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000203",
+      "name": "RANDOM_BOOL",
+      "summary": "Draw a repeatable random true or false, like a coin toss",
+      "keywords": ["random", "seed", "bool", "coin", "toss", "flip", "heads", "tails"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "state", "type": "int" }],
+        "output": { "name": "drawn", "type": "pair<bool,int>" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "ONE DRAW, TOP BIT. true when the highest bit of one SplitMix64 output (as RANDOM_NEXT, 400-0000200) is set. The result is (value, next state)."
+        ]
+      },
+      "examples": ["400-0000203@[seed] -> toss"],
+      "conformance": [
+        { "id": "random_bool.basic", "args": [42], "expect": [true, -7046029254386353089] },
+        { "id": "random_bool.zero_seed", "args": [0], "expect": [true, -7046029254386353131] }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000204",
+      "name": "RANDOM_INTS",
+      "summary": "Draw a list of repeatable random whole numbers between two bounds",
+      "keywords": ["random", "seed", "list", "many", "dice", "rolls", "sample", "range"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "state", "type": "int" },
+          { "name": "count", "type": "int" },
+          { "name": "low", "type": "int" },
+          { "name": "high", "type": "int" }
+        ],
+        "output": { "name": "drawn", "type": "pair<list<int>,int>" },
+        "effects": [],
+        "errors": ["invalid_range"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "EXACTLY count CALLS OF RANDOM_RANGE (400-0000201), in order, each from the state the last one returned. The result is (the values, the state after the last draw), so the list is the same as chaining the single draws by hand.",
+          "A count of zero or less gives an empty list and the state unchanged, as TAKE (300-0000010) treats a negative count. low above high is an invalid_range error even then."
+        ]
+      },
+      "examples": ["400-0000204@[seed, 10, 1, 6] -> rolls"],
+      "conformance": [
+        { "id": "random_ints.dice", "args": [42, 5, 1, 6], "expect": [[2, 2, 1, 1, 5], 1663341875487337619] },
+        { "id": "random_ints.negative_count", "args": [42, -3, 1, 6], "expect": [[], 42] },
+        { "id": "random_ints.backwards", "args": [42, 0, 6, 1], "raises": "invalid_range" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000205",
+      "name": "RANDOM_FLOATS",
+      "summary": "Draw a list of repeatable random floats from 0 up to but not including 1",
+      "keywords": ["random", "seed", "list", "many", "float", "sample", "uniform"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "state", "type": "int" },
+          { "name": "count", "type": "int" }
+        ],
+        "output": { "name": "drawn", "type": "pair<list<float>,int>" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "EXACTLY count CALLS OF RANDOM_FLOAT (400-0000202), in order, each from the state the last one returned. The result is (the values, the state after the last draw).",
+          "A count of zero or less gives an empty list and the state unchanged."
+        ]
+      },
+      "examples": ["400-0000205@[seed, 100] -> samples"],
+      "conformance": [
+        { "id": "random_floats.basic", "args": [42, 2], "expect": [[0.7415648787718233, 0.1599103928769201], 4354685564936845396] },
+        { "id": "random_floats.none", "args": [42, 0], "expect": [[], 42] }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000206",
+      "name": "SHUFFLE",
+      "summary": "Put a list in a repeatable random order",
+      "keywords": ["shuffle", "random", "seed", "order", "permute", "mix", "deal", "cards"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "state", "type": "int" },
+          { "name": "sequence", "type": "list<T>" }
+        ],
+        "output": { "name": "shuffled", "type": "pair<list<T>,int>" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "FISHER-YATES FROM THE BACK, EXACTLY. For i from the last index down to 1: j is RANDOM_RANGE(0, i) (400-0000201) from the current state, then the items at i and j swap. Every order is equally likely.",
+          "The result is (the shuffled list, the state after the last draw). A list of zero or one items takes no draws and comes back as it was, with the state unchanged. The input list is not changed."
+        ]
+      },
+      "examples": ["400-0000206@[seed, deck] -> dealt"],
+      "conformance": [
+        { "id": "shuffle.letters", "args": [42, ["a", "b", "c", "d", "e"]], "expect": [["b", "c", "a", "e", "d"], 8709371129873690750] },
+        { "id": "shuffle.empty", "args": [9, []], "expect": [[], 9] }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000207",
+      "name": "PICK",
+      "summary": "Pick one item from a list at random, repeatably, or a fallback when the list is empty",
+      "description": "Total by construction, as FIRST: there is no optional type in v0, so the caller supplies the value to use for an empty list.",
+      "keywords": ["pick", "choose", "choice", "random", "seed", "select", "one of", "draw"],
+      "contract": {
+        "version": 1,
+        "inputs": [
+          { "name": "state", "type": "int" },
+          { "name": "sequence", "type": "list<T>" },
+          { "name": "fallback", "type": "T" }
+        ],
+        "output": { "name": "picked", "type": "pair<T,int>" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "ONE CALL OF RANDOM_RANGE(0, n - 1) (400-0000201) for a list of n items; the item at that index is picked. The result is (the item, the next state).",
+          "Never fails. An empty list gives the fallback and the state unchanged, with no draw taken."
+        ]
+      },
+      "examples": ["400-0000207@[seed, names, \"nobody\"] -> picked"],
+      "conformance": [
+        { "id": "pick.basic", "args": [42, ["a", "b", "c"], "z"], "expect": ["b", -7046029254386353089] },
+        { "id": "pick.fallback", "args": [9, [], "z"], "expect": ["z", 9] }
+      ],
+      "status": "active",
+      "since": "0.2.0"
     }
   ]
 }

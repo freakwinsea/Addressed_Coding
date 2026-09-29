@@ -1317,6 +1317,133 @@ pub fn mod_fraction(a: &Fraction, b: &Fraction) -> Fraction {
 }
 
 // --------------------------------------------------------------------------
+// repeatable random numbers
+// --------------------------------------------------------------------------
+//
+// SplitMix64, written out by hand, as the Python runtime does. The state is an
+// ordinary `i64` that goes in and comes back out, so there is no hidden
+// generator and a call is a pure function. Its 64 bits are read as `u64` for the
+// arithmetic, which wraps by definition here, and handed back as an `i64` with
+// the same bits, so every int is a valid seed.
+
+const GOLDEN_GAMMA: u64 = 0x9E37_79B9_7F4A_7C15;
+
+/// One SplitMix64 step: (unsigned 64-bit output, next state as an int).
+fn splitmix(state: i64) -> (u64, i64) {
+    let bits = (state as u64).wrapping_add(GOLDEN_GAMMA);
+    let mut z = bits;
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^= z >> 31;
+    (z, bits as i64)
+}
+
+/// A uniform draw from 0 .. span - 1, 1 <= span <= 2^64, by rejection.
+///
+/// Outputs at or above the largest multiple of span are thrown away and the
+/// next one is drawn, so every value is exactly as likely as every other.
+fn draw_below(mut state: i64, span: u128) -> (u64, i64) {
+    const FULL: u128 = 1 << 64;
+    if span == FULL {
+        return splitmix(state);
+    }
+    let limit = FULL - (FULL % span);
+    loop {
+        let (output, next) = splitmix(state);
+        state = next;
+        if (output as u128) < limit {
+            return ((output as u128 % span) as u64, state);
+        }
+    }
+}
+
+/// 400-0000200 RANDOM_NEXT — (a whole number over the full int range, next state).
+pub fn random_next(state: &i64) -> (i64, i64) {
+    let (output, state) = splitmix(*state);
+    (output as i64, state)
+}
+
+/// 400-0000201 RANDOM_RANGE — low..high inclusive, unbiased.
+pub fn random_range(state: &i64, low: &i64, high: &i64) -> (i64, i64) {
+    if low > high {
+        crate::fault(
+            "invalid_range",
+            &format!("RANDOM_RANGE low {low} is above high {high}"),
+        );
+    }
+    let span = (*high as i128 - *low as i128 + 1) as u128;
+    let (offset, state) = draw_below(*state, span);
+    ((*low as i128 + offset as i128) as i64, state)
+}
+
+/// 400-0000202 RANDOM_FLOAT — the top 53 bits over 2^53, in [0, 1).
+pub fn random_float(state: &i64) -> (f64, i64) {
+    let (output, state) = splitmix(*state);
+    ((output >> 11) as f64 * (1.0 / 9007199254740992.0), state)
+}
+
+/// 400-0000203 RANDOM_BOOL — the top bit.
+pub fn random_bool(state: &i64) -> (bool, i64) {
+    let (output, state) = splitmix(*state);
+    (output >> 63 == 1, state)
+}
+
+/// 400-0000204 RANDOM_INTS — count draws of RANDOM_RANGE, in order.
+pub fn random_ints(state: &i64, count: &i64, low: &i64, high: &i64) -> (Vec<i64>, i64) {
+    if low > high {
+        crate::fault(
+            "invalid_range",
+            &format!("RANDOM_INTS low {low} is above high {high}"),
+        );
+    }
+    let mut state = *state;
+    let mut values = Vec::new();
+    for _ in 0..*count {
+        let (value, next) = random_range(&state, low, high);
+        state = next;
+        values.push(value);
+    }
+    (values, state)
+}
+
+/// 400-0000205 RANDOM_FLOATS — count draws of RANDOM_FLOAT, in order.
+pub fn random_floats(state: &i64, count: &i64) -> (Vec<f64>, i64) {
+    let mut state = *state;
+    let mut values = Vec::new();
+    for _ in 0..*count {
+        let (value, next) = random_float(&state);
+        state = next;
+        values.push(value);
+    }
+    (values, state)
+}
+
+/// 400-0000206 SHUFFLE — Fisher-Yates from the back.
+///
+/// For i from the last index down to 1, j is RANDOM_RANGE(0, i) and items i and
+/// j swap. The input is not touched; a copy is shuffled.
+pub fn shuffle<T: Clone>(state: &i64, sequence: &[T]) -> (Vec<T>, i64) {
+    let mut items = sequence.to_vec();
+    let mut state = *state;
+    for i in (1..items.len()).rev() {
+        let (j, next) = random_range(&state, &0, &(i as i64));
+        state = next;
+        items.swap(i, j as usize);
+    }
+    (items, state)
+}
+
+/// 400-0000207 PICK — one item, RANDOM_RANGE(0, n - 1); empty gives the fallback.
+pub fn pick<T: Clone>(state: &i64, sequence: &[T], fallback: &T) -> (T, i64) {
+    if sequence.is_empty() {
+        return (fallback.clone(), *state);
+    }
+    let last = sequence.len() as i64 - 1;
+    let (index, state) = random_range(state, &0, &last);
+    (sequence[index as usize].clone(), state)
+}
+
+// --------------------------------------------------------------------------
 // bits and bases
 // --------------------------------------------------------------------------
 //
@@ -1602,5 +1729,34 @@ mod tests {
         assert!(root.mul(&root) <= big);
         let above = root.add(&BigInt::from_i64(1));
         assert!(above.mul(&above) > big);
+    }
+
+    #[test]
+    fn splitmix_matches_the_published_reference() {
+        let mut state = 1234567i64;
+        let mut outputs = Vec::new();
+        for _ in 0..5 {
+            let (output, next) = random_next(&state);
+            state = next;
+            outputs.push(output as u64);
+        }
+        assert_eq!(
+            outputs,
+            [
+                6457827717110365317,
+                3203168211198807973,
+                9817491932198370423,
+                4593380528125082431,
+                16408922859458223821
+            ]
+        );
+    }
+
+    #[test]
+    fn random_range_covers_the_extremes() {
+        let (value, _) = random_range(&7, &i64::MIN, &i64::MAX);
+        // low + offset, so the full span is the raw output shifted down by 2^63.
+        assert_eq!(value, (random_next(&7).0 as u64 ^ (1 << 63)) as i64);
+        assert_eq!(random_range(&7, &5, &5).0, 5);
     }
 }

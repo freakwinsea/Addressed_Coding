@@ -1470,6 +1470,90 @@ b
              ! The base is checked before the text: The base is 2 to 36; any
                other base is an invalid_base ERROR.
              errors: invalid_base
+
+400-0000200  RANDOM_NEXT(state: int) -> pair<int,int>
+             Draw a repeatable random whole number from a seed, and the state to draw the next one from
+             ! SPLITMIX64, EXACTLY. Read the state's 64 bits as unsigned; add
+               0x9E3779B97F4A7C15, wrapping at 2^64, to get the next state;
+               then z = next; z = (z xor (z >> 30)) x 0xBF58476D1CE4E5B9; z =
+               (z xor (z >> 27)) x 0x94D049BB133111EB; z = z xor (z >> 31),
+               every multiply wrapping at 2^64. z is the output.
+             ! THE RESULT IS A PAIR: (value, next state). Both are ints
+               carrying the 64 bits as a signed number, so the value covers
+               the whole int range and every int, negative ones included, is
+               a valid seed. Pass the next state to the next draw.
+             ! NOT FOR SECRETS. The sequence is fully predictable from the
+               state by design; this is for simulations, tests and repeatable
+               shuffles, not passwords or keys.
+             ! Neither host's own generator is used: Python's random module
+               and Rust's rand crate produce different sequences, and the
+               point of this address is that the sequence is part of the
+               contract.
+
+400-0000201  RANDOM_RANGE(state: int, low: int, high: int) -> pair<int,int>
+             Draw a repeatable random whole number between two bounds, both included, with no bias
+             ! BOTH BOUNDS ARE INCLUDED: low 1, high 6 is a die. low above
+               high is an invalid_range error; low equal to high always gives
+               low, and still uses one draw.
+             ! UNBIASED BY REJECTION, EXACTLY. span = high - low + 1, from 1
+               to 2^64. Draw SplitMix64 outputs as RANDOM_NEXT (400-0000200),
+               read as unsigned; throw away any output at or above 2^64 -
+               (2^64 mod span) and draw again; the value is low + (output mod
+               span). When span is 2^64 nothing is thrown away.
+             ! The result is (value, next state), and the next state is the
+               one after the last draw, rejected draws included.
+             errors: invalid_range
+
+400-0000202  RANDOM_FLOAT(state: int) -> pair<float,int>
+             Draw a repeatable random float from 0 up to but not including 1
+             ! ONE DRAW, TOP 53 BITS. The value is (output >> 11) / 2^53 for
+               one SplitMix64 output as RANDOM_NEXT (400-0000200) reads it as
+               unsigned: exact in a float, at least 0.0, and never 1.0.
+             ! The result is (value, next state).
+
+400-0000203  RANDOM_BOOL(state: int) -> pair<bool,int>
+             Draw a repeatable random true or false, like a coin toss
+             ! ONE DRAW, TOP BIT. true when the highest bit of one SplitMix64
+               output (as RANDOM_NEXT, 400-0000200) is set. The result is
+               (value, next state).
+
+400-0000204  RANDOM_INTS(state: int, count: int, low: int, high: int) -> pair<list<int>,int>
+             Draw a list of repeatable random whole numbers between two bounds
+             ! EXACTLY count CALLS OF RANDOM_RANGE (400-0000201), in order,
+               each from the state the last one returned. The result is (the
+               values, the state after the last draw), so the list is the
+               same as chaining the single draws by hand.
+             ! A count of zero or less gives an empty list and the state
+               unchanged, as TAKE (300-0000010) treats a negative count. low
+               above high is an invalid_range error even then.
+             errors: invalid_range
+
+400-0000205  RANDOM_FLOATS(state: int, count: int) -> pair<list<float>,int>
+             Draw a list of repeatable random floats from 0 up to but not including 1
+             ! EXACTLY count CALLS OF RANDOM_FLOAT (400-0000202), in order,
+               each from the state the last one returned. The result is (the
+               values, the state after the last draw).
+             ! A count of zero or less gives an empty list and the state
+               unchanged.
+
+400-0000206  SHUFFLE(state: int, sequence: list<T>) -> pair<list<T>,int>
+             Put a list in a repeatable random order
+             ! FISHER-YATES FROM THE BACK, EXACTLY. For i from the last index
+               down to 1: j is RANDOM_RANGE(0, i) (400-0000201) from the
+               current state, then the items at i and j swap. Every order is
+               equally likely.
+             ! The result is (the shuffled list, the state after the last
+               draw). A list of zero or one items takes no draws and comes
+               back as it was, with the state unchanged. The input list is
+               not changed.
+
+400-0000207  PICK(state: int, sequence: list<T>, fallback: T) -> pair<T,int>
+             Pick one item from a list at random, repeatably, or a fallback when the list is empty
+             ! ONE CALL OF RANDOM_RANGE(0, n - 1) (400-0000201) for a list of
+               n items; the item at that index is picked. The result is (the
+               item, the next state).
+             ! Never fails. An empty list gives the fallback and the state
+               unchanged, with no draw taken.
 ```
 
 ### 500 — Input / output — the only addresses with effects

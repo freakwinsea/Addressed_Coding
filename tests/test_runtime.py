@@ -12,6 +12,7 @@ import pytest
 from phonebook.registry import Registry
 from phonebook_rt import IMPLEMENTATIONS, PhonebookFault
 from phonebook_rt.decimal_ import Decimal
+from phonebook_rt import numbers_
 
 
 def normalize(value):
@@ -681,6 +682,80 @@ class TestRootsAndRemainders:
         assert excinfo.value.code == "overflow"
 
 
+class TestRepeatableRandom:
+    """400-0000200..207. The Rust side is held to the same sequences by
+    tests/conformance/random.phone; these check the Python side against the
+    published SplitMix64 reference and against the contract's own wording."""
+
+    def test_splitmix_matches_the_published_reference(self):
+        state, outputs = 1234567, []
+        for _ in range(5):
+            value, state = numbers_.random_next(state)
+            outputs.append(value % 2**64)
+        assert outputs == [
+            6457827717110365317,
+            3203168211198807973,
+            9817491932198370423,
+            4593380528125082431,
+            16408922859458223821,
+        ]
+
+    def test_the_state_steps_by_the_golden_gamma(self):
+        state = -1
+        for step in range(1, 1000):
+            _, state = numbers_.random_next(state)
+            assert state % 2**64 == (-1 + step * 0x9E3779B97F4A7C15) % 2**64
+
+    def test_list_draws_equal_chained_single_draws(self):
+        state, chained = 2026, []
+        for _ in range(2000):
+            value, state = numbers_.random_range(state, -7, 12)
+            chained.append(value)
+        assert numbers_.random_ints(2026, 2000, -7, 12) == (chained, state)
+
+        state, floats = 2026, []
+        for _ in range(2000):
+            value, state = numbers_.random_float(state)
+            floats.append(value)
+        assert numbers_.random_floats(2026, 2000) == (floats, state)
+
+    def test_range_rejection_matches_the_contract(self):
+        """Written from the contract note, independently of _draw_below."""
+        low, high = -1, 2**63 - 1
+        span = high - low + 1
+        limit = 2**64 - (2**64 % span)
+        state = 0
+        for _ in range(500):
+            expected_state = state
+            while True:
+                output, expected_state = numbers_.random_next(expected_state)
+                output %= 2**64
+                if output < limit:
+                    break
+            value, state = numbers_.random_range(state, low, high)
+            assert (value, state) == (low + output % span, expected_state)
+
+    def test_ranges_stay_in_bounds_and_hit_every_value(self):
+        values, _ = numbers_.random_ints(5, 6000, 1, 6)
+        assert set(values) == {1, 2, 3, 4, 5, 6}
+        assert all(900 < values.count(face) < 1100 for face in range(1, 7))
+
+    def test_floats_are_in_the_unit_interval(self):
+        values, _ = numbers_.random_floats(9, 5000)
+        assert all(0.0 <= v < 1.0 for v in values)
+        assert 0.45 < sum(values) / len(values) < 0.55
+
+    def test_shuffle_is_a_permutation_and_leaves_its_input_alone(self):
+        deck = list(range(52))
+        dealt, _ = numbers_.shuffle(31337, deck)
+        assert deck == list(range(52))
+        assert sorted(dealt) == deck and dealt != deck
+
+    def test_python_random_is_not_used(self):
+        import inspect
+
+        source = inspect.getsource(numbers_)
+        assert "import random" not in source and "from random" not in source
 class TestBitsAndBases:
     """The bit operations and base conversions against oracles used only here:
     Python's own unbounded ints, masked to 64 bits by hand, and `int(text,

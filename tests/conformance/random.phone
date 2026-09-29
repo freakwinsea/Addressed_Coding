@@ -1,0 +1,55 @@
+phonebook 0.1
+
+# Repeatable random numbers (400-0000200..207). Every line is a place the
+# hand-written SplitMix64 in Python and the one in Rust must agree, down to the
+# last bit of the state. The long lists are the parity check: one wrong carry,
+# shift or rejection anywhere and every value after it differs.
+
+400-0000200@[1234567] -> first
+100-0000001@[first]
+300-0000016@[first] -> state_1
+400-0000200@[state_1] -> second
+100-0000001@[second]
+400-0000200@[-9223372036854775808] -> from_min
+100-0000001@[from_min]
+400-0000200@[9223372036854775807] -> from_max
+100-0000001@[from_max]
+
+# dice, and the whole int range
+400-0000201@[42, 1, 6] -> roll
+100-0000001@[roll]
+400-0000201@[42, -9223372036854775808, 9223372036854775807] -> anything
+100-0000001@[anything]
+
+# a span just over 2^63, so about half of all draws are thrown away
+400-0000201@[0, -1, 9223372036854775807] -> redrawn
+100-0000001@[redrawn]
+400-0000204@[7, 300, -1, 9223372036854775807] -> wide
+100-0000001@[wide]
+
+# long runs over small, odd and awkward spans
+400-0000204@[2026, 1000, 1, 6] -> dice
+100-0000001@[dice]
+400-0000204@[-5, 500, -1000000007, 1000000007] -> signed
+100-0000001@[signed]
+400-0000204@[99, 300, 0, 6148914691236517205] -> third_of_range
+100-0000001@[third_of_range]
+
+# floats and coin tosses
+400-0000205@[2026, 300] -> samples
+100-0000001@[samples]
+400-0000202@[-1] -> one_float
+100-0000001@[one_float]
+400-0000203@[0] -> toss
+100-0000001@[toss]
+
+# shuffles and picks carry the state along
+300-0000001@["ace", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "jack", "queen", "king"] -> deck
+400-0000206@[31337, deck] -> dealt
+100-0000001@[dealt]
+300-0000016@[dealt] -> after_deal
+400-0000207@[after_deal, deck, "joker"] -> picked
+100-0000001@[picked]
+300-0000001@[1.5, 2.5] -> halves
+400-0000206@[1, halves] -> swapped
+100-0000001@[swapped]
