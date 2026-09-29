@@ -986,3 +986,118 @@ def mod_fraction(a: Fraction, b: Fraction) -> Fraction:
         raise PhonebookFault("division_by_zero", "MOD_FRACTION by zero")
     remainder = _truncated_remainder(a.numerator * b.denominator, b.numerator * a.denominator)
     return _fraction(remainder, a.denominator * b.denominator, "MOD_FRACTION")
+
+
+# --------------------------------------------------------------------------
+# repeatable random numbers
+# --------------------------------------------------------------------------
+#
+# SplitMix64, written out by hand. Python's `random` module is not used: its
+# Mersenne Twister is not what Rust has, and the sequence a seed gives must be
+# the same in both backends. The state is an ordinary int that goes in and comes
+# back out, so there is no hidden generator and a call is a pure function. The
+# 64 bits are read as unsigned for the arithmetic and handed back as a signed
+# int with the same bits, so every int is a valid seed.
+
+_MASK64 = 2**64 - 1
+_GOLDEN_GAMMA = 0x9E3779B97F4A7C15
+
+
+def _unsigned(value: int) -> int:
+    return value & _MASK64
+
+
+def _signed(bits: int) -> int:
+    return bits - 2**64 if bits >= 2**63 else bits
+
+
+def _splitmix(state: int) -> tuple[int, int]:
+    """One SplitMix64 step: (unsigned 64-bit output, next state as an int)."""
+    bits = (_unsigned(state) + _GOLDEN_GAMMA) & _MASK64
+    z = bits
+    z = ((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9) & _MASK64
+    z = ((z ^ (z >> 27)) * 0x94D049BB133111EB) & _MASK64
+    z = z ^ (z >> 31)
+    return z, _signed(bits)
+
+
+def _draw_below(state: int, span: int) -> tuple[int, int]:
+    """A uniform draw from 0 .. span - 1, 1 <= span <= 2**64, by rejection.
+
+    Outputs at or above the largest multiple of span are thrown away and the
+    next one is drawn, so every value is exactly as likely as every other.
+    """
+    if span == 2**64:
+        return _splitmix(state)
+    limit = 2**64 - (2**64 % span)
+    while True:
+        output, state = _splitmix(state)
+        if output < limit:
+            return output % span, state
+
+
+def random_next(state: int) -> tuple[int, int]:
+    """400-0000200 RANDOM_NEXT — (a whole number over the full int range, next state)."""
+    output, state = _splitmix(state)
+    return _signed(output), state
+
+
+def random_range(state: int, low: int, high: int) -> tuple[int, int]:
+    """400-0000201 RANDOM_RANGE — low..high inclusive, unbiased."""
+    if low > high:
+        raise PhonebookFault("invalid_range", f"RANDOM_RANGE low {low} is above high {high}")
+    offset, state = _draw_below(state, high - low + 1)
+    return low + offset, state
+
+
+def random_float(state: int) -> tuple[float, int]:
+    """400-0000202 RANDOM_FLOAT — the top 53 bits over 2**53, in [0, 1)."""
+    output, state = _splitmix(state)
+    return (output >> 11) * (1.0 / 9007199254740992.0), state
+
+
+def random_bool(state: int) -> tuple[bool, int]:
+    """400-0000203 RANDOM_BOOL — the top bit."""
+    output, state = _splitmix(state)
+    return output >> 63 == 1, state
+
+
+def random_ints(state: int, count: int, low: int, high: int) -> tuple[list, int]:
+    """400-0000204 RANDOM_INTS — count draws of RANDOM_RANGE, in order."""
+    if low > high:
+        raise PhonebookFault("invalid_range", f"RANDOM_INTS low {low} is above high {high}")
+    values = []
+    for _ in range(count):
+        value, state = random_range(state, low, high)
+        values.append(value)
+    return values, state
+
+
+def random_floats(state: int, count: int) -> tuple[list, int]:
+    """400-0000205 RANDOM_FLOATS — count draws of RANDOM_FLOAT, in order."""
+    values = []
+    for _ in range(count):
+        value, state = random_float(state)
+        values.append(value)
+    return values, state
+
+
+def shuffle(state: int, sequence: list) -> tuple[list, int]:
+    """400-0000206 SHUFFLE — Fisher-Yates from the back.
+
+    For i from the last index down to 1, j is RANDOM_RANGE(0, i) and items i and
+    j swap. The input list is not touched; a copy is shuffled.
+    """
+    items = list(sequence)
+    for i in range(len(items) - 1, 0, -1):
+        j, state = random_range(state, 0, i)
+        items[i], items[j] = items[j], items[i]
+    return items, state
+
+
+def pick(state: int, sequence: list, fallback):
+    """400-0000207 PICK — one item, RANDOM_RANGE(0, n - 1); empty gives the fallback."""
+    if not sequence:
+        return fallback, state
+    index, state = random_range(state, 0, len(sequence) - 1)
+    return sequence[index], state
