@@ -1294,6 +1294,202 @@ b
                denominator can grow to the product of the two, so one that no
                longer fits in 64 bits is an overflow error.
              errors: division_by_zero, overflow
+
+400-0000180  SMALLEST(values: list<T>) -> T
+             The smallest number in a list, of any number type
+             ! Works for int, bigint, float, decimal and fraction, in the
+               order COMPARE (400-0000064) uses. MIN (400-0000006) is the
+               two-int version.
+             ! TIES GO TO THE FIRST: when several values are equal, the one
+               that comes first in the list is returned. That only shows for
+               decimals, where 0.3 and 0.30 are equal but print differently:
+               SMALLEST([0.30, 0.3]) is 0.30.
+             ! AN EMPTY LIST IS AN empty_list ERROR: there is no smallest of
+               nothing.
+             errors: empty_list
+
+400-0000181  LARGEST(values: list<T>) -> T
+             The largest number in a list, of any number type
+             ! Works for int, bigint, float, decimal and fraction, in the
+               order COMPARE (400-0000064) uses. MAX (400-0000007) is the
+               two-int version.
+             ! TIES GO TO THE FIRST: when several values are equal, the one
+               that comes first in the list is returned. That only shows for
+               decimals, where 0.3 and 0.30 are equal but print differently:
+               LARGEST([0.30, 0.3]) is 0.30.
+             ! AN EMPTY LIST IS AN empty_list ERROR: there is no largest of
+               nothing.
+             errors: empty_list
+
+400-0000182  SUM_FLOAT(values: list<float>) -> float
+             Add up a list of floats, left to right
+             ! ADDED LEFT TO RIGHT, EACH STEP ROUNDED as ADD_FLOAT
+               (400-0000015) rounds. NOT a compensated sum: SUM_FLOAT([0.1,
+               0.2, 0.3]) is 0.6000000000000001. Python 3.12's sum() and
+               math.fsum would say 0.6; neither is used.
+             ! An empty list sums to 0.0. A running sum that is not finite is
+               an overflow error.
+             errors: overflow
+
+400-0000183  SUM_BIG(values: list<bigint>) -> bigint
+             Add up a list of bigints
+             ! EXACT. An empty list sums to 0.
+             ! Only the final total has to fit the 4000-digit ceiling; a
+               running total may pass it on the way, so [10^3999 x 9, 10^3999
+               x 9, -(10^3999 x 9)] is fine. A total with more than 4000
+               digits is an overflow error.
+             errors: overflow
+
+400-0000184  SUM_DEC(values: list<decimal>) -> decimal
+             Add up a list of decimals exactly
+             ! EXACT: 0.10 + 0.20 + 0.30 is 0.60. The total has the largest
+               scale in the list, as ADD_DEC (400-0000043) keeps the larger
+               of two: [1.5, 0.25] sums to 1.75, and [1, 2.00] to 3.00.
+             ! An empty list sums to 0, with no places.
+             ! Only the final total has to fit the 4000-digit ceiling; a
+               running total may pass it on the way. A total with more than
+               4000 digits is an overflow error.
+             errors: overflow
+
+400-0000185  SUM_FRACTION(values: list<fraction>) -> fraction
+             Add up a list of fractions exactly
+             ! EXACT and in lowest terms: 1/2 + 1/3 + 1/6 is 1. An empty list
+               sums to 0.
+             ! ADDED LEFT TO RIGHT with ADD_FRACTION (400-0000081). Overflow
+               is an error the moment a running total does not fit in a
+               64-bit fraction, even when a later value would have brought it
+               back, as for SUM (400-0000008).
+             errors: overflow
+
+400-0000186  AVERAGE(values: list<int>, places: int) -> decimal
+             The average of a list of integers, as a decimal to a number of places
+             ! The exact sum divided by the count, rounded ONCE to exactly
+               `places` digits after the point, HALVES AWAY FROM ZERO, as
+               DIV_DEC (400-0000046): the average of [1, 2] to 0 places is 2,
+               and of [-1, -2] is -2.
+             ! The sum is exact and never overflows, however large the ints
+               are.
+             ! `places` must be between 0 and 1000, or it is an
+               invalid_places error.
+             ! AN EMPTY LIST IS AN empty_list ERROR: there is no average of
+               nothing.
+             errors: empty_list, invalid_places
+
+400-0000187  AVERAGE_FLOAT(values: list<float>) -> float
+             The average of a list of floats
+             ! SUM_FLOAT (400-0000182) of the list, then divided by the
+               count, rounded as DIV_FLOAT (400-0000018). So the sum is added
+               left to right with each step rounded, not compensated.
+             ! A running sum that is not finite is an overflow error, even
+               when the average would fit.
+             ! AN EMPTY LIST IS AN empty_list ERROR: there is no average of
+               nothing.
+             errors: empty_list, overflow
+
+400-0000188  AVERAGE_BIG(values: list<bigint>, places: int) -> decimal
+             The average of a list of bigints, as a decimal to a number of places
+             ! The exact sum divided by the count, rounded ONCE to exactly
+               `places` digits after the point, HALVES AWAY FROM ZERO, as
+               AVERAGE (400-0000186).
+             ! The sum is exact and is not held to the 4000-digit ceiling;
+               only the average is. An average with more than 4000 digits is
+               an overflow error.
+             ! `places` must be between 0 and 1000, or it is an
+               invalid_places error.
+             ! AN EMPTY LIST IS AN empty_list ERROR: there is no average of
+               nothing.
+             errors: empty_list, invalid_places, overflow
+
+400-0000189  AVERAGE_DEC(values: list<decimal>, places: int) -> decimal
+             The average of a list of decimals, to a number of places
+             ! The exact sum divided by the count, rounded ONCE to exactly
+               `places` digits after the point, HALVES AWAY FROM ZERO, as
+               DIV_DEC (400-0000046): the average of [0.01, 0.02] to 2 places
+               is 0.02.
+             ! The result always has `places` places, whatever scales the
+               values have.
+             ! The sum is exact and is not held to the 4000-digit ceiling;
+               only the average is. An average with more than 4000 digits is
+               an overflow error.
+             ! `places` must be between 0 and 1000, or it is an
+               invalid_places error.
+             ! AN EMPTY LIST IS AN empty_list ERROR: there is no average of
+               nothing.
+             errors: empty_list, invalid_places, overflow
+
+400-0000190  AVERAGE_FRACTION(values: list<fraction>) -> fraction
+             The exact average of a list of fractions
+             ! EXACT and in lowest terms: SUM_FRACTION (400-0000185) of the
+               list divided by the count. The average of 1/2 and 1/3 is 5/12.
+             ! The sum can overflow as SUM_FRACTION says, and so can the
+               division, when the count times the denominator does not reduce
+               back into 64 bits.
+             ! AN EMPTY LIST IS AN empty_list ERROR: there is no average of
+               nothing.
+             errors: empty_list, overflow
+
+400-0000191  MEDIAN(values: list<int>) -> decimal
+             The middle value of a list of integers, as an exact decimal
+             ! The list is sorted, smallest first. An ODD count gives the
+               middle value, with no places. An EVEN count gives the exact
+               midpoint of the two middle values: [1, 3] gives 2, and [1, 2]
+               gives 1.5, with one place only when it is needed.
+             ! Never rounded, so the answer is always exact, and it never
+               overflows.
+             ! AN EMPTY LIST IS AN empty_list ERROR: there is no median of
+               nothing.
+             errors: empty_list
+
+400-0000192  MEDIAN_FLOAT(values: list<float>) -> float
+             The middle value of a list of floats
+             ! The list is sorted, smallest first. An ODD count gives the
+               middle value. An EVEN count gives the exact midpoint of the
+               two middle values, ROUNDED ONCE to the nearest float, ties to
+               even.
+             ! The midpoint NEVER OVERFLOWS: the median of two values near
+               the largest float is still a finite float, even though their
+               sum is not.
+             ! AN EMPTY LIST IS AN empty_list ERROR: there is no median of
+               nothing.
+             errors: empty_list
+
+400-0000193  MEDIAN_BIG(values: list<bigint>) -> decimal
+             The middle value of a list of bigints, as an exact decimal
+             ! The same rule as MEDIAN (400-0000191): an ODD count gives the
+               middle value, with no places; an EVEN count gives the exact
+               midpoint of the two middle values, with one place only when it
+               is needed.
+             ! A midpoint of two values near the 4000-digit ceiling can need
+               4001 digits once it has a place, which is an overflow error.
+             ! AN EMPTY LIST IS AN empty_list ERROR: there is no median of
+               nothing.
+             errors: empty_list, overflow
+
+400-0000194  MEDIAN_DEC(values: list<decimal>) -> decimal
+             The middle value of a list of decimals, exactly
+             ! The list is sorted by value, smallest first, and equal values
+               keep their list order (a stable sort, as SORT). An ODD count
+               gives the middle value exactly as it is, places and all.
+             ! An EVEN count gives the exact midpoint of the two middle
+               values, at the larger of their two scales, plus one place only
+               when it is needed: [1.0, 3.0] gives 2.0, and [0.01, 0.02]
+               gives 0.015.
+             ! Never rounded. A midpoint with more than 1000 places or 4000
+               digits is an overflow error.
+             ! AN EMPTY LIST IS AN empty_list ERROR: there is no median of
+               nothing.
+             errors: empty_list, overflow
+
+400-0000195  MEDIAN_FRACTION(values: list<fraction>) -> fraction
+             The middle value of a list of fractions, exactly
+             ! The list is sorted, smallest first. An ODD count gives the
+               middle value. An EVEN count gives the exact midpoint of the
+               two middle values, in lowest terms: 1/3 and 1/2 give 5/12.
+             ! A midpoint whose lowest terms do not fit in a 64-bit fraction
+               is an overflow error.
+             ! AN EMPTY LIST IS AN empty_list ERROR: there is no median of
+               nothing.
+             errors: empty_list, overflow
 ```
 
 ### 500 — Input / output — the only addresses with effects

@@ -986,3 +986,208 @@ def mod_fraction(a: Fraction, b: Fraction) -> Fraction:
         raise PhonebookFault("division_by_zero", "MOD_FRACTION by zero")
     remainder = _truncated_remainder(a.numerator * b.denominator, b.numerator * a.denominator)
     return _fraction(remainder, a.denominator * b.denominator, "MOD_FRACTION")
+
+
+# --------------------------------------------------------------------------
+# list maths: smallest, largest, sum, average and median
+# --------------------------------------------------------------------------
+#
+# None of these use Python's `min`, `max`, `sum` or `statistics`. From 3.12,
+# `sum` of floats is compensated and would say 0.6 where adding left to right
+# says 0.6000000000000001; `statistics.median` averages two floats in a way
+# that can overflow; and `min`/`max` would hide which of two equal decimals is
+# kept. Each rule is written out here as the Rust runtime writes it.
+
+
+def _not_empty(values: list, operation: str) -> None:
+    if not values:
+        raise PhonebookFault("empty_list", f"{operation} of an empty list")
+
+
+def smallest(values: list):
+    """400-0000180 SMALLEST — the first of equal values wins."""
+    _not_empty(values, "SMALLEST")
+    best = values[0]
+    for value in values[1:]:
+        if value < best:
+            best = value
+    return best
+
+
+def largest(values: list):
+    """400-0000181 LARGEST — the first of equal values wins."""
+    _not_empty(values, "LARGEST")
+    best = values[0]
+    for value in values[1:]:
+        if value > best:
+            best = value
+    return best
+
+
+def sum_float(values: list) -> float:
+    """400-0000182 SUM_FLOAT — left to right, each step rounded. NOT `sum()`."""
+    total = 0.0
+    for value in values:
+        total = _finite(total + value, "SUM_FLOAT")
+    return total
+
+
+def sum_big(values: list) -> int:
+    """400-0000183 SUM_BIG — exact; only the final total meets the ceiling."""
+    total = 0
+    for value in values:
+        total += value
+    return _checked_big(total, "SUM_BIG")
+
+
+def _exact_dec_sum(values: list) -> Decimal:
+    """The exact total at the largest scale in the list, not yet checked."""
+    scale = 0
+    for value in values:
+        scale = max(scale, value.scale)
+    total = 0
+    for value in values:
+        total += value.rescaled(scale)
+    return Decimal(total, scale)
+
+
+def sum_dec(values: list) -> Decimal:
+    """400-0000184 SUM_DEC — exact, at the largest scale in the list."""
+    return _exact_dec_sum(values).checked("SUM_DEC")
+
+
+def sum_fraction(values: list) -> Fraction:
+    """400-0000185 SUM_FRACTION — left to right with ADD_FRACTION's check each step."""
+    total = Fraction(0, 1)
+    for value in values:
+        total = _fraction(
+            total.numerator * value.denominator + value.numerator * total.denominator,
+            total.denominator * value.denominator,
+            "SUM_FRACTION",
+        )
+    return total
+
+
+def _average_places(total: int, scale: int, count: int, places: int, operation: str) -> Decimal:
+    """(total x 10^-scale) / count, rounded once to `places`, halves away from zero."""
+    return Decimal(
+        divide_rounded(total * 10**places, count * 10**scale), places
+    ).checked(operation)
+
+
+def average(values: list, places: int) -> Decimal:
+    """400-0000186 AVERAGE — the exact int sum over the count, rounded once."""
+    _checked_places(places, "AVERAGE")
+    _not_empty(values, "AVERAGE")
+    total = 0
+    for value in values:
+        total += value
+    return _average_places(total, 0, len(values), places, "AVERAGE")
+
+
+def average_float(values: list) -> float:
+    """400-0000187 AVERAGE_FLOAT — SUM_FLOAT, then divided by the count."""
+    _not_empty(values, "AVERAGE_FLOAT")
+    return _finite(sum_float(values) / float(len(values)), "AVERAGE_FLOAT")
+
+
+def average_big(values: list, places: int) -> Decimal:
+    """400-0000188 AVERAGE_BIG — the exact sum over the count, rounded once."""
+    _checked_places(places, "AVERAGE_BIG")
+    _not_empty(values, "AVERAGE_BIG")
+    total = 0
+    for value in values:
+        total += value
+    return _average_places(total, 0, len(values), places, "AVERAGE_BIG")
+
+
+def average_dec(values: list, places: int) -> Decimal:
+    """400-0000189 AVERAGE_DEC — the exact sum over the count, rounded once."""
+    _checked_places(places, "AVERAGE_DEC")
+    _not_empty(values, "AVERAGE_DEC")
+    total = _exact_dec_sum(values)
+    return _average_places(total.coefficient, total.scale, len(values), places, "AVERAGE_DEC")
+
+
+def average_fraction(values: list) -> Fraction:
+    """400-0000190 AVERAGE_FRACTION — SUM_FRACTION over the count, exactly."""
+    _not_empty(values, "AVERAGE_FRACTION")
+    total = sum_fraction(values)
+    return _fraction(total.numerator, total.denominator * len(values), "AVERAGE_FRACTION")
+
+
+def _middle(values: list, operation: str) -> tuple:
+    """The one middle value of a sorted copy, or the two middle values.
+
+    `sorted` is stable, as the contract needs for decimals of equal value.
+    """
+    _not_empty(values, operation)
+    ordered = sorted(values)
+    half = len(ordered) // 2
+    if len(ordered) % 2:
+        return (ordered[half],)
+    return ordered[half - 1], ordered[half]
+
+
+def _half_of(total: int, scale: int) -> Decimal:
+    """total x 10^-scale halved exactly: one more place only when total is odd."""
+    if total % 2 == 0:
+        return Decimal(total // 2, scale)
+    return Decimal(total * 5, scale + 1)
+
+
+def median(values: list) -> Decimal:
+    """400-0000191 MEDIAN — the middle int, or the exact midpoint of two."""
+    middle = _middle(values, "MEDIAN")
+    if len(middle) == 1:
+        return Decimal(middle[0], 0)
+    return _half_of(middle[0] + middle[1], 0)
+
+
+def median_float(values: list) -> float:
+    """400-0000192 MEDIAN_FLOAT — the exact midpoint of two, rounded once.
+
+    When a + b is finite, it and the halving round only once between them:
+    halving is exact unless the result is subnormal, and a sum that small was
+    exact to begin with. When a + b is not finite both values are huge, so
+    halving each is exact and the one rounding is in their sum.
+    """
+    middle = _middle(values, "MEDIAN_FLOAT")
+    if len(middle) == 1:
+        return middle[0]
+    a, b = middle
+    total = a + b
+    if math.isfinite(total):
+        return _finite(total / 2.0, "MEDIAN_FLOAT")
+    return _finite(a / 2.0 + b / 2.0, "MEDIAN_FLOAT")
+
+
+def median_big(values: list) -> Decimal:
+    """400-0000193 MEDIAN_BIG — the same rule as MEDIAN, under the ceiling."""
+    middle = _middle(values, "MEDIAN_BIG")
+    if len(middle) == 1:
+        return Decimal(middle[0], 0)
+    return _half_of(middle[0] + middle[1], 0).checked("MEDIAN_BIG")
+
+
+def median_dec(values: list) -> Decimal:
+    """400-0000194 MEDIAN_DEC — the middle value as it is, or the exact midpoint."""
+    middle = _middle(values, "MEDIAN_DEC")
+    if len(middle) == 1:
+        return middle[0]
+    a, b = middle
+    scale = max(a.scale, b.scale)
+    return _half_of(a.rescaled(scale) + b.rescaled(scale), scale).checked("MEDIAN_DEC")
+
+
+def median_fraction(values: list) -> Fraction:
+    """400-0000195 MEDIAN_FRACTION — the middle value, or the exact midpoint."""
+    middle = _middle(values, "MEDIAN_FRACTION")
+    if len(middle) == 1:
+        return middle[0]
+    a, b = middle
+    return _fraction(
+        a.numerator * b.denominator + b.numerator * a.denominator,
+        2 * a.denominator * b.denominator,
+        "MEDIAN_FRACTION",
+    )
