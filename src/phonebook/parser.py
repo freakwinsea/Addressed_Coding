@@ -40,6 +40,9 @@ PIN_RE = re.compile(rf"^pin\s+(?P<address>{ADDRESS})\s+(?P<selector>{SELECTOR})\
 HEADER_RE = re.compile(r"^phonebook\s+(?P<version>[0-9]+\.[0-9]+)\s*$")
 RETURN_RE = re.compile(r"^return\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*$")
 INT_RE = re.compile(r"^-?[0-9]+$")
+#: An int may also be written in hex or binary, `0xff` or `0b1010`: a signed
+#: value like any other int, so `0xffffffffffffffff` does not fit and -1 does.
+BASED_INT_RE = re.compile(r"^-?0(?:[xX][0-9a-fA-F]+|[bB][01]+)$")
 #: A bigint literal is an integer with an `n` suffix, as in JavaScript: `12n`.
 BIGINT_RE = re.compile(r"^-?[0-9]+n$")
 #: A decimal literal is digits, an optional fraction, and a `d` suffix: `0.10d`.
@@ -283,6 +286,20 @@ class _Parser:
                 self.fail(
                     f"integer literal {text} does not fit in a 64-bit signed integer "
                     f"({INT64_MIN} to {INT64_MAX})",
+                    line_no,
+                )
+            return Literal(value, INT, label)
+        if BASED_INT_RE.match(text):
+            negative = text.startswith("-")
+            digits = text.lstrip("-")
+            value = int(digits[2:], 16 if digits[1] in "xX" else 2)
+            value = -value if negative else value
+            if value < INT64_MIN or value > INT64_MAX:
+                self.fail(
+                    f"integer literal {text} does not fit in a 64-bit signed integer "
+                    f"({INT64_MIN} to {INT64_MAX})"
+                    "\n  hint: a literal is a signed value, not a bit pattern; "
+                    "PARSE_BASE_UNSIGNED (400-0000171) reads a pattern",
                     line_no,
                 )
             return Literal(value, INT, label)

@@ -989,6 +989,301 @@ def mod_fraction(a: Fraction, b: Fraction) -> Fraction:
 
 
 # --------------------------------------------------------------------------
+# repeatable random numbers
+# --------------------------------------------------------------------------
+#
+# SplitMix64, written out by hand. Python's `random` module is not used: its
+# Mersenne Twister is not what Rust has, and the sequence a seed gives must be
+# the same in both backends. The state is an ordinary int that goes in and comes
+# back out, so there is no hidden generator and a call is a pure function. The
+# 64 bits are read as unsigned for the arithmetic and handed back as a signed
+# int with the same bits, so every int is a valid seed.
+
+_MASK64 = 2**64 - 1
+_GOLDEN_GAMMA = 0x9E3779B97F4A7C15
+
+
+def _unsigned(value: int) -> int:
+    return value & _MASK64
+
+
+def _signed(bits: int) -> int:
+    return bits - 2**64 if bits >= 2**63 else bits
+
+
+def _splitmix(state: int) -> tuple[int, int]:
+    """One SplitMix64 step: (unsigned 64-bit output, next state as an int)."""
+    bits = (_unsigned(state) + _GOLDEN_GAMMA) & _MASK64
+    z = bits
+    z = ((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9) & _MASK64
+    z = ((z ^ (z >> 27)) * 0x94D049BB133111EB) & _MASK64
+    z = z ^ (z >> 31)
+    return z, _signed(bits)
+
+
+def _draw_below(state: int, span: int) -> tuple[int, int]:
+    """A uniform draw from 0 .. span - 1, 1 <= span <= 2**64, by rejection.
+
+    Outputs at or above the largest multiple of span are thrown away and the
+    next one is drawn, so every value is exactly as likely as every other.
+    """
+    if span == 2**64:
+        return _splitmix(state)
+    limit = 2**64 - (2**64 % span)
+    while True:
+        output, state = _splitmix(state)
+        if output < limit:
+            return output % span, state
+
+
+def random_next(state: int) -> tuple[int, int]:
+    """400-0000200 RANDOM_NEXT — (a whole number over the full int range, next state)."""
+    output, state = _splitmix(state)
+    return _signed(output), state
+
+
+def random_range(state: int, low: int, high: int) -> tuple[int, int]:
+    """400-0000201 RANDOM_RANGE — low..high inclusive, unbiased."""
+    if low > high:
+        raise PhonebookFault("invalid_range", f"RANDOM_RANGE low {low} is above high {high}")
+    offset, state = _draw_below(state, high - low + 1)
+    return low + offset, state
+
+
+def random_float(state: int) -> tuple[float, int]:
+    """400-0000202 RANDOM_FLOAT — the top 53 bits over 2**53, in [0, 1)."""
+    output, state = _splitmix(state)
+    return (output >> 11) * (1.0 / 9007199254740992.0), state
+
+
+def random_bool(state: int) -> tuple[bool, int]:
+    """400-0000203 RANDOM_BOOL — the top bit."""
+    output, state = _splitmix(state)
+    return output >> 63 == 1, state
+
+
+def random_ints(state: int, count: int, low: int, high: int) -> tuple[list, int]:
+    """400-0000204 RANDOM_INTS — count draws of RANDOM_RANGE, in order."""
+    if low > high:
+        raise PhonebookFault("invalid_range", f"RANDOM_INTS low {low} is above high {high}")
+    values = []
+    for _ in range(count):
+        value, state = random_range(state, low, high)
+        values.append(value)
+    return values, state
+
+
+def random_floats(state: int, count: int) -> tuple[list, int]:
+    """400-0000205 RANDOM_FLOATS — count draws of RANDOM_FLOAT, in order."""
+    values = []
+    for _ in range(count):
+        value, state = random_float(state)
+        values.append(value)
+    return values, state
+
+
+def shuffle(state: int, sequence: list) -> tuple[list, int]:
+    """400-0000206 SHUFFLE — Fisher-Yates from the back.
+
+    For i from the last index down to 1, j is RANDOM_RANGE(0, i) and items i and
+    j swap. The input list is not touched; a copy is shuffled.
+    """
+    items = list(sequence)
+    for i in range(len(items) - 1, 0, -1):
+        j, state = random_range(state, 0, i)
+        items[i], items[j] = items[j], items[i]
+    return items, state
+
+
+def pick(state: int, sequence: list, fallback):
+    """400-0000207 PICK — one item, RANDOM_RANGE(0, n - 1); empty gives the fallback."""
+    if not sequence:
+        return fallback, state
+    index, state = random_range(state, 0, len(sequence) - 1)
+    return sequence[index], state
+
+
+# --------------------------------------------------------------------------
+# bits and bases
+# --------------------------------------------------------------------------
+#
+# An int is 64 bits in two's complement on every backend. Python's own ints
+# have no width, so `~`, `&`, `|` and `^` already agree with Rust on int64
+# inputs, but `<<` would grow forever and `bin(-5)` prints '-0b101'. Every
+# function below works on the 64-bit pattern: `_bits` reads it as an unsigned
+# number, `_signed` reads it back.
+
+_BITS_MASK = 2**64 - 1
+_BASE_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+
+def _bits(value: int) -> int:
+    """The 64-bit pattern of an int, as an unsigned number from 0 to 2**64 - 1."""
+    return value & _BITS_MASK
+
+
+def _signed(bits: int) -> int:
+    """A 64-bit pattern read back as a signed int."""
+    return bits - 2**64 if bits > INT64_MAX else bits
+
+
+def _checked_shift(count: int, operation: str) -> int:
+    if count < 0:
+        raise PhonebookFault("invalid_shift", f"{operation} count {count} is negative")
+    return count
+
+
+def _checked_base(base: int, operation: str) -> int:
+    if base < 2 or base > 36:
+        raise PhonebookFault("invalid_base", f"{operation} base {base} is not between 2 and 36")
+    return base
+
+
+def _digits_in_base(magnitude: int, base: int) -> str:
+    """The digits of a non-negative number, lowercase, most significant first."""
+    if magnitude == 0:
+        return "0"
+    digits = []
+    while magnitude > 0:
+        magnitude, digit = divmod(magnitude, base)
+        digits.append(_BASE_DIGITS[digit])
+    return "".join(reversed(digits))
+
+
+def _read_digits(digits: str, base: int, limit: int) -> int | None:
+    """ASCII digits in `base`, either case, to a number below `limit`.
+
+    NOT `int(text, base)`, which takes underscores, a '0x' prefix when the base
+    is 16, and digits from other scripts. None for any of those, and as soon as
+    the number reaches the limit, so a long input is never read to the end.
+    """
+    if not digits:
+        return None
+    value = 0
+    for char in digits:
+        digit = _BASE_DIGITS.find(char.lower()) if char.isascii() else -1
+        if digit < 0 or digit >= base:
+            return None
+        value = value * base + digit
+        if value >= limit:
+            return None
+    return value
+
+
+def _split_sign(text: str) -> tuple[bool, str]:
+    if text[:1] == "-":
+        return True, text[1:]
+    if text[:1] == "+":
+        return False, text[1:]
+    return False, text
+
+
+def bit_and(a: int, b: int) -> int:
+    """400-0000160 BIT_AND — on the two 64-bit patterns."""
+    return _signed(_bits(a) & _bits(b))
+
+
+def bit_or(a: int, b: int) -> int:
+    """400-0000161 BIT_OR — on the two 64-bit patterns."""
+    return _signed(_bits(a) | _bits(b))
+
+
+def bit_xor(a: int, b: int) -> int:
+    """400-0000162 BIT_XOR — on the two 64-bit patterns."""
+    return _signed(_bits(a) ^ _bits(b))
+
+
+def bit_not(a: int) -> int:
+    """400-0000163 BIT_NOT — every bit flipped, so the result is -a - 1."""
+    return _signed(_bits(a) ^ _BITS_MASK)
+
+
+def shift_left(value: int, count: int) -> int:
+    """400-0000164 SHIFT_LEFT — bits pushed past bit 63 are dropped.
+
+    NOT Python's `<<`, which never drops a bit. 64 or more shifts every bit out.
+    """
+    count = _checked_shift(count, "SHIFT_LEFT")
+    if count >= 64:
+        return 0
+    return _signed((_bits(value) << count) & _BITS_MASK)
+
+
+def shift_right(value: int, count: int) -> int:
+    """400-0000165 SHIFT_RIGHT — copies of the sign bit come in at the top."""
+    count = _checked_shift(count, "SHIFT_RIGHT")
+    if count >= 64:
+        return -1 if value < 0 else 0
+    return value >> count
+
+
+def shift_right_unsigned(value: int, count: int) -> int:
+    """400-0000166 SHIFT_RIGHT_UNSIGNED — zeros come in at the top."""
+    count = _checked_shift(count, "SHIFT_RIGHT_UNSIGNED")
+    if count >= 64:
+        return 0
+    return _signed(_bits(value) >> count)
+
+
+def count_bits(value: int) -> int:
+    """400-0000167 COUNT_BITS — ones in the 64-bit pattern, so -1 has 64.
+
+    NOT `bin(value).count("1")`, which counts the ones of the magnitude.
+    """
+    return bin(_bits(value)).count("1")
+
+
+def to_base(value: int, base: int) -> str:
+    """400-0000168 TO_BASE — a '-' then the magnitude. NOT `bin()` or `hex()`."""
+    base = _checked_base(base, "TO_BASE")
+    digits = _digits_in_base(-value if value < 0 else value, base)
+    return "-" + digits if value < 0 else digits
+
+
+def parse_base(value: str, base: int, fallback: int) -> int:
+    """400-0000169 PARSE_BASE — never fails on the text; a bad base is an error."""
+    base = _checked_base(base, "PARSE_BASE")
+    negative, digits = _split_sign(value.strip(WHITESPACE))
+    # The magnitude can be one more than INT64_MAX when the sign is '-'.
+    magnitude = _read_digits(digits, base, 2**63 + 1 if negative else 2**63)
+    if magnitude is None:
+        return fallback
+    return -magnitude if negative else magnitude
+
+
+def to_base_unsigned(value: int, base: int) -> str:
+    """400-0000170 TO_BASE_UNSIGNED — the 64-bit pattern, so -1 in 16 is 16 f's."""
+    base = _checked_base(base, "TO_BASE_UNSIGNED")
+    return _digits_in_base(_bits(value), base)
+
+
+def parse_base_unsigned(value: str, base: int, fallback: int) -> int:
+    """400-0000171 PARSE_BASE_UNSIGNED — 0 to 2**64 - 1, read back as a pattern."""
+    base = _checked_base(base, "PARSE_BASE_UNSIGNED")
+    bits = _read_digits(value.strip(WHITESPACE), base, 2**64)
+    if bits is None:
+        return fallback
+    return _signed(bits)
+
+
+def big_to_base(value: int, base: int) -> str:
+    """400-0000172 BIG_TO_BASE — a '-' then the magnitude, as TO_BASE."""
+    base = _checked_base(base, "BIG_TO_BASE")
+    digits = _digits_in_base(-value if value < 0 else value, base)
+    return "-" + digits if value < 0 else digits
+
+
+def parse_big_base(value: str, base: int, fallback: int) -> int:
+    """400-0000173 PARSE_BIG_BASE — never fails on the text; the 4000-digit ceiling holds."""
+    base = _checked_base(base, "PARSE_BIG_BASE")
+    negative, digits = _split_sign(value.strip(WHITESPACE))
+    magnitude = _read_digits(digits, base, _BIGINT_LIMIT)
+    if magnitude is None:
+        return fallback
+    return -magnitude if negative else magnitude
+
+
+# --------------------------------------------------------------------------
 # list maths: smallest, largest, sum, average and median
 # --------------------------------------------------------------------------
 #

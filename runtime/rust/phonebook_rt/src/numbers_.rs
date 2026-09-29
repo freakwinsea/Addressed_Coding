@@ -1317,6 +1317,361 @@ pub fn mod_fraction(a: &Fraction, b: &Fraction) -> Fraction {
 }
 
 // --------------------------------------------------------------------------
+// repeatable random numbers
+// --------------------------------------------------------------------------
+//
+// SplitMix64, written out by hand, as the Python runtime does. The state is an
+// ordinary `i64` that goes in and comes back out, so there is no hidden
+// generator and a call is a pure function. Its 64 bits are read as `u64` for the
+// arithmetic, which wraps by definition here, and handed back as an `i64` with
+// the same bits, so every int is a valid seed.
+
+const GOLDEN_GAMMA: u64 = 0x9E37_79B9_7F4A_7C15;
+
+/// One SplitMix64 step: (unsigned 64-bit output, next state as an int).
+fn splitmix(state: i64) -> (u64, i64) {
+    let bits = (state as u64).wrapping_add(GOLDEN_GAMMA);
+    let mut z = bits;
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^= z >> 31;
+    (z, bits as i64)
+}
+
+/// A uniform draw from 0 .. span - 1, 1 <= span <= 2^64, by rejection.
+///
+/// Outputs at or above the largest multiple of span are thrown away and the
+/// next one is drawn, so every value is exactly as likely as every other.
+fn draw_below(mut state: i64, span: u128) -> (u64, i64) {
+    const FULL: u128 = 1 << 64;
+    if span == FULL {
+        return splitmix(state);
+    }
+    let limit = FULL - (FULL % span);
+    loop {
+        let (output, next) = splitmix(state);
+        state = next;
+        if (output as u128) < limit {
+            return ((output as u128 % span) as u64, state);
+        }
+    }
+}
+
+/// 400-0000200 RANDOM_NEXT — (a whole number over the full int range, next state).
+pub fn random_next(state: &i64) -> (i64, i64) {
+    let (output, state) = splitmix(*state);
+    (output as i64, state)
+}
+
+/// 400-0000201 RANDOM_RANGE — low..high inclusive, unbiased.
+pub fn random_range(state: &i64, low: &i64, high: &i64) -> (i64, i64) {
+    if low > high {
+        crate::fault(
+            "invalid_range",
+            &format!("RANDOM_RANGE low {low} is above high {high}"),
+        );
+    }
+    let span = (*high as i128 - *low as i128 + 1) as u128;
+    let (offset, state) = draw_below(*state, span);
+    ((*low as i128 + offset as i128) as i64, state)
+}
+
+/// 400-0000202 RANDOM_FLOAT — the top 53 bits over 2^53, in [0, 1).
+pub fn random_float(state: &i64) -> (f64, i64) {
+    let (output, state) = splitmix(*state);
+    ((output >> 11) as f64 * (1.0 / 9007199254740992.0), state)
+}
+
+/// 400-0000203 RANDOM_BOOL — the top bit.
+pub fn random_bool(state: &i64) -> (bool, i64) {
+    let (output, state) = splitmix(*state);
+    (output >> 63 == 1, state)
+}
+
+/// 400-0000204 RANDOM_INTS — count draws of RANDOM_RANGE, in order.
+pub fn random_ints(state: &i64, count: &i64, low: &i64, high: &i64) -> (Vec<i64>, i64) {
+    if low > high {
+        crate::fault(
+            "invalid_range",
+            &format!("RANDOM_INTS low {low} is above high {high}"),
+        );
+    }
+    let mut state = *state;
+    let mut values = Vec::new();
+    for _ in 0..*count {
+        let (value, next) = random_range(&state, low, high);
+        state = next;
+        values.push(value);
+    }
+    (values, state)
+}
+
+/// 400-0000205 RANDOM_FLOATS — count draws of RANDOM_FLOAT, in order.
+pub fn random_floats(state: &i64, count: &i64) -> (Vec<f64>, i64) {
+    let mut state = *state;
+    let mut values = Vec::new();
+    for _ in 0..*count {
+        let (value, next) = random_float(&state);
+        state = next;
+        values.push(value);
+    }
+    (values, state)
+}
+
+/// 400-0000206 SHUFFLE — Fisher-Yates from the back.
+///
+/// For i from the last index down to 1, j is RANDOM_RANGE(0, i) and items i and
+/// j swap. The input is not touched; a copy is shuffled.
+pub fn shuffle<T: Clone>(state: &i64, sequence: &[T]) -> (Vec<T>, i64) {
+    let mut items = sequence.to_vec();
+    let mut state = *state;
+    for i in (1..items.len()).rev() {
+        let (j, next) = random_range(&state, &0, &(i as i64));
+        state = next;
+        items.swap(i, j as usize);
+    }
+    (items, state)
+}
+
+/// 400-0000207 PICK — one item, RANDOM_RANGE(0, n - 1); empty gives the fallback.
+pub fn pick<T: Clone>(state: &i64, sequence: &[T], fallback: &T) -> (T, i64) {
+    if sequence.is_empty() {
+        return (fallback.clone(), *state);
+    }
+    let last = sequence.len() as i64 - 1;
+    let (index, state) = random_range(state, &0, &last);
+    (sequence[index as usize].clone(), state)
+}
+
+// --------------------------------------------------------------------------
+// bits and bases
+// --------------------------------------------------------------------------
+//
+// An int is 64 bits in two's complement on every backend, which is Rust's own
+// `i64`, so `&`, `|`, `^` and `!` need no help. The shifts do: `<<` and `>>`
+// panic in a debug build when the count is 64 or more, and wrap it in a
+// release build. Printing needs help too: `{:x}` on a negative i64 prints the
+// pattern, where TO_BASE promises a '-' and the magnitude.
+
+const BASE_DIGITS: &[u8; 36] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+
+fn checked_shift(count: i64, operation: &str) -> u32 {
+    if count < 0 {
+        crate::fault(
+            "invalid_shift",
+            &format!("{operation} count {count} is negative"),
+        );
+    }
+    // Every count past 63 does the same thing, so 64 stands in for all of them.
+    count.min(64) as u32
+}
+
+fn checked_base(base: i64, operation: &str) -> u32 {
+    if !(2..=36).contains(&base) {
+        crate::fault(
+            "invalid_base",
+            &format!("{operation} base {base} is not between 2 and 36"),
+        );
+    }
+    base as u32
+}
+
+/// The digits of a non-negative number, lowercase, most significant first.
+fn digits_in_base(mut magnitude: u64, base: u32) -> String {
+    if magnitude == 0 {
+        return "0".to_string();
+    }
+    let mut digits = Vec::new();
+    while magnitude > 0 {
+        digits.push(BASE_DIGITS[(magnitude % base as u64) as usize]);
+        magnitude /= base as u64;
+    }
+    digits.reverse();
+    String::from_utf8(digits).unwrap()
+}
+
+/// One ASCII digit in `base`, either case; `None` for anything else.
+fn digit_value(byte: u8, base: u32) -> Option<u32> {
+    let digit = match byte {
+        b'0'..=b'9' => (byte - b'0') as u32,
+        b'a'..=b'z' => (byte - b'a') as u32 + 10,
+        b'A'..=b'Z' => (byte - b'A') as u32 + 10,
+        _ => return None,
+    };
+    if digit < base {
+        Some(digit)
+    } else {
+        None
+    }
+}
+
+/// ASCII digits in `base` to a number below `limit`. NOT `from_str_radix`,
+/// which takes a leading '+' of its own. `None` as soon as the number reaches
+/// the limit, so a long input is never read to the end.
+fn read_digits(digits: &str, base: u32, limit: u128) -> Option<u128> {
+    if digits.is_empty() {
+        return None;
+    }
+    let mut value: u128 = 0;
+    for byte in digits.bytes() {
+        value = value * base as u128 + digit_value(byte, base)? as u128;
+        if value >= limit {
+            return None;
+        }
+    }
+    Some(value)
+}
+
+fn split_sign(text: &str) -> (bool, &str) {
+    match text.as_bytes().first() {
+        Some(b'-') => (true, &text[1..]),
+        Some(b'+') => (false, &text[1..]),
+        _ => (false, text),
+    }
+}
+
+/// 400-0000160 BIT_AND — on the two 64-bit patterns.
+pub fn bit_and(a: &i64, b: &i64) -> i64 {
+    a & b
+}
+
+/// 400-0000161 BIT_OR — on the two 64-bit patterns.
+pub fn bit_or(a: &i64, b: &i64) -> i64 {
+    a | b
+}
+
+/// 400-0000162 BIT_XOR — on the two 64-bit patterns.
+pub fn bit_xor(a: &i64, b: &i64) -> i64 {
+    a ^ b
+}
+
+/// 400-0000163 BIT_NOT — every bit flipped, so the result is -a - 1.
+pub fn bit_not(a: &i64) -> i64 {
+    !a
+}
+
+/// 400-0000164 SHIFT_LEFT — bits pushed past bit 63 are dropped. 64 or more
+/// shifts every bit out; `<<` would panic or wrap the count instead.
+pub fn shift_left(value: &i64, count: &i64) -> i64 {
+    let count = checked_shift(*count, "SHIFT_LEFT");
+    if count >= 64 {
+        return 0;
+    }
+    ((*value as u64) << count) as i64
+}
+
+/// 400-0000165 SHIFT_RIGHT — copies of the sign bit come in at the top, which
+/// is what `>>` does on an i64.
+pub fn shift_right(value: &i64, count: &i64) -> i64 {
+    let count = checked_shift(*count, "SHIFT_RIGHT");
+    if count >= 64 {
+        return if *value < 0 { -1 } else { 0 };
+    }
+    value >> count
+}
+
+/// 400-0000166 SHIFT_RIGHT_UNSIGNED — zeros come in at the top.
+pub fn shift_right_unsigned(value: &i64, count: &i64) -> i64 {
+    let count = checked_shift(*count, "SHIFT_RIGHT_UNSIGNED");
+    if count >= 64 {
+        return 0;
+    }
+    ((*value as u64) >> count) as i64
+}
+
+/// 400-0000167 COUNT_BITS — ones in the 64-bit pattern, so -1 has 64.
+pub fn count_bits(value: &i64) -> i64 {
+    value.count_ones() as i64
+}
+
+/// 400-0000168 TO_BASE — a '-' then the magnitude. NOT `{:b}` or `{:x}`,
+/// which print a negative number's pattern.
+pub fn to_base(value: &i64, base: &i64) -> String {
+    let base = checked_base(*base, "TO_BASE");
+    let digits = digits_in_base(value.unsigned_abs(), base);
+    if *value < 0 {
+        format!("-{digits}")
+    } else {
+        digits
+    }
+}
+
+/// 400-0000169 PARSE_BASE — never fails on the text; a bad base is an error.
+pub fn parse_base(value: &str, base: &i64, fallback: &i64) -> i64 {
+    let base = checked_base(*base, "PARSE_BASE");
+    let candidate = crate::text::trim(value);
+    let (negative, digits) = split_sign(&candidate);
+    // The magnitude can be one more than i64::MAX when the sign is '-'.
+    let limit: u128 = if negative { (1 << 63) + 1 } else { 1 << 63 };
+    match read_digits(digits, base, limit) {
+        Some(magnitude) if negative => (-(magnitude as i128)) as i64,
+        Some(magnitude) => magnitude as i64,
+        None => *fallback,
+    }
+}
+
+/// 400-0000170 TO_BASE_UNSIGNED — the 64-bit pattern, so -1 in 16 is 16 f's.
+pub fn to_base_unsigned(value: &i64, base: &i64) -> String {
+    let base = checked_base(*base, "TO_BASE_UNSIGNED");
+    digits_in_base(*value as u64, base)
+}
+
+/// 400-0000171 PARSE_BASE_UNSIGNED — 0 to 2^64 - 1, read back as a pattern.
+pub fn parse_base_unsigned(value: &str, base: &i64, fallback: &i64) -> i64 {
+    let base = checked_base(*base, "PARSE_BASE_UNSIGNED");
+    match read_digits(&crate::text::trim(value), base, 1 << 64) {
+        Some(bits) => bits as u64 as i64,
+        None => *fallback,
+    }
+}
+
+/// 400-0000172 BIG_TO_BASE — a '-' then the magnitude, as TO_BASE.
+pub fn big_to_base(value: &BigInt, base: &i64) -> String {
+    let base = checked_base(*base, "BIG_TO_BASE");
+    if value.is_zero() {
+        return "0".to_string();
+    }
+    let mut magnitude = value.abs();
+    let mut digits = Vec::new();
+    while !magnitude.is_zero() {
+        let (quotient, digit) = magnitude.div_rem_small(base);
+        digits.push(BASE_DIGITS[digit as usize]);
+        magnitude = quotient;
+    }
+    if value.is_negative() {
+        digits.push(b'-');
+    }
+    digits.reverse();
+    String::from_utf8(digits).unwrap()
+}
+
+/// 400-0000173 PARSE_BIG_BASE — never fails on the text; the 4000-digit
+/// ceiling holds, and a number past it stops the reading at once.
+pub fn parse_big_base(value: &str, base: &i64, fallback: &BigInt) -> BigInt {
+    let base = checked_base(*base, "PARSE_BIG_BASE");
+    let candidate = crate::text::trim(value);
+    let (negative, digits) = split_sign(&candidate);
+    if digits.is_empty() {
+        return fallback.clone();
+    }
+    let mut magnitude = BigInt::default();
+    for byte in digits.bytes() {
+        let Some(digit) = digit_value(byte, base) else {
+            return fallback.clone();
+        };
+        magnitude = magnitude.mul_small_add(base, digit);
+        if magnitude.digit_count() > crate::bigint::MAX_DIGITS {
+            return fallback.clone();
+        }
+    }
+    if negative {
+        magnitude.neg()
+    } else {
+        magnitude
+    }
+}
+
+// --------------------------------------------------------------------------
 // list maths: smallest, largest, sum, average and median
 // --------------------------------------------------------------------------
 //
@@ -1581,6 +1936,29 @@ mod tests {
         }
     }
 
+    /// The big path must agree with the i64 path wherever both apply, and must
+    /// read back what it writes in every base.
+    #[test]
+    fn big_bases_round_trip() {
+        for value in [0i64, 1, -1, 35, -36, 255, i64::MAX, i64::MIN] {
+            for base in 2..=36i64 {
+                let text = to_base(&value, &base);
+                assert_eq!(big_to_base(&BigInt::from_i64(value), &base), text);
+                assert_eq!(parse_base(&text, &base, &7), value);
+                let big = parse_big_base(&text, &base, &BigInt::default());
+                assert_eq!(big, BigInt::from_i64(value));
+            }
+        }
+        let widest = BigInt::parse(&"9".repeat(4000)).unwrap();
+        let text = big_to_base(&widest, &2);
+        assert_eq!(parse_big_base(&text, &2, &BigInt::default()), widest);
+        let past = format!("{text}0");
+        assert_eq!(
+            parse_big_base(&past, &2, &BigInt::default()),
+            BigInt::default()
+        );
+    }
+
     /// The midpoint must be the exact one rounded once, never overflowing;
     /// checked against the halving of the exact sum, taken in wider steps.
     #[test]
@@ -1625,5 +2003,34 @@ mod tests {
         assert!(root.mul(&root) <= big);
         let above = root.add(&BigInt::from_i64(1));
         assert!(above.mul(&above) > big);
+    }
+
+    #[test]
+    fn splitmix_matches_the_published_reference() {
+        let mut state = 1234567i64;
+        let mut outputs = Vec::new();
+        for _ in 0..5 {
+            let (output, next) = random_next(&state);
+            state = next;
+            outputs.push(output as u64);
+        }
+        assert_eq!(
+            outputs,
+            [
+                6457827717110365317,
+                3203168211198807973,
+                9817491932198370423,
+                4593380528125082431,
+                16408922859458223821
+            ]
+        );
+    }
+
+    #[test]
+    fn random_range_covers_the_extremes() {
+        let (value, _) = random_range(&7, &i64::MIN, &i64::MAX);
+        // low + offset, so the full span is the raw output shifted down by 2^63.
+        assert_eq!(value, (random_next(&7).0 as u64 ^ (1 << 63)) as i64);
+        assert_eq!(random_range(&7, &5, &5).0, 5);
     }
 }
