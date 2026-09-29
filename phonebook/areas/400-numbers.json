@@ -2420,6 +2420,429 @@
       "since": "0.2.0"
     },
     {
+      "address": "400-0000160",
+      "name": "BIT_AND",
+      "summary": "Bitwise AND of two ints",
+      "keywords": ["and", "bitwise", "bits", "mask", "binary", "flags"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }, { "name": "b", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Works on the int's 64-bit TWO'S COMPLEMENT pattern, the same on every backend. The result is that pattern read back as a signed int, so it never overflows.",
+          "A bit is 1 when it is 1 in both: 12 AND 10 is 8. -1 has every bit set, so -1 AND x is x."
+        ]
+      },
+      "examples": ["400-0000160@[flags, 4] -> masked"],
+      "conformance": [
+        { "id": "bit_and.basic", "args": [12, 10], "expect": 8 },
+        { "id": "bit_and.all_ones", "args": [-1, 1234], "expect": 1234 },
+        { "id": "bit_and.negatives", "args": [-8, -3], "expect": -8 },
+        { "id": "bit_and.min", "args": [-9223372036854775808, -1], "expect": -9223372036854775808 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000161",
+      "name": "BIT_OR",
+      "summary": "Bitwise OR of two ints",
+      "keywords": ["or", "bitwise", "bits", "set flag", "binary", "flags"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }, { "name": "b", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Works on the int's 64-bit TWO'S COMPLEMENT pattern, the same on every backend. The result is that pattern read back as a signed int, so it never overflows.",
+          "A bit is 1 when it is 1 in either: 12 OR 10 is 14."
+        ]
+      },
+      "examples": ["400-0000161@[flags, 4] -> with_flag"],
+      "conformance": [
+        { "id": "bit_or.basic", "args": [12, 10], "expect": 14 },
+        { "id": "bit_or.negative", "args": [-8, 3], "expect": -5 },
+        { "id": "bit_or.zero", "args": [0, 0], "expect": 0 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000162",
+      "name": "BIT_XOR",
+      "summary": "Bitwise exclusive OR of two ints",
+      "keywords": ["xor", "exclusive or", "bitwise", "bits", "toggle", "flip", "binary"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }, { "name": "b", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Works on the int's 64-bit TWO'S COMPLEMENT pattern, the same on every backend. The result is that pattern read back as a signed int, so it never overflows.",
+          "A bit is 1 when it is 1 in exactly one: 12 XOR 10 is 6. x XOR x is 0."
+        ]
+      },
+      "examples": ["400-0000162@[flags, 4] -> toggled"],
+      "conformance": [
+        { "id": "bit_xor.basic", "args": [12, 10], "expect": 6 },
+        { "id": "bit_xor.self", "args": [99, 99], "expect": 0 },
+        { "id": "bit_xor.all_ones", "args": [-1, 5], "expect": -6 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000163",
+      "name": "BIT_NOT",
+      "summary": "Flip every bit of an int",
+      "keywords": ["not", "complement", "invert", "bitwise", "bits", "binary"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "a", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Works on the int's 64-bit TWO'S COMPLEMENT pattern, the same on every backend. The result is that pattern read back as a signed int, so it never overflows.",
+          "Every one of the 64 bits flips, so the result is always -a - 1: NOT 0 is -1, NOT 5 is -6, and NOT of the smallest int is the largest."
+        ]
+      },
+      "examples": ["400-0000163@[mask] -> inverse"],
+      "conformance": [
+        { "id": "bit_not.zero", "args": [0], "expect": -1 },
+        { "id": "bit_not.five", "args": [5], "expect": -6 },
+        { "id": "bit_not.min", "args": [-9223372036854775808], "expect": 9223372036854775807 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000164",
+      "name": "SHIFT_LEFT",
+      "summary": "Move the bits of an int toward the top",
+      "keywords": ["shift", "shift left", "bits", "bitwise", "binary", "power of two"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "int" }, { "name": "count", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["invalid_shift"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Works on the int's 64-bit TWO'S COMPLEMENT pattern, the same on every backend. The result is that pattern read back as a signed int, so it never overflows. Zeros come in at the bottom.",
+          "BITS PUSHED PAST BIT 63 ARE DROPPED, never an overflow error: 1 shifted by 63 is the smallest int, and 3 shifted by 63 is too. Python's << would never drop a bit. To multiply with an overflow check, use MUL (400-0000003) or POW (400-0000012).",
+          "A COUNT OF 64 OR MORE shifts every bit out and gives 0. Rust's own << would panic or wrap the count instead. A NEGATIVE COUNT IS AN invalid_shift ERROR."
+        ]
+      },
+      "examples": ["400-0000164@[1, bit] -> mask"],
+      "conformance": [
+        { "id": "shift_left.basic", "args": [1, 4], "expect": 16 },
+        { "id": "shift_left.negative", "args": [-3, 2], "expect": -12 },
+        { "id": "shift_left.into_sign", "args": [1, 63], "expect": -9223372036854775808 },
+        { "id": "shift_left.dropped", "args": [3, 63], "expect": -9223372036854775808 },
+        { "id": "shift_left.all_out", "args": [5, 64], "expect": 0 },
+        { "id": "shift_left.far", "args": [5, 1000], "expect": 0 },
+        { "id": "shift_left.zero", "args": [7, 0], "expect": 7 },
+        { "id": "shift_left.bad_count", "args": [1, -1], "expect": null, "raises": "invalid_shift" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000165",
+      "name": "SHIFT_RIGHT",
+      "summary": "Move the bits of an int toward the bottom, keeping the sign",
+      "keywords": ["shift", "shift right", "arithmetic shift", "bits", "bitwise", "binary", "halve"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "int" }, { "name": "count", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["invalid_shift"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "An ARITHMETIC shift: copies of the sign bit come in at the top, so the result is value / 2^count ROUNDED DOWN, toward negative infinity. -7 shifted by 1 is -4, where DIV (400-0000004) by 2 would give -3.",
+          "A COUNT OF 64 OR MORE gives 0 for a value of zero or more, and -1 for a negative value. A NEGATIVE COUNT IS AN invalid_shift ERROR."
+        ]
+      },
+      "examples": ["400-0000165@[value, 4] -> high"],
+      "conformance": [
+        { "id": "shift_right.basic", "args": [16, 4], "expect": 1 },
+        { "id": "shift_right.rounds_down", "args": [-7, 1], "expect": -4 },
+        { "id": "shift_right.minus_one", "args": [-1, 10], "expect": -1 },
+        { "id": "shift_right.all_out", "args": [12345, 64], "expect": 0 },
+        { "id": "shift_right.all_out_negative", "args": [-12345, 99], "expect": -1 },
+        { "id": "shift_right.bad_count", "args": [1, -5], "expect": null, "raises": "invalid_shift" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000166",
+      "name": "SHIFT_RIGHT_UNSIGNED",
+      "summary": "Move the bits of an int toward the bottom, with zeros at the top",
+      "keywords": ["shift", "shift right", "logical shift", "unsigned", "bits", "bitwise", "binary", ">>>"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "int" }, { "name": "count", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["invalid_shift"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Works on the int's 64-bit TWO'S COMPLEMENT pattern, the same on every backend. The result is that pattern read back as a signed int, so it never overflows. Zeros come in at the top, as Java's >>> does, so a negative value turns positive for any count from 1 to 63: -1 shifted by 60 is 15.",
+          "A COUNT OF 64 OR MORE gives 0. A count of 0 gives the value back. A NEGATIVE COUNT IS AN invalid_shift ERROR."
+        ]
+      },
+      "examples": ["400-0000166@[hash, 32] -> top_half"],
+      "conformance": [
+        { "id": "shift_right_unsigned.positive", "args": [16, 4], "expect": 1 },
+        { "id": "shift_right_unsigned.negative", "args": [-1, 60], "expect": 15 },
+        { "id": "shift_right_unsigned.sign_bit", "args": [-9223372036854775808, 63], "expect": 1 },
+        { "id": "shift_right_unsigned.zero", "args": [-5, 0], "expect": -5 },
+        { "id": "shift_right_unsigned.all_out", "args": [-1, 64], "expect": 0 },
+        { "id": "shift_right_unsigned.bad_count", "args": [1, -1], "expect": null, "raises": "invalid_shift" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000167",
+      "name": "COUNT_BITS",
+      "summary": "Count the 1 bits of an int",
+      "keywords": ["count bits", "popcount", "population count", "ones", "bits", "hamming weight", "binary"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "int" }],
+        "output": { "name": "count", "type": "int" },
+        "effects": [],
+        "errors": [],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Counts the ones in the 64-bit TWO'S COMPLEMENT pattern, so the answer is 0 to 64: -1 has 64 and the smallest int has 1. Python's bin(-1).count('1') would say 1."
+        ]
+      },
+      "examples": ["400-0000167@[flags] -> set"],
+      "conformance": [
+        { "id": "count_bits.zero", "args": [0], "expect": 0 },
+        { "id": "count_bits.basic", "args": [255], "expect": 8 },
+        { "id": "count_bits.minus_one", "args": [-1], "expect": 64 },
+        { "id": "count_bits.min", "args": [-9223372036854775808], "expect": 1 },
+        { "id": "count_bits.negative", "args": [-8], "expect": 61 }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000168",
+      "name": "TO_BASE",
+      "summary": "Write an int in base 2 to 36",
+      "keywords": ["base", "binary", "hex", "hexadecimal", "octal", "radix", "to text", "print", "bits"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "int" }, { "name": "base", "type": "int" }],
+        "output": { "name": "text", "type": "text" },
+        "effects": [],
+        "errors": ["invalid_base"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "A '-' THEN THE MAGNITUDE for a negative value, never the bit pattern: -255 in base 16 is '-ff'. TO_BASE_UNSIGNED (400-0000170) writes the pattern. Rust's {:x} would write the pattern here.",
+          "Digits are 0-9 then a-z for 10 to 35: base 16 uses 0-9 and a-f, base 2 uses 0 and 1. Always lowercase. NO PREFIX: 255 in base 16 is 'ff', not '0xff' as Python's hex() writes. No leading zeros; zero is '0'.",
+          "The smallest int works: its magnitude has no positive int twin, but it is written all the same. The base is 2 to 36; any other base is an invalid_base ERROR."
+        ]
+      },
+      "examples": ["400-0000168@[flags, 2] -> bits"],
+      "conformance": [
+        { "id": "to_base.hex", "args": [255, 16], "expect": "ff" },
+        { "id": "to_base.binary", "args": [10, 2], "expect": "1010" },
+        { "id": "to_base.negative", "args": [-255, 16], "expect": "-ff" },
+        { "id": "to_base.zero", "args": [0, 2], "expect": "0" },
+        { "id": "to_base.base36", "args": [35, 36], "expect": "z" },
+        { "id": "to_base.min", "args": [-9223372036854775808, 16], "expect": "-8000000000000000" },
+        { "id": "to_base.decimal", "args": [-42, 10], "expect": "-42" },
+        { "id": "to_base.bad_base", "args": [5, 1], "expect": null, "raises": "invalid_base" },
+        { "id": "to_base.big_base", "args": [5, 37], "expect": null, "raises": "invalid_base" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000169",
+      "name": "PARSE_BASE",
+      "summary": "Read an int written in base 2 to 36, with a fallback",
+      "keywords": ["parse", "read", "base", "binary", "hex", "hexadecimal", "radix", "text to number"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }, { "name": "base", "type": "int" }, { "name": "fallback", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["invalid_base"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "An optional leading '-' or '+', then digits in the base. Digits are 0-9 then a-z for 10 to 35: base 16 uses 0-9 and a-f, base 2 uses 0 and 1.",
+          "Never fails on the text: text that is not a number in the base returns the fallback. Surrounding whitespace is trimmed first. Letters may be either case. NO PREFIX ('0x', '0b'), no underscores, no spaces inside, and no digits from other scripts; Python's int(text, 16) would take '0x1f' and '1_f'.",
+          "A number outside the 64-bit signed range returns the fallback: '7fffffffffffffff' in base 16 is the largest int and '8000000000000000' is the fallback, but '-8000000000000000' is the smallest int. PARSE_BASE_UNSIGNED (400-0000171) reads a bit pattern instead.",
+          "The base is checked before the text: The base is 2 to 36; any other base is an invalid_base ERROR."
+        ]
+      },
+      "examples": ["400-0000169@[cell, 16, 0] -> colour"],
+      "conformance": [
+        { "id": "parse_base.hex", "args": ["ff", 16, 0], "expect": 255 },
+        { "id": "parse_base.upper", "args": ["FF", 16, 0], "expect": 255 },
+        { "id": "parse_base.binary", "args": [" 1010 ", 2, 0], "expect": 10 },
+        { "id": "parse_base.negative", "args": ["-ff", 16, 0], "expect": -255 },
+        { "id": "parse_base.plus", "args": ["+z", 36, 0], "expect": 35 },
+        { "id": "parse_base.max", "args": ["7fffffffffffffff", 16, 0], "expect": 9223372036854775807 },
+        { "id": "parse_base.past_max", "args": ["8000000000000000", 16, -1], "expect": -1 },
+        { "id": "parse_base.min", "args": ["-8000000000000000", 16, 0], "expect": -9223372036854775808 },
+        { "id": "parse_base.prefix", "args": ["0xff", 16, -1], "expect": -1 },
+        { "id": "parse_base.underscore", "args": ["1_0", 2, -1], "expect": -1 },
+        { "id": "parse_base.bad_digit", "args": ["102", 2, -1], "expect": -1 },
+        { "id": "parse_base.empty", "args": ["", 10, -1], "expect": -1 },
+        { "id": "parse_base.bad_base", "args": ["1", 0, 0], "expect": null, "raises": "invalid_base" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000170",
+      "name": "TO_BASE_UNSIGNED",
+      "summary": "Write the 64-bit pattern of an int in base 2 to 36",
+      "keywords": ["base", "binary", "hex", "hexadecimal", "unsigned", "bit pattern", "two's complement", "print", "bits"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "int" }, { "name": "base", "type": "int" }],
+        "output": { "name": "text", "type": "text" },
+        "effects": [],
+        "errors": ["invalid_base"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Writes the int's 64-bit TWO'S COMPLEMENT pattern read as a number from 0 to 2^64 - 1: -1 in base 16 is 'ffffffffffffffff'. A value of zero or more is written the same as TO_BASE (400-0000168).",
+          "Digits are 0-9 then a-z for 10 to 35: base 16 uses 0-9 and a-f, base 2 uses 0 and 1. Always lowercase, NO PREFIX, and NO PADDING: 5 in base 2 is '101', not 64 digits. The base is 2 to 36; any other base is an invalid_base ERROR."
+        ]
+      },
+      "examples": ["400-0000170@[hash, 16] -> hex"],
+      "conformance": [
+        { "id": "to_base_unsigned.minus_one", "args": [-1, 16], "expect": "ffffffffffffffff" },
+        { "id": "to_base_unsigned.positive", "args": [255, 16], "expect": "ff" },
+        { "id": "to_base_unsigned.min", "args": [-9223372036854775808, 2], "expect": "1000000000000000000000000000000000000000000000000000000000000000" },
+        { "id": "to_base_unsigned.minus_two", "args": [-2, 8], "expect": "1777777777777777777776" },
+        { "id": "to_base_unsigned.bad_base", "args": [1, 40], "expect": null, "raises": "invalid_base" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000171",
+      "name": "PARSE_BASE_UNSIGNED",
+      "summary": "Read a 64-bit pattern written in base 2 to 36, with a fallback",
+      "keywords": ["parse", "read", "base", "binary", "hex", "hexadecimal", "unsigned", "bit pattern", "mask"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }, { "name": "base", "type": "int" }, { "name": "fallback", "type": "int" }],
+        "output": { "name": "result", "type": "int" },
+        "effects": [],
+        "errors": ["invalid_base"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "Digits in the base, NO SIGN, for a number from 0 to 2^64 - 1, which becomes the int with that 64-bit TWO'S COMPLEMENT pattern: 'ffffffffffffffff' in base 16 is -1. It reads back exactly what TO_BASE_UNSIGNED (400-0000170) writes. Digits are 0-9 then a-z for 10 to 35: base 16 uses 0-9 and a-f, base 2 uses 0 and 1.",
+          "Never fails on the text: text that is not a number in the base returns the fallback. Surrounding whitespace is trimmed first. Letters may be either case. NO PREFIX ('0x', '0b'), no underscores, no spaces inside, and no digits from other scripts; Python's int(text, 16) would take '0x1f' and '1_f'. A '-' or '+' returns the fallback, and so does a number of 2^64 or more.",
+          "The base is checked before the text: The base is 2 to 36; any other base is an invalid_base ERROR."
+        ]
+      },
+      "examples": ["400-0000171@[cell, 16, 0] -> mask"],
+      "conformance": [
+        { "id": "parse_base_unsigned.all_ones", "args": ["ffffffffffffffff", 16, 0], "expect": -1 },
+        { "id": "parse_base_unsigned.small", "args": ["ff", 16, 0], "expect": 255 },
+        { "id": "parse_base_unsigned.sign_bit", "args": ["8000000000000000", 16, 0], "expect": -9223372036854775808 },
+        { "id": "parse_base_unsigned.too_big", "args": ["10000000000000000", 16, 7], "expect": 7 },
+        { "id": "parse_base_unsigned.signed", "args": ["-1", 16, 7], "expect": 7 },
+        { "id": "parse_base_unsigned.plus", "args": ["+1", 16, 7], "expect": 7 },
+        { "id": "parse_base_unsigned.bad_base", "args": ["1", 1, 0], "expect": null, "raises": "invalid_base" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000172",
+      "name": "BIG_TO_BASE",
+      "summary": "Write a bigint in base 2 to 36",
+      "keywords": ["base", "binary", "hex", "hexadecimal", "radix", "bigint", "big", "to text", "print"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "bigint" }, { "name": "base", "type": "int" }],
+        "output": { "name": "text", "type": "text" },
+        "effects": [],
+        "errors": ["invalid_base"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The same as TO_BASE (400-0000168) for a bigint: a '-' THEN THE MAGNITUDE for a negative value, lowercase, no prefix, no leading zeros, and zero is '0'. Digits are 0-9 then a-z for 10 to 35: base 16 uses 0-9 and a-f, base 2 uses 0 and 1.",
+          "Never too long to write: the widest bigint, 4000 nines, is 13288 digits in base 2. The base is 2 to 36; any other base is an invalid_base ERROR."
+        ]
+      },
+      "examples": ["400-0000172@[key, 16] -> hex"],
+      "conformance": [
+        { "id": "big_to_base.hex", "args": [18446744073709551616, 16], "expect": "10000000000000000" },
+        { "id": "big_to_base.negative", "args": [-255, 16], "expect": "-ff" },
+        { "id": "big_to_base.zero", "args": [0, 2], "expect": "0" },
+        { "id": "big_to_base.bad_base", "args": [1, 1], "expect": null, "raises": "invalid_base" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
+      "address": "400-0000173",
+      "name": "PARSE_BIG_BASE",
+      "summary": "Read a bigint written in base 2 to 36, with a fallback",
+      "keywords": ["parse", "read", "base", "binary", "hex", "hexadecimal", "radix", "bigint", "big"],
+      "contract": {
+        "version": 1,
+        "inputs": [{ "name": "value", "type": "text" }, { "name": "base", "type": "int" }, { "name": "fallback", "type": "bigint" }],
+        "output": { "name": "result", "type": "bigint" },
+        "effects": [],
+        "errors": ["invalid_base"],
+        "purity": "pure",
+        "determinism": "deterministic",
+        "notes": [
+          "The same grammar as PARSE_BASE (400-0000169): an optional leading '-' or '+', then digits in the base. Digits are 0-9 then a-z for 10 to 35: base 16 uses 0-9 and a-f, base 2 uses 0 and 1.",
+          "Never fails on the text: text that is not a number in the base returns the fallback. Surrounding whitespace is trimmed first. Letters may be either case. NO PREFIX ('0x', '0b'), no underscores, no spaces inside, and no digits from other scripts; Python's int(text, 16) would take '0x1f' and '1_f'.",
+          "A number with more than 4000 decimal digits returns the fallback, however it was written. Leading zeros do not count.",
+          "The base is checked before the text: The base is 2 to 36; any other base is an invalid_base ERROR."
+        ]
+      },
+      "examples": ["400-0000173@[cell, 16, 0n] -> key"],
+      "conformance": [
+        { "id": "parse_big_base.past_int64", "args": ["10000000000000000", 16, 0], "expect": 18446744073709551616 },
+        { "id": "parse_big_base.negative", "args": ["-FF", 16, 0], "expect": -255 },
+        { "id": "parse_big_base.leading_zeros", "args": ["0000000000000000000000000001", 2, 0], "expect": 1 },
+        { "id": "parse_big_base.prefix", "args": ["0b1", 2, -1], "expect": -1 },
+        { "id": "parse_big_base.bad_base", "args": ["1", 37, 0], "expect": null, "raises": "invalid_base" }
+      ],
+      "status": "active",
+      "since": "0.2.0"
+    },
+    {
       "address": "400-0000200",
       "name": "RANDOM_NEXT",
       "summary": "Draw a repeatable random whole number from a seed, and the state to draw the next one from",

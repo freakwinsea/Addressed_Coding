@@ -66,7 +66,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `100` | Core | 6 addresses |
 | `200` | Text | 12 |
 | `300` | Collections | 16 |
-| `400` | Numbers | 87 |
+| `400` | Numbers | 109 |
 | `500` | I/O — the only block that touches the filesystem | 4 |
 | `600` | Logic and comparison | 7 |
 | `700` | Reserved for future shared blocks | empty |
@@ -74,7 +74,7 @@ sanctioned way to add to the ledger is `dial registry freeze`.
 | `900` | Rust-native escape hatch | reserved, empty |
 | `999` | Quarantine — unregistered or withdrawn. The checker rejects it. | reserved |
 
-140 global addresses in v0. That is the entire budget; adding one is meant to
+154 global addresses in v0. That is the entire budget; adding one is meant to
 feel expensive (see `CONTRIBUTING.md`).
 
 `000` is the inverse of "dial 9 for an outside line": it is the local
@@ -261,6 +261,26 @@ Ranges are unbiased by rejection, floats take the top 53 bits of one draw, and
 `SHUFFLE` is Fisher-Yates from the back; the notes pin each exactly. None of
 this is fit for secrets.
 
+### 3.7 Bits and bases
+
+An `int` is a 64-bit two's complement pattern on both backends. Python's own
+ints have no width and Rust's shifts panic past 63, so the contracts pin what
+happens at the edges:
+
+| Question | Contract |
+|---|---|
+| AND, OR, XOR, NOT | `BIT_AND`, `BIT_OR`, `BIT_XOR` and `BIT_NOT` work on the 64-bit pattern and never overflow. `BIT_NOT` of `x` is always `-x - 1`. |
+| Shifting left | `SHIFT_LEFT` drops bits pushed past bit 63, so `1` shifted by 63 is the smallest int. Python's `<<` would never drop a bit. |
+| Shifting right | `SHIFT_RIGHT` copies the sign bit in, so it rounds down: `-7` by 1 is `-4`. `SHIFT_RIGHT_UNSIGNED` brings zeros in, as Java's `>>>` does. |
+| Shift counts | A count of 64 or more shifts every bit out: 0, or -1 for `SHIFT_RIGHT` of a negative. A negative count is an `invalid_shift` error. Rust's `<<` would panic or wrap the count. |
+| Counting bits | `COUNT_BITS` counts the ones of the pattern, so `-1` has 64. Python's `bin(-1).count("1")` would say 1. |
+| Writing | `TO_BASE` and `BIG_TO_BASE` take a base from 2 to 36 and write a `-` then the magnitude, lowercase, with no prefix: `-255` in base 16 is `-ff`. `TO_BASE_UNSIGNED` writes the pattern instead: `-1` in base 16 is sixteen `f`s. Any other base is an `invalid_base` error. |
+| Reading | `PARSE_BASE`, `PARSE_BASE_UNSIGNED` and `PARSE_BIG_BASE` take either case, trim whitespace, and return the fallback for anything else: no `0x`, no underscores, no digits from other scripts. Python's `int(text, 16)` would take `0x1f` and `1_f`. `PARSE_BASE_UNSIGNED` takes no sign and reads `0` to `2^64 - 1` as a pattern. |
+
+An `int` literal may be written in hex or binary: `0xff`, `-0b1010`. It is a
+signed value like any other int literal, so `0xffffffffffffffff` is a parse
+error; write `-1`, or read the pattern with `PARSE_BASE_UNSIGNED`.
+
 Backend representations:
 
 | Phonebook | Python | Rust |
@@ -364,6 +384,8 @@ conformance test:
 | Float to int (Rust saturates) | `TO_INT` **truncates**, and out of range is an `overflow` error |
 | Fractions (Python's grow without limit, Rust has none) | always lowest terms, 64-bit parts, `overflow` past that (§3.4) |
 | Random numbers (Mersenne Twister vs. whatever a crate picks) | hand-written SplitMix64 in both, state passed in and out (§3.6) |
+| Shifts (Python never drops a bit, Rust panics past 63) | `SHIFT_LEFT` drops bits past bit 63; a count of 64 or more shifts every bit out (§3.7) |
+| Negative numbers in hex (`-0xff` vs. the bit pattern) | `TO_BASE` writes a `-` and the magnitude; `TO_BASE_UNSIGNED` writes the pattern (§3.7) |
 
 ## 6. Registry entries
 
@@ -446,7 +468,7 @@ compiler0 (Python, this repo)
 ```
 
 That requires a semantic kernel covering parsing, syntax trees, and error
-handling — well beyond the 140 addresses of v0. v0 deliberately does not chase
+handling — well beyond the 154 addresses of v0. v0 deliberately does not chase
 it.
 
 ## 9. Out of scope in v0

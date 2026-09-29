@@ -32,7 +32,7 @@ ADDRESS@[arg, arg, ...]              # when the address returns nothing
 
 - `# ` starts a comment, to end of line.
 - The `phonebook 0.1` header goes first. It is optional but conventional.
-- Literals: `"text"`, `42`, `-7`, `1.5`, `-2e3`, `true`, `false`. Escapes: `\n \t \r \\ \"`.
+- Literals: `"text"`, `42`, `-7`, `0xff`, `0b1010`, `1.5`, `-2e3`, `true`, `false`. Escapes: `\n \t \r \\ \"`.
 - Arguments may be named: `@[sequence=lines, predicate=000-0000001]`. The names
   must match the contract, in order.
 
@@ -157,6 +157,14 @@ list<T>   map<K,V>   pair<K,V>   callable(T,...)->R   any
   type, so use `ADD_FRACTION` rather than `ADD`, and leave it with
   `FRACTION_TO_FLOAT`, `FLOOR_FRACTION` or `ROUND_FRACTION`. It prints as
   `1/3`, or `2` when whole. Parts past 64 bits are an `overflow` error.
+- **Bits and bases.** An `int` can be written in hex or binary: `0xff`,
+  `-0b1010`; it is still a signed value, so `0xffffffffffffffff` is an error
+  (write `-1`). `BIT_AND`, `BIT_OR`, `BIT_XOR`, `BIT_NOT`, the shifts and
+  `COUNT_BITS` work on the 64-bit pattern. `TO_BASE` / `PARSE_BASE` write and
+  read any base from 2 to 36 with a `-` for negatives (`-ff`);
+  `TO_BASE_UNSIGNED` / `PARSE_BASE_UNSIGNED` use the bit pattern instead
+  (`ffffffffffffffff` is `-1`). `BIG_TO_BASE` / `PARSE_BIG_BASE` do the same
+  for a bigint. No `0x` prefix is written or read.
 
 ## 5. Patterns you will need
 
@@ -1294,6 +1302,174 @@ b
                denominator can grow to the product of the two, so one that no
                longer fits in 64 bits is an overflow error.
              errors: division_by_zero, overflow
+
+400-0000160  BIT_AND(a: int, b: int) -> int
+             Bitwise AND of two ints
+             ! Works on the int's 64-bit TWO'S COMPLEMENT pattern, the same
+               on every backend. The result is that pattern read back as a
+               signed int, so it never overflows.
+             ! A bit is 1 when it is 1 in both: 12 AND 10 is 8. -1 has every
+               bit set, so -1 AND x is x.
+
+400-0000161  BIT_OR(a: int, b: int) -> int
+             Bitwise OR of two ints
+             ! Works on the int's 64-bit TWO'S COMPLEMENT pattern, the same
+               on every backend. The result is that pattern read back as a
+               signed int, so it never overflows.
+             ! A bit is 1 when it is 1 in either: 12 OR 10 is 14.
+
+400-0000162  BIT_XOR(a: int, b: int) -> int
+             Bitwise exclusive OR of two ints
+             ! Works on the int's 64-bit TWO'S COMPLEMENT pattern, the same
+               on every backend. The result is that pattern read back as a
+               signed int, so it never overflows.
+             ! A bit is 1 when it is 1 in exactly one: 12 XOR 10 is 6. x XOR
+               x is 0.
+
+400-0000163  BIT_NOT(a: int) -> int
+             Flip every bit of an int
+             ! Works on the int's 64-bit TWO'S COMPLEMENT pattern, the same
+               on every backend. The result is that pattern read back as a
+               signed int, so it never overflows.
+             ! Every one of the 64 bits flips, so the result is always -a -
+               1: NOT 0 is -1, NOT 5 is -6, and NOT of the smallest int is
+               the largest.
+
+400-0000164  SHIFT_LEFT(value: int, count: int) -> int
+             Move the bits of an int toward the top
+             ! Works on the int's 64-bit TWO'S COMPLEMENT pattern, the same
+               on every backend. The result is that pattern read back as a
+               signed int, so it never overflows. Zeros come in at the
+               bottom.
+             ! BITS PUSHED PAST BIT 63 ARE DROPPED, never an overflow error:
+               1 shifted by 63 is the smallest int, and 3 shifted by 63 is
+               too. Python's << would never drop a bit. To multiply with an
+               overflow check, use MUL (400-0000003) or POW (400-0000012).
+             ! A COUNT OF 64 OR MORE shifts every bit out and gives 0. Rust's
+               own << would panic or wrap the count instead. A NEGATIVE COUNT
+               IS AN invalid_shift ERROR.
+             errors: invalid_shift
+
+400-0000165  SHIFT_RIGHT(value: int, count: int) -> int
+             Move the bits of an int toward the bottom, keeping the sign
+             ! An ARITHMETIC shift: copies of the sign bit come in at the
+               top, so the result is value / 2^count ROUNDED DOWN, toward
+               negative infinity. -7 shifted by 1 is -4, where DIV
+               (400-0000004) by 2 would give -3.
+             ! A COUNT OF 64 OR MORE gives 0 for a value of zero or more, and
+               -1 for a negative value. A NEGATIVE COUNT IS AN invalid_shift
+               ERROR.
+             errors: invalid_shift
+
+400-0000166  SHIFT_RIGHT_UNSIGNED(value: int, count: int) -> int
+             Move the bits of an int toward the bottom, with zeros at the top
+             ! Works on the int's 64-bit TWO'S COMPLEMENT pattern, the same
+               on every backend. The result is that pattern read back as a
+               signed int, so it never overflows. Zeros come in at the top,
+               as Java's >>> does, so a negative value turns positive for any
+               count from 1 to 63: -1 shifted by 60 is 15.
+             ! A COUNT OF 64 OR MORE gives 0. A count of 0 gives the value
+               back. A NEGATIVE COUNT IS AN invalid_shift ERROR.
+             errors: invalid_shift
+
+400-0000167  COUNT_BITS(value: int) -> int
+             Count the 1 bits of an int
+             ! Counts the ones in the 64-bit TWO'S COMPLEMENT pattern, so the
+               answer is 0 to 64: -1 has 64 and the smallest int has 1.
+               Python's bin(-1).count('1') would say 1.
+
+400-0000168  TO_BASE(value: int, base: int) -> text
+             Write an int in base 2 to 36
+             ! A '-' THEN THE MAGNITUDE for a negative value, never the bit
+               pattern: -255 in base 16 is '-ff'. TO_BASE_UNSIGNED
+               (400-0000170) writes the pattern. Rust's {:x} would write the
+               pattern here.
+             ! Digits are 0-9 then a-z for 10 to 35: base 16 uses 0-9 and
+               a-f, base 2 uses 0 and 1. Always lowercase. NO PREFIX: 255 in
+               base 16 is 'ff', not '0xff' as Python's hex() writes. No
+               leading zeros; zero is '0'.
+             ! The smallest int works: its magnitude has no positive int
+               twin, but it is written all the same. The base is 2 to 36; any
+               other base is an invalid_base ERROR.
+             errors: invalid_base
+
+400-0000169  PARSE_BASE(value: text, base: int, fallback: int) -> int
+             Read an int written in base 2 to 36, with a fallback
+             ! An optional leading '-' or '+', then digits in the base.
+               Digits are 0-9 then a-z for 10 to 35: base 16 uses 0-9 and
+               a-f, base 2 uses 0 and 1.
+             ! Never fails on the text: text that is not a number in the base
+               returns the fallback. Surrounding whitespace is trimmed first.
+               Letters may be either case. NO PREFIX ('0x', '0b'), no
+               underscores, no spaces inside, and no digits from other
+               scripts; Python's int(text, 16) would take '0x1f' and '1_f'.
+             ! A number outside the 64-bit signed range returns the fallback:
+               '7fffffffffffffff' in base 16 is the largest int and
+               '8000000000000000' is the fallback, but '-8000000000000000' is
+               the smallest int. PARSE_BASE_UNSIGNED (400-0000171) reads a
+               bit pattern instead.
+             ! The base is checked before the text: The base is 2 to 36; any
+               other base is an invalid_base ERROR.
+             errors: invalid_base
+
+400-0000170  TO_BASE_UNSIGNED(value: int, base: int) -> text
+             Write the 64-bit pattern of an int in base 2 to 36
+             ! Writes the int's 64-bit TWO'S COMPLEMENT pattern read as a
+               number from 0 to 2^64 - 1: -1 in base 16 is
+               'ffffffffffffffff'. A value of zero or more is written the
+               same as TO_BASE (400-0000168).
+             ! Digits are 0-9 then a-z for 10 to 35: base 16 uses 0-9 and
+               a-f, base 2 uses 0 and 1. Always lowercase, NO PREFIX, and NO
+               PADDING: 5 in base 2 is '101', not 64 digits. The base is 2 to
+               36; any other base is an invalid_base ERROR.
+             errors: invalid_base
+
+400-0000171  PARSE_BASE_UNSIGNED(value: text, base: int, fallback: int) -> int
+             Read a 64-bit pattern written in base 2 to 36, with a fallback
+             ! Digits in the base, NO SIGN, for a number from 0 to 2^64 - 1,
+               which becomes the int with that 64-bit TWO'S COMPLEMENT
+               pattern: 'ffffffffffffffff' in base 16 is -1. It reads back
+               exactly what TO_BASE_UNSIGNED (400-0000170) writes. Digits are
+               0-9 then a-z for 10 to 35: base 16 uses 0-9 and a-f, base 2
+               uses 0 and 1.
+             ! Never fails on the text: text that is not a number in the base
+               returns the fallback. Surrounding whitespace is trimmed first.
+               Letters may be either case. NO PREFIX ('0x', '0b'), no
+               underscores, no spaces inside, and no digits from other
+               scripts; Python's int(text, 16) would take '0x1f' and '1_f'. A
+               '-' or '+' returns the fallback, and so does a number of 2^64
+               or more.
+             ! The base is checked before the text: The base is 2 to 36; any
+               other base is an invalid_base ERROR.
+             errors: invalid_base
+
+400-0000172  BIG_TO_BASE(value: bigint, base: int) -> text
+             Write a bigint in base 2 to 36
+             ! The same as TO_BASE (400-0000168) for a bigint: a '-' THEN THE
+               MAGNITUDE for a negative value, lowercase, no prefix, no
+               leading zeros, and zero is '0'. Digits are 0-9 then a-z for 10
+               to 35: base 16 uses 0-9 and a-f, base 2 uses 0 and 1.
+             ! Never too long to write: the widest bigint, 4000 nines, is
+               13288 digits in base 2. The base is 2 to 36; any other base is
+               an invalid_base ERROR.
+             errors: invalid_base
+
+400-0000173  PARSE_BIG_BASE(value: text, base: int, fallback: bigint) -> bigint
+             Read a bigint written in base 2 to 36, with a fallback
+             ! The same grammar as PARSE_BASE (400-0000169): an optional
+               leading '-' or '+', then digits in the base. Digits are 0-9
+               then a-z for 10 to 35: base 16 uses 0-9 and a-f, base 2 uses 0
+               and 1.
+             ! Never fails on the text: text that is not a number in the base
+               returns the fallback. Surrounding whitespace is trimmed first.
+               Letters may be either case. NO PREFIX ('0x', '0b'), no
+               underscores, no spaces inside, and no digits from other
+               scripts; Python's int(text, 16) would take '0x1f' and '1_f'.
+             ! A number with more than 4000 decimal digits returns the
+               fallback, however it was written. Leading zeros do not count.
+             ! The base is checked before the text: The base is 2 to 36; any
+               other base is an invalid_base ERROR.
+             errors: invalid_base
 
 400-0000200  RANDOM_NEXT(state: int) -> pair<int,int>
              Draw a repeatable random whole number from a seed, and the state to draw the next one from

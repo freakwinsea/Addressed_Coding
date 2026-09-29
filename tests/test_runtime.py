@@ -756,3 +756,107 @@ class TestRepeatableRandom:
 
         source = inspect.getsource(numbers_)
         assert "import random" not in source and "from random" not in source
+class TestBitsAndBases:
+    """The bit operations and base conversions against oracles used only here:
+    Python's own unbounded ints, masked to 64 bits by hand, and `int(text,
+    base)` on text the contract accepts. The conformance suite then holds Rust
+    to whatever Python prints."""
+
+    MASK = 2**64 - 1
+
+    def operands(self, count: int):
+        import random
+
+        rng = random.Random(160)
+        edges = [0, 1, -1, 2**63 - 1, -(2**63), 255, -256]
+        values = list(edges)
+        for _ in range(count):
+            bits = rng.getrandbits(64)
+            values.append(bits - 2**64 if bits >= 2**63 else bits)
+        return values
+
+    def signed(self, bits: int) -> int:
+        bits &= self.MASK
+        return bits - 2**64 if bits >= 2**63 else bits
+
+    def test_logic_matches_python_on_the_pattern(self):
+        from phonebook_rt import numbers_
+
+        values = self.operands(300)
+        for a, b in zip(values, reversed(values)):
+            assert numbers_.bit_and(a, b) == a & b
+            assert numbers_.bit_or(a, b) == a | b
+            assert numbers_.bit_xor(a, b) == a ^ b
+            assert numbers_.bit_not(a) == -a - 1
+            assert numbers_.count_bits(a) == bin(a & self.MASK).count("1")
+
+    def test_shifts_at_every_count(self):
+        from phonebook_rt import numbers_
+
+        for value in self.operands(40):
+            for count in list(range(0, 70)) + [1000, 2**63 - 1]:
+                expect_left = self.signed(value << count) if count < 64 else 0
+                assert numbers_.shift_left(value, count) == expect_left
+                assert numbers_.shift_right(value, count) == value >> count
+                expect_unsigned = (value & self.MASK) >> count
+                assert numbers_.shift_right_unsigned(value, count) == self.signed(expect_unsigned)
+
+    def test_negative_shift_counts_are_errors(self):
+        from phonebook_rt import numbers_
+        from phonebook_rt.faults import PhonebookFault
+
+        for shift in (numbers_.shift_left, numbers_.shift_right, numbers_.shift_right_unsigned):
+            with pytest.raises(PhonebookFault, match="invalid_shift"):
+                shift(1, -1)
+
+    def test_every_base_round_trips(self):
+        from phonebook_rt import numbers_
+
+        for value in self.operands(60):
+            for base in range(2, 37):
+                text = numbers_.to_base(value, base)
+                assert int(text, base) == value
+                assert text == text.lower()
+                assert text == "0" or not text.lstrip("-").startswith("0")
+                assert numbers_.parse_base(text.upper(), base, 7) == value
+                pattern = numbers_.to_base_unsigned(value, base)
+                assert int(pattern, base) == value & self.MASK
+                assert numbers_.parse_base_unsigned(pattern, base, 7) == value
+                assert numbers_.big_to_base(value, base) == text
+                assert numbers_.parse_big_base(text, base, 7) == value
+
+    def test_parse_base_edges(self):
+        from phonebook_rt import numbers_
+
+        assert numbers_.parse_base("7fffffffffffffff", 16, 0) == 2**63 - 1
+        assert numbers_.parse_base("8000000000000000", 16, -1) == -1
+        assert numbers_.parse_base("-8000000000000000", 16, 0) == -(2**63)
+        assert numbers_.parse_base("-8000000000000001", 16, -1) == -1
+        for junk in ("", "-", "+", "0x1f", "1_f", "1 f", "+-1", "１２", "g"):
+            assert numbers_.parse_base(junk, 16, -7) == -7, junk
+            assert numbers_.parse_big_base(junk, 16, -7) == -7, junk
+        assert numbers_.parse_base_unsigned("-1", 16, 7) == 7
+        assert numbers_.parse_base_unsigned("1" * 64, 2, 7) == -1
+        assert numbers_.parse_base_unsigned("1" * 65, 2, 7) == 7
+
+    def test_bad_bases_are_errors(self):
+        from phonebook_rt import numbers_
+        from phonebook_rt.faults import PhonebookFault
+
+        for base in (-16, 0, 1, 37):
+            with pytest.raises(PhonebookFault, match="invalid_base"):
+                numbers_.to_base(1, base)
+            with pytest.raises(PhonebookFault, match="invalid_base"):
+                numbers_.parse_base("junk", base, 0)
+            with pytest.raises(PhonebookFault, match="invalid_base"):
+                numbers_.parse_big_base("junk", base, 0)
+
+    def test_bigint_bases_meet_the_ceiling(self):
+        from phonebook_rt import numbers_
+
+        widest = 10**4000 - 1
+        for base in (2, 16, 36):
+            text = numbers_.big_to_base(-widest, base)
+            assert numbers_.parse_big_base(text, base, 0) == -widest
+            assert numbers_.parse_big_base(numbers_.big_to_base(widest + 1, base), base, 7) == 7
+        assert numbers_.parse_big_base("0" * 50_000 + "1", 2, 7) == 1

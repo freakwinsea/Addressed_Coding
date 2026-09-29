@@ -1443,6 +1443,234 @@ pub fn pick<T: Clone>(state: &i64, sequence: &[T], fallback: &T) -> (T, i64) {
     (sequence[index as usize].clone(), state)
 }
 
+// --------------------------------------------------------------------------
+// bits and bases
+// --------------------------------------------------------------------------
+//
+// An int is 64 bits in two's complement on every backend, which is Rust's own
+// `i64`, so `&`, `|`, `^` and `!` need no help. The shifts do: `<<` and `>>`
+// panic in a debug build when the count is 64 or more, and wrap it in a
+// release build. Printing needs help too: `{:x}` on a negative i64 prints the
+// pattern, where TO_BASE promises a '-' and the magnitude.
+
+const BASE_DIGITS: &[u8; 36] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+
+fn checked_shift(count: i64, operation: &str) -> u32 {
+    if count < 0 {
+        crate::fault(
+            "invalid_shift",
+            &format!("{operation} count {count} is negative"),
+        );
+    }
+    // Every count past 63 does the same thing, so 64 stands in for all of them.
+    count.min(64) as u32
+}
+
+fn checked_base(base: i64, operation: &str) -> u32 {
+    if !(2..=36).contains(&base) {
+        crate::fault(
+            "invalid_base",
+            &format!("{operation} base {base} is not between 2 and 36"),
+        );
+    }
+    base as u32
+}
+
+/// The digits of a non-negative number, lowercase, most significant first.
+fn digits_in_base(mut magnitude: u64, base: u32) -> String {
+    if magnitude == 0 {
+        return "0".to_string();
+    }
+    let mut digits = Vec::new();
+    while magnitude > 0 {
+        digits.push(BASE_DIGITS[(magnitude % base as u64) as usize]);
+        magnitude /= base as u64;
+    }
+    digits.reverse();
+    String::from_utf8(digits).unwrap()
+}
+
+/// One ASCII digit in `base`, either case; `None` for anything else.
+fn digit_value(byte: u8, base: u32) -> Option<u32> {
+    let digit = match byte {
+        b'0'..=b'9' => (byte - b'0') as u32,
+        b'a'..=b'z' => (byte - b'a') as u32 + 10,
+        b'A'..=b'Z' => (byte - b'A') as u32 + 10,
+        _ => return None,
+    };
+    if digit < base {
+        Some(digit)
+    } else {
+        None
+    }
+}
+
+/// ASCII digits in `base` to a number below `limit`. NOT `from_str_radix`,
+/// which takes a leading '+' of its own. `None` as soon as the number reaches
+/// the limit, so a long input is never read to the end.
+fn read_digits(digits: &str, base: u32, limit: u128) -> Option<u128> {
+    if digits.is_empty() {
+        return None;
+    }
+    let mut value: u128 = 0;
+    for byte in digits.bytes() {
+        value = value * base as u128 + digit_value(byte, base)? as u128;
+        if value >= limit {
+            return None;
+        }
+    }
+    Some(value)
+}
+
+fn split_sign(text: &str) -> (bool, &str) {
+    match text.as_bytes().first() {
+        Some(b'-') => (true, &text[1..]),
+        Some(b'+') => (false, &text[1..]),
+        _ => (false, text),
+    }
+}
+
+/// 400-0000160 BIT_AND — on the two 64-bit patterns.
+pub fn bit_and(a: &i64, b: &i64) -> i64 {
+    a & b
+}
+
+/// 400-0000161 BIT_OR — on the two 64-bit patterns.
+pub fn bit_or(a: &i64, b: &i64) -> i64 {
+    a | b
+}
+
+/// 400-0000162 BIT_XOR — on the two 64-bit patterns.
+pub fn bit_xor(a: &i64, b: &i64) -> i64 {
+    a ^ b
+}
+
+/// 400-0000163 BIT_NOT — every bit flipped, so the result is -a - 1.
+pub fn bit_not(a: &i64) -> i64 {
+    !a
+}
+
+/// 400-0000164 SHIFT_LEFT — bits pushed past bit 63 are dropped. 64 or more
+/// shifts every bit out; `<<` would panic or wrap the count instead.
+pub fn shift_left(value: &i64, count: &i64) -> i64 {
+    let count = checked_shift(*count, "SHIFT_LEFT");
+    if count >= 64 {
+        return 0;
+    }
+    ((*value as u64) << count) as i64
+}
+
+/// 400-0000165 SHIFT_RIGHT — copies of the sign bit come in at the top, which
+/// is what `>>` does on an i64.
+pub fn shift_right(value: &i64, count: &i64) -> i64 {
+    let count = checked_shift(*count, "SHIFT_RIGHT");
+    if count >= 64 {
+        return if *value < 0 { -1 } else { 0 };
+    }
+    value >> count
+}
+
+/// 400-0000166 SHIFT_RIGHT_UNSIGNED — zeros come in at the top.
+pub fn shift_right_unsigned(value: &i64, count: &i64) -> i64 {
+    let count = checked_shift(*count, "SHIFT_RIGHT_UNSIGNED");
+    if count >= 64 {
+        return 0;
+    }
+    ((*value as u64) >> count) as i64
+}
+
+/// 400-0000167 COUNT_BITS — ones in the 64-bit pattern, so -1 has 64.
+pub fn count_bits(value: &i64) -> i64 {
+    value.count_ones() as i64
+}
+
+/// 400-0000168 TO_BASE — a '-' then the magnitude. NOT `{:b}` or `{:x}`,
+/// which print a negative number's pattern.
+pub fn to_base(value: &i64, base: &i64) -> String {
+    let base = checked_base(*base, "TO_BASE");
+    let digits = digits_in_base(value.unsigned_abs(), base);
+    if *value < 0 {
+        format!("-{digits}")
+    } else {
+        digits
+    }
+}
+
+/// 400-0000169 PARSE_BASE — never fails on the text; a bad base is an error.
+pub fn parse_base(value: &str, base: &i64, fallback: &i64) -> i64 {
+    let base = checked_base(*base, "PARSE_BASE");
+    let candidate = crate::text::trim(value);
+    let (negative, digits) = split_sign(&candidate);
+    // The magnitude can be one more than i64::MAX when the sign is '-'.
+    let limit: u128 = if negative { (1 << 63) + 1 } else { 1 << 63 };
+    match read_digits(digits, base, limit) {
+        Some(magnitude) if negative => (-(magnitude as i128)) as i64,
+        Some(magnitude) => magnitude as i64,
+        None => *fallback,
+    }
+}
+
+/// 400-0000170 TO_BASE_UNSIGNED — the 64-bit pattern, so -1 in 16 is 16 f's.
+pub fn to_base_unsigned(value: &i64, base: &i64) -> String {
+    let base = checked_base(*base, "TO_BASE_UNSIGNED");
+    digits_in_base(*value as u64, base)
+}
+
+/// 400-0000171 PARSE_BASE_UNSIGNED — 0 to 2^64 - 1, read back as a pattern.
+pub fn parse_base_unsigned(value: &str, base: &i64, fallback: &i64) -> i64 {
+    let base = checked_base(*base, "PARSE_BASE_UNSIGNED");
+    match read_digits(&crate::text::trim(value), base, 1 << 64) {
+        Some(bits) => bits as u64 as i64,
+        None => *fallback,
+    }
+}
+
+/// 400-0000172 BIG_TO_BASE — a '-' then the magnitude, as TO_BASE.
+pub fn big_to_base(value: &BigInt, base: &i64) -> String {
+    let base = checked_base(*base, "BIG_TO_BASE");
+    if value.is_zero() {
+        return "0".to_string();
+    }
+    let mut magnitude = value.abs();
+    let mut digits = Vec::new();
+    while !magnitude.is_zero() {
+        let (quotient, digit) = magnitude.div_rem_small(base);
+        digits.push(BASE_DIGITS[digit as usize]);
+        magnitude = quotient;
+    }
+    if value.is_negative() {
+        digits.push(b'-');
+    }
+    digits.reverse();
+    String::from_utf8(digits).unwrap()
+}
+
+/// 400-0000173 PARSE_BIG_BASE — never fails on the text; the 4000-digit
+/// ceiling holds, and a number past it stops the reading at once.
+pub fn parse_big_base(value: &str, base: &i64, fallback: &BigInt) -> BigInt {
+    let base = checked_base(*base, "PARSE_BIG_BASE");
+    let candidate = crate::text::trim(value);
+    let (negative, digits) = split_sign(&candidate);
+    if digits.is_empty() {
+        return fallback.clone();
+    }
+    let mut magnitude = BigInt::default();
+    for byte in digits.bytes() {
+        let Some(digit) = digit_value(byte, base) else {
+            return fallback.clone();
+        };
+        magnitude = magnitude.mul_small_add(base, digit);
+        if magnitude.digit_count() > crate::bigint::MAX_DIGITS {
+            return fallback.clone();
+        }
+    }
+    if negative {
+        magnitude.neg()
+    } else {
+        magnitude
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1465,6 +1693,29 @@ mod tests {
         for value in [f64::MIN_POSITIVE, 5e-324, f64::MAX, 2.0, 0.25, 1e-310] {
             assert_eq!(sqrt_(&value).to_bits(), value.sqrt().to_bits(), "{value:e}");
         }
+    }
+
+    /// The big path must agree with the i64 path wherever both apply, and must
+    /// read back what it writes in every base.
+    #[test]
+    fn big_bases_round_trip() {
+        for value in [0i64, 1, -1, 35, -36, 255, i64::MAX, i64::MIN] {
+            for base in 2..=36i64 {
+                let text = to_base(&value, &base);
+                assert_eq!(big_to_base(&BigInt::from_i64(value), &base), text);
+                assert_eq!(parse_base(&text, &base, &7), value);
+                let big = parse_big_base(&text, &base, &BigInt::default());
+                assert_eq!(big, BigInt::from_i64(value));
+            }
+        }
+        let widest = BigInt::parse(&"9".repeat(4000)).unwrap();
+        let text = big_to_base(&widest, &2);
+        assert_eq!(parse_big_base(&text, &2, &BigInt::default()), widest);
+        let past = format!("{text}0");
+        assert_eq!(
+            parse_big_base(&past, &2, &BigInt::default()),
+            BigInt::default()
+        );
     }
 
     #[test]
