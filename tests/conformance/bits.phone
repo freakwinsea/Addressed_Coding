@@ -1,0 +1,130 @@
+phonebook 0.1
+
+# Bits and bases. An int is a 64-bit two's complement pattern on both
+# backends, but the hosts disagree around it: Python's << never drops a bit,
+# Rust's << panics or wraps once the count reaches 64, bin(-5) prints
+# '-0b101' where {:b} prints the pattern, and int(text, 16) takes '0x' and
+# underscores. This file is where the two have to agree on all of that.
+
+# Hex and binary literals are plain signed ints.
+100-0000001@[0xff]
+100-0000001@[-0b1010]
+100-0000001@[-0x8000000000000000]
+
+# AND, OR, XOR and NOT work on the 64-bit pattern.
+400-0000160@[0b1100, 0b1010] -> and_basic               # BIT_AND
+100-0000001@[and_basic]
+400-0000160@[-8, -3] -> and_negative
+100-0000001@[and_negative]
+400-0000161@[0b1100, 0b1010] -> or_basic                # BIT_OR
+100-0000001@[or_basic]
+400-0000161@[-8, 3] -> or_negative
+100-0000001@[or_negative]
+400-0000162@[0b1100, 0b1010] -> xor_basic               # BIT_XOR
+100-0000001@[xor_basic]
+400-0000162@[-1, 0x7fffffffffffffff] -> xor_sign
+100-0000001@[xor_sign]
+400-0000163@[0] -> not_zero                             # BIT_NOT
+100-0000001@[not_zero]
+400-0000163@[-9223372036854775808] -> not_min
+100-0000001@[not_min]
+
+# SHIFT_LEFT drops bits past bit 63; 64 or more gives 0.
+400-0000164@[1, 4] -> shl_basic                         # SHIFT_LEFT
+100-0000001@[shl_basic]
+400-0000164@[1, 63] -> shl_sign
+100-0000001@[shl_sign]
+400-0000164@[3, 63] -> shl_dropped
+100-0000001@[shl_dropped]
+400-0000164@[0x7fffffffffffffff, 1] -> shl_max
+100-0000001@[shl_max]
+400-0000164@[-1, 64] -> shl_all_out
+100-0000001@[shl_all_out]
+400-0000164@[5, 9223372036854775807] -> shl_far
+100-0000001@[shl_far]
+
+# SHIFT_RIGHT copies the sign bit, so it rounds down; 64 or more gives 0 or -1.
+400-0000165@[-7, 1] -> shr_rounds_down                  # SHIFT_RIGHT
+100-0000001@[shr_rounds_down]
+400-0000165@[-9223372036854775808, 63] -> shr_min
+100-0000001@[shr_min]
+400-0000165@[-5, 64] -> shr_all_out_negative
+100-0000001@[shr_all_out_negative]
+400-0000165@[5, 200] -> shr_all_out
+100-0000001@[shr_all_out]
+
+# SHIFT_RIGHT_UNSIGNED brings in zeros.
+400-0000166@[-1, 60] -> ushr_negative                   # SHIFT_RIGHT_UNSIGNED
+100-0000001@[ushr_negative]
+400-0000166@[-1, 1] -> ushr_one
+100-0000001@[ushr_one]
+400-0000166@[-9223372036854775808, 63] -> ushr_sign
+100-0000001@[ushr_sign]
+400-0000166@[-1, 64] -> ushr_all_out
+100-0000001@[ushr_all_out]
+400-0000166@[-5, 0] -> ushr_zero
+100-0000001@[ushr_zero]
+
+# COUNT_BITS counts the pattern, so -1 has 64.
+400-0000167@[-1] -> count_minus_one                     # COUNT_BITS
+100-0000001@[count_minus_one]
+400-0000167@[-9223372036854775808] -> count_min
+100-0000001@[count_min]
+400-0000167@[0xff] -> count_byte
+100-0000001@[count_byte]
+
+# TO_BASE writes a '-' then the magnitude, lowercase, with no prefix.
+400-0000168@[255, 16] -> hex                            # TO_BASE
+100-0000001@[hex]
+400-0000168@[-255, 16] -> hex_negative
+100-0000001@[hex_negative]
+400-0000168@[-9223372036854775808, 2] -> binary_min
+100-0000001@[binary_min]
+400-0000168@[9223372036854775807, 36] -> base36_max
+100-0000001@[base36_max]
+400-0000168@[0, 7] -> zero
+100-0000001@[zero]
+
+# TO_BASE_UNSIGNED writes the pattern.
+400-0000170@[-1, 16] -> pattern_minus_one               # TO_BASE_UNSIGNED
+100-0000001@[pattern_minus_one]
+400-0000170@[-2, 8] -> pattern_octal
+100-0000001@[pattern_octal]
+400-0000170@[-9223372036854775808, 36] -> pattern_min
+100-0000001@[pattern_min]
+
+# PARSE_BASE takes either case and a sign, and nothing else.
+400-0000169@[" FF ", 16, 0] -> parse_hex                # PARSE_BASE
+100-0000001@[parse_hex]
+400-0000169@["-8000000000000000", 16, 0] -> parse_min
+100-0000001@[parse_min]
+400-0000169@["8000000000000000", 16, -1] -> parse_past_max
+100-0000001@[parse_past_max]
+400-0000169@["0xff", 16, -1] -> parse_prefix
+100-0000001@[parse_prefix]
+400-0000169@["f_f", 16, -1] -> parse_underscore
+100-0000001@[parse_underscore]
+400-0000169@["+-1", 10, -1] -> parse_two_signs
+100-0000001@[parse_two_signs]
+400-0000169@["１２", 10, -1] -> parse_wide_digits
+100-0000001@[parse_wide_digits]
+400-0000169@["Zz", 36, 0] -> parse_base36
+100-0000001@[parse_base36]
+
+# PARSE_BASE_UNSIGNED reads a pattern back, and takes no sign.
+400-0000171@["ffffffffffffffff", 16, 0] -> parse_pattern    # PARSE_BASE_UNSIGNED
+100-0000001@[parse_pattern]
+400-0000171@["10000000000000000", 16, 7] -> parse_pattern_too_big
+100-0000001@[parse_pattern_too_big]
+400-0000171@["+1", 2, 7] -> parse_pattern_signed
+100-0000001@[parse_pattern_signed]
+
+# The bigint pair has no 64-bit limit, only the 4000-digit ceiling.
+400-0000172@[-340282366920938463463374607431768211456n, 16] -> big_hex    # BIG_TO_BASE
+100-0000001@[big_hex]
+400-0000172@[0n, 2] -> big_zero
+100-0000001@[big_zero]
+400-0000173@["-ffffffffffffffffffffffffffffffff", 16, 0n] -> big_parsed   # PARSE_BIG_BASE
+100-0000001@[big_parsed]
+400-0000173@["0x1", 16, -1n] -> big_prefix
+100-0000001@[big_prefix]

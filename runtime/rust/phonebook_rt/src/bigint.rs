@@ -201,6 +201,37 @@ impl BigInt {
     }
 }
 
+impl BigInt {
+    /// The magnitude times a small factor, plus a small addend: one step of
+    /// reading digits in a base. The result is never negative.
+    pub fn mul_small_add(&self, factor: u32, addend: u32) -> BigInt {
+        let mut limbs = Vec::with_capacity(self.limbs.len() + 1);
+        let mut carry = addend as u64;
+        for limb in &self.limbs {
+            let value = *limb as u64 * factor as u64 + carry;
+            limbs.push((value % BASE) as u32);
+            carry = value / BASE;
+        }
+        if carry > 0 {
+            limbs.push(carry as u32);
+        }
+        BigInt::from_parts(false, limbs)
+    }
+
+    /// The magnitude divided by a small divisor: the quotient, never negative,
+    /// and the remainder. One step of writing digits in a base.
+    pub fn div_rem_small(&self, divisor: u32) -> (BigInt, u32) {
+        let mut quotient = vec![0u32; self.limbs.len()];
+        let mut remainder: u64 = 0;
+        for (index, limb) in self.limbs.iter().enumerate().rev() {
+            let value = remainder * BASE + *limb as u64;
+            quotient[index] = (value / divisor as u64) as u32;
+            remainder = value % divisor as u64;
+        }
+        (BigInt::from_parts(false, quotient), remainder as u32)
+    }
+}
+
 impl Ord for BigInt {
     fn cmp(&self, other: &BigInt) -> Ordering {
         match (self.negative, other.negative) {

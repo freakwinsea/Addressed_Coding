@@ -102,6 +102,29 @@ def test_int_literals_at_the_64_bit_limits_are_accepted(registry):
     build("100-0000005@[-9223372036854775808] -> t\n100-0000001@[t]\n", registry)
 
 
+def test_hex_and_binary_int_literals(registry):
+    checked = build(
+        "400-0000160@[0xFF, -0b1010] -> masked\n100-0000001@[masked]\n", registry
+    )
+    args = checked.body[0].call.args
+    assert [arg.value for arg in args] == [255, -10]
+    assert all(arg.type.name == "int" for arg in args)
+    build("100-0000005@[0x7fffffffffffffff] -> t\n100-0000001@[t]\n", registry)
+    build("100-0000005@[-0x8000000000000000] -> t\n100-0000001@[t]\n", registry)
+
+
+def test_hex_literals_are_signed_values_not_bit_patterns(registry):
+    fails("100-0000005@[0xffffffffffffffff] -> t\n100-0000001@[t]\n", registry, "PARSE_BASE_UNSIGNED")
+    fails("100-0000005@[0x8000000000000000] -> t\n100-0000001@[t]\n", registry, "64-bit")
+
+
+def test_based_literals_take_no_underscores_or_bigint_suffix(registry):
+    fails("100-0000005@[0xff_ff] -> t\n100-0000001@[t]\n", registry, "cannot read")
+    fails("100-0000005@[0x] -> t\n100-0000001@[t]\n", registry, "cannot read")
+    fails("100-0000005@[0b102] -> t\n100-0000001@[t]\n", registry, "cannot read")
+    fails("100-0000005@[0xffn] -> t\n100-0000001@[t]\n", registry, "cannot read")
+
+
 def test_unbound_reference(registry):
     fails("100-0000001@[nope]\n", registry, "not bound")
 
