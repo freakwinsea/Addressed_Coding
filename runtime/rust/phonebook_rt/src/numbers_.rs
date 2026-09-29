@@ -1671,6 +1671,247 @@ pub fn parse_big_base(value: &str, base: &i64, fallback: &BigInt) -> BigInt {
     }
 }
 
+// --------------------------------------------------------------------------
+// list maths: smallest, largest, sum, average and median
+// --------------------------------------------------------------------------
+//
+// None of these lean on `Iterator::min`, `max` or `sum`. `min` and `max` need
+// `Ord`, which `f64` does not have, and `max` keeps the LAST of equal values
+// where the contract keeps the first; `sum` of i64 panics or wraps by build
+// profile. Each rule is written out here as the Python runtime writes it.
+
+fn not_empty<T>(values: &[T], operation: &str) {
+    if values.is_empty() {
+        crate::fault("empty_list", &format!("{operation} of an empty list"));
+    }
+}
+
+/// 400-0000180 SMALLEST — the first of equal values wins.
+pub fn smallest<T: Clone + PartialOrd>(values: &[T]) -> T {
+    not_empty(values, "SMALLEST");
+    let mut best = &values[0];
+    for value in &values[1..] {
+        if value < best {
+            best = value;
+        }
+    }
+    best.clone()
+}
+
+/// 400-0000181 LARGEST — the first of equal values wins.
+pub fn largest<T: Clone + PartialOrd>(values: &[T]) -> T {
+    not_empty(values, "LARGEST");
+    let mut best = &values[0];
+    for value in &values[1..] {
+        if value > best {
+            best = value;
+        }
+    }
+    best.clone()
+}
+
+/// 400-0000182 SUM_FLOAT — left to right, each step rounded; not compensated.
+pub fn sum_float(values: &[f64]) -> f64 {
+    let mut total = 0.0;
+    for value in values {
+        total = finite(total + value, "SUM_FLOAT");
+    }
+    total
+}
+
+/// 400-0000183 SUM_BIG — exact; only the final total meets the ceiling.
+pub fn sum_big(values: &[BigInt]) -> BigInt {
+    let mut total = BigInt::default();
+    for value in values {
+        total = total.add(value);
+    }
+    total.checked("SUM_BIG")
+}
+
+/// The exact total at the largest scale in the list, not yet checked.
+fn exact_dec_sum(values: &[Decimal]) -> Decimal {
+    let mut scale = 0;
+    for value in values {
+        scale = scale.max(value.scale());
+    }
+    let mut total = BigInt::default();
+    for value in values {
+        total = total.add(&value.rescaled(scale));
+    }
+    Decimal::new(total, scale)
+}
+
+/// 400-0000184 SUM_DEC — exact, at the largest scale in the list.
+pub fn sum_dec(values: &[Decimal]) -> Decimal {
+    exact_dec_sum(values).checked("SUM_DEC")
+}
+
+/// 400-0000185 SUM_FRACTION — left to right with ADD_FRACTION's check each step.
+pub fn sum_fraction(values: &[Fraction]) -> Fraction {
+    let mut total = Fraction {
+        numerator: 0,
+        denominator: 1,
+    };
+    for value in values {
+        total = fraction(
+            total.numerator as i128 * value.denominator as i128
+                + value.numerator as i128 * total.denominator as i128,
+            total.denominator as i128 * value.denominator as i128,
+            "SUM_FRACTION",
+        );
+    }
+    total
+}
+
+/// (total x 10^-scale) / count, rounded once to `places`, halves away from zero.
+fn average_places(
+    total: &BigInt,
+    scale: usize,
+    count: usize,
+    places: usize,
+    operation: &str,
+) -> Decimal {
+    let numerator = total.mul(&BigInt::pow10(places));
+    let denominator = BigInt::from_i64(count as i64).mul(&BigInt::pow10(scale));
+    Decimal::new(divide_rounded(&numerator, &denominator), places).checked(operation)
+}
+
+/// 400-0000186 AVERAGE — the exact int sum over the count, rounded once.
+pub fn average(values: &[i64], places: &i64) -> Decimal {
+    let places = checked_places(*places, "AVERAGE");
+    not_empty(values, "AVERAGE");
+    let mut total = BigInt::default();
+    for value in values {
+        total = total.add(&BigInt::from_i64(*value));
+    }
+    average_places(&total, 0, values.len(), places, "AVERAGE")
+}
+
+/// 400-0000187 AVERAGE_FLOAT — SUM_FLOAT, then divided by the count.
+pub fn average_float(values: &[f64]) -> f64 {
+    not_empty(values, "AVERAGE_FLOAT");
+    finite(sum_float(values) / values.len() as f64, "AVERAGE_FLOAT")
+}
+
+/// 400-0000188 AVERAGE_BIG — the exact sum over the count, rounded once.
+pub fn average_big(values: &[BigInt], places: &i64) -> Decimal {
+    let places = checked_places(*places, "AVERAGE_BIG");
+    not_empty(values, "AVERAGE_BIG");
+    let mut total = BigInt::default();
+    for value in values {
+        total = total.add(value);
+    }
+    average_places(&total, 0, values.len(), places, "AVERAGE_BIG")
+}
+
+/// 400-0000189 AVERAGE_DEC — the exact sum over the count, rounded once.
+pub fn average_dec(values: &[Decimal], places: &i64) -> Decimal {
+    let places = checked_places(*places, "AVERAGE_DEC");
+    not_empty(values, "AVERAGE_DEC");
+    let total = exact_dec_sum(values);
+    average_places(
+        total.coefficient(),
+        total.scale(),
+        values.len(),
+        places,
+        "AVERAGE_DEC",
+    )
+}
+
+/// 400-0000190 AVERAGE_FRACTION — SUM_FRACTION over the count, exactly.
+pub fn average_fraction(values: &[Fraction]) -> Fraction {
+    not_empty(values, "AVERAGE_FRACTION");
+    let total = sum_fraction(values);
+    fraction(
+        total.numerator as i128,
+        total.denominator as i128 * values.len() as i128,
+        "AVERAGE_FRACTION",
+    )
+}
+
+/// The one middle value of a sorted copy, or the two middle values.
+/// SORT (300-0000005) is stable, as the contract needs for equal decimals.
+fn middle<T: Clone + PartialOrd>(values: &[T], operation: &str) -> (T, Option<T>) {
+    not_empty(values, operation);
+    let ordered = crate::collections_::sort_seq(values);
+    let half = ordered.len() / 2;
+    if ordered.len() % 2 == 1 {
+        return (ordered[half].clone(), None);
+    }
+    (ordered[half - 1].clone(), Some(ordered[half].clone()))
+}
+
+/// total x 10^-scale halved exactly: one more place only when total is odd.
+fn half_of(total: &BigInt, scale: usize) -> Decimal {
+    let (half, rest) = total.div_rem(&BigInt::from_i64(2));
+    if rest.is_zero() {
+        return Decimal::new(half, scale);
+    }
+    Decimal::new(total.mul(&BigInt::from_i64(5)), scale + 1)
+}
+
+/// 400-0000191 MEDIAN — the middle int, or the exact midpoint of two.
+pub fn median(values: &[i64]) -> Decimal {
+    match middle(values, "MEDIAN") {
+        (only, None) => Decimal::new(BigInt::from_i64(only), 0),
+        (a, Some(b)) => half_of(&BigInt::from_i64(a).add(&BigInt::from_i64(b)), 0),
+    }
+}
+
+/// 400-0000192 MEDIAN_FLOAT — the exact midpoint of two, rounded once.
+///
+/// When a + b is finite, it and the halving round only once between them:
+/// halving is exact unless the result is subnormal, and a sum that small was
+/// exact to begin with. When a + b is not finite both values are huge, so
+/// halving each is exact and the one rounding is in their sum.
+pub fn median_float(values: &[f64]) -> f64 {
+    match middle(values, "MEDIAN_FLOAT") {
+        (only, None) => only,
+        (a, Some(b)) => {
+            let total = a + b;
+            if total.is_finite() {
+                finite(total / 2.0, "MEDIAN_FLOAT")
+            } else {
+                finite(a / 2.0 + b / 2.0, "MEDIAN_FLOAT")
+            }
+        }
+    }
+}
+
+/// 400-0000193 MEDIAN_BIG — the same rule as MEDIAN, under the ceiling.
+pub fn median_big(values: &[BigInt]) -> Decimal {
+    match middle(values, "MEDIAN_BIG") {
+        (only, None) => Decimal::new(only, 0),
+        (a, Some(b)) => half_of(&a.add(&b), 0).checked("MEDIAN_BIG"),
+    }
+}
+
+/// 400-0000194 MEDIAN_DEC — the middle value as it is, or the exact midpoint.
+pub fn median_dec(values: &[Decimal]) -> Decimal {
+    match middle(values, "MEDIAN_DEC") {
+        (only, None) => only,
+        (a, Some(b)) => {
+            let scale = a.scale().max(b.scale());
+            half_of(&a.rescaled(scale).add(&b.rescaled(scale)), scale).checked("MEDIAN_DEC")
+        }
+    }
+}
+
+/// 400-0000195 MEDIAN_FRACTION — the middle value, or the exact midpoint.
+/// Every product is under 2^126, so their sum and the doubled denominator
+/// both fit in i128.
+pub fn median_fraction(values: &[Fraction]) -> Fraction {
+    match middle(values, "MEDIAN_FRACTION") {
+        (only, None) => only,
+        (a, Some(b)) => fraction(
+            a.numerator as i128 * b.denominator as i128
+                + b.numerator as i128 * a.denominator as i128,
+            2 * a.denominator as i128 * b.denominator as i128,
+            "MEDIAN_FRACTION",
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1716,6 +1957,39 @@ mod tests {
             parse_big_base(&past, &2, &BigInt::default()),
             BigInt::default()
         );
+    }
+
+    /// The midpoint must be the exact one rounded once, never overflowing;
+    /// checked against the halving of the exact sum, taken in wider steps.
+    #[test]
+    fn float_midpoint_is_correctly_rounded() {
+        let mut state: u64 = 0x2545_F491_4F6C_DD1D;
+        for _ in 0..200_000 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let a = f64::from_bits(state >> 1);
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let b = f64::from_bits(state);
+            if !a.is_finite() || !b.is_finite() {
+                continue;
+            }
+            // Scaling by a power of two is exact away from the ends, so the
+            // rounded (a/4 + b/4) * 2 is the rounded midpoint for these.
+            if a.abs() > 1e-300 && b.abs() > 1e-300 {
+                let expected = finite((a / 4.0 + b / 4.0) * 2.0, "test");
+                assert_eq!(
+                    median_float(&[a, b]).to_bits(),
+                    expected.to_bits(),
+                    "{a:e} {b:e}"
+                );
+            }
+        }
+        let max = f64::MAX;
+        assert_eq!(median_float(&[max, max]), max);
+        assert_eq!(median_float(&[5e-324, 1e-323]), 1e-323);
     }
 
     #[test]

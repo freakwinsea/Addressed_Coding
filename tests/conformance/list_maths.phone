@@ -1,0 +1,175 @@
+phonebook 0.1
+
+# Smallest, largest, sum, average and median over lists of every number type.
+# Neither runtime uses its host's min, max, sum or statistics: each rule is
+# written out by hand in both, so this file is where they have to agree on
+# which of two equal decimals is kept, on how floats are added, on where an
+# average rounds, and on the exact midpoint of two middle values.
+
+# SMALLEST and LARGEST take a list of any number type.
+300-0000001@[5, -2, 9, -2] -> ints
+400-0000180@[ints] -> int_small                    # SMALLEST
+100-0000001@[int_small]
+400-0000181@[ints] -> int_large                    # LARGEST
+100-0000001@[int_large]
+300-0000001@[2.5, -0.5, 1e300, -1e-300] -> floats
+400-0000180@[floats] -> float_small
+100-0000001@[float_small]
+400-0000181@[floats] -> float_large
+100-0000001@[float_large]
+300-0000001@[5n, -123456789012345678901n, 123456789012345678901n] -> bigs
+400-0000180@[bigs] -> big_small
+100-0000001@[big_small]
+400-0000181@[bigs] -> big_large
+100-0000001@[big_large]
+
+# Ties go to the first: 0.30 and 0.3 are equal, and the one listed first wins.
+300-0000001@[0.30d, 0.3d, 0.1d, 0.9d, 0.90d] -> decs
+400-0000180@[decs] -> dec_small
+100-0000001@[dec_small]
+400-0000181@[decs] -> dec_large
+100-0000001@[dec_large]
+300-0000001@[0.3d, 0.30d] -> tied
+400-0000180@[tied] -> tied_small
+100-0000001@[tied_small]
+400-0000181@[tied] -> tied_large
+100-0000001@[tied_large]
+
+400-0000080@[1, 3] -> third
+400-0000080@[1, 2] -> half
+400-0000080@[-1, 6] -> neg_sixth
+400-0000080@[1, 6] -> sixth
+300-0000001@[third, half, neg_sixth] -> fracs
+400-0000180@[fracs] -> frac_small
+100-0000001@[frac_small]
+400-0000181@[fracs] -> frac_large
+100-0000001@[frac_large]
+
+# SUM_FLOAT adds left to right and rounds each step, so 0.1 + 0.2 + 0.3 is
+# 0.6000000000000001. Python 3.12's sum() would say 0.6.
+300-0000001@[0.1, 0.2, 0.3] -> tenths
+400-0000182@[tenths] -> tenths_sum                 # SUM_FLOAT
+100-0000001@[tenths_sum]
+300-0000001@[0.3, 0.2, 0.1] -> tenths_back
+400-0000182@[tenths_back] -> tenths_back_sum       # order matters: 0.6
+100-0000001@[tenths_back_sum]
+300-0000001@[1e16, 1.0, -1e16] -> absorbed
+400-0000182@[absorbed] -> absorbed_sum             # the 1.0 is lost
+100-0000001@[absorbed_sum]
+300-0000001@[0.0] -> one_zero
+300-0000010@[one_zero, 0] -> no_floats            # TAKE 0: an empty float list
+400-0000182@[no_floats] -> empty_float_sum
+100-0000001@[empty_float_sum]
+
+# SUM_BIG is exact; only the total has to fit 4000 digits.
+400-0000183@[bigs] -> big_sum                      # SUM_BIG
+100-0000001@[big_sum]
+
+# SUM_DEC keeps the largest scale in the list.
+300-0000001@[0.10d, 0.20d, 0.30d] -> cents
+400-0000184@[cents] -> cents_sum                   # SUM_DEC
+100-0000001@[cents_sum]
+300-0000001@[1d, 2.000d, -0.5d] -> mixed_places
+400-0000184@[mixed_places] -> mixed_sum
+100-0000001@[mixed_sum]
+
+# SUM_FRACTION is exact: 1/2 + 1/3 + 1/6 is 1.
+300-0000001@[half, third, sixth] -> unit_parts
+400-0000185@[unit_parts] -> unit                   # SUM_FRACTION
+100-0000001@[unit]
+
+# AVERAGE rounds once, to the places asked for, halves away from zero.
+300-0000001@[1, 2, 4] -> small_ints
+400-0000186@[small_ints, 3] -> avg_three           # AVERAGE
+100-0000001@[avg_three]
+300-0000001@[1, 2] -> one_two
+400-0000186@[one_two, 0] -> avg_half_up
+100-0000001@[avg_half_up]
+300-0000001@[-1, -2] -> neg_one_two
+400-0000186@[neg_one_two, 0] -> avg_half_down
+100-0000001@[avg_half_down]
+400-0000186@[one_two, 4] -> avg_pads
+100-0000001@[avg_pads]
+300-0000001@[9223372036854775807, 9223372036854775807, 9223372036854775806] -> huge_ints
+400-0000186@[huge_ints, 2] -> avg_no_overflow     # the sum never overflows
+100-0000001@[avg_no_overflow]
+
+# AVERAGE_FLOAT is SUM_FLOAT over the count.
+400-0000187@[tenths] -> avg_tenths                 # AVERAGE_FLOAT
+100-0000001@[avg_tenths]
+300-0000001@[1.0, 2.0, 4.0] -> small_floats
+400-0000187@[small_floats] -> avg_floats
+100-0000001@[avg_floats]
+
+400-0000188@[bigs, 5] -> avg_bigs                  # AVERAGE_BIG
+100-0000001@[avg_bigs]
+300-0000001@[100000000000000000000n, 1n] -> two_bigs
+400-0000188@[two_bigs, 1] -> avg_two_bigs
+100-0000001@[avg_two_bigs]
+
+300-0000001@[10.00d, 20.00d, 25.00d] -> bills
+400-0000189@[bills, 2] -> avg_bills                # AVERAGE_DEC
+100-0000001@[avg_bills]
+300-0000001@[0.01d, 0.02d] -> pennies
+400-0000189@[pennies, 2] -> avg_pennies            # 0.015 -> 0.02
+100-0000001@[avg_pennies]
+400-0000189@[pennies, 5] -> avg_pennies_padded
+100-0000001@[avg_pennies_padded]
+
+400-0000190@[fracs] -> avg_fracs                   # AVERAGE_FRACTION
+100-0000001@[avg_fracs]
+300-0000001@[half, third] -> half_third
+400-0000190@[half_third] -> avg_half_third         # 5/12
+100-0000001@[avg_half_third]
+
+# MEDIAN: the middle value, or the exact midpoint of the two middle values.
+300-0000001@[9, 1, 5] -> odd_ints
+400-0000191@[odd_ints] -> med_odd                  # MEDIAN
+100-0000001@[med_odd]
+300-0000001@[4, 1, 3, 2, 6, 5] -> even_ints
+400-0000191@[even_ints] -> med_even
+100-0000001@[med_even]
+300-0000001@[1, 3] -> one_three
+400-0000191@[one_three] -> med_whole
+100-0000001@[med_whole]
+400-0000191@[neg_one_two] -> med_neg_half
+100-0000001@[med_neg_half]
+300-0000001@[9223372036854775807, 9223372036854775806] -> top_ints
+400-0000191@[top_ints] -> med_top
+100-0000001@[med_top]
+
+400-0000192@[floats] -> med_floats                 # MEDIAN_FLOAT
+100-0000001@[med_floats]
+300-0000001@[1.7976931348623157e308, 1.7976931348623157e308] -> maxes
+400-0000192@[maxes] -> med_maxes                   # no overflow
+100-0000001@[med_maxes]
+300-0000001@[1.7976931348623157e308, 1.7976931348623155e308] -> near_maxes
+400-0000192@[near_maxes] -> med_near_maxes
+100-0000001@[med_near_maxes]
+300-0000001@[5e-324, 1e-323] -> subnormals
+400-0000192@[subnormals] -> med_subnormals         # ties to even
+100-0000001@[med_subnormals]
+300-0000001@[-1e308, 1e308, 3.0, -3.0] -> opposites
+400-0000192@[opposites] -> med_opposites
+100-0000001@[med_opposites]
+
+400-0000193@[bigs] -> med_bigs                     # MEDIAN_BIG
+100-0000001@[med_bigs]
+400-0000193@[two_bigs] -> med_two_bigs
+100-0000001@[med_two_bigs]
+
+400-0000194@[decs] -> med_decs                     # MEDIAN_DEC, stable
+100-0000001@[med_decs]
+300-0000001@[2.50d, 1d, 3.0d] -> odd_decs
+400-0000194@[odd_decs] -> med_odd_decs             # keeps its places
+100-0000001@[med_odd_decs]
+400-0000194@[pennies] -> med_pennies               # one more place: 0.015
+100-0000001@[med_pennies]
+300-0000001@[1.0d, 3.00d] -> even_decs
+400-0000194@[even_decs] -> med_even_decs           # the larger scale: 2.00
+100-0000001@[med_even_decs]
+
+400-0000195@[fracs] -> med_fracs                   # MEDIAN_FRACTION
+100-0000001@[med_fracs]
+400-0000195@[half_third] -> med_half_third         # 5/12
+100-0000001@[med_half_third]

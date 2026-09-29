@@ -43,8 +43,15 @@ def collect_cases():
 
 def decimals_from_text(types, values):
     """JSON has no decimal, so a case writes one as its text: "0.30"."""
+    def read(type_, value):
+        if type_.name == "decimal":
+            return Decimal.literal(value)
+        if type_.name == "list" and type_.args[0].name == "decimal":
+            return [Decimal.literal(item) for item in value]
+        return value
+
     return [
-        Decimal.literal(value) if index < len(types) and types[index].name == "decimal" else value
+        read(types[index], value) if index < len(types) else value
         for index, value in enumerate(values)
     ]
 
@@ -860,3 +867,129 @@ class TestBitsAndBases:
             assert numbers_.parse_big_base(text, base, 0) == -widest
             assert numbers_.parse_big_base(numbers_.big_to_base(widest + 1, base), base, 7) == 7
         assert numbers_.parse_big_base("0" * 50_000 + "1", 2, 7) == 1
+class TestListMathsPromises:
+    """SMALLEST, LARGEST, SUM_*, AVERAGE_* and MEDIAN_* (400-0000180..195)."""
+
+    def test_fractions_are_exact(self):
+        from phonebook_rt import numbers_
+
+        half, third, sixth = (numbers_.make_fraction(1, d) for d in (2, 3, 6))
+        assert numbers_.sum_fraction([half, third, sixth]) == numbers_.make_fraction(1, 1)
+        assert numbers_.sum_fraction([]) == numbers_.make_fraction(0, 1)
+        assert numbers_.average_fraction([half, third]) == numbers_.make_fraction(5, 12)
+        assert numbers_.median_fraction([half, sixth, third]) == third
+        assert numbers_.median_fraction([half, third]) == numbers_.make_fraction(5, 12)
+        assert numbers_.smallest([half, sixth, third]) == sixth
+        assert numbers_.largest([half, sixth, third]) == half
+
+    def test_fraction_overflow_is_a_contract_error(self):
+        from phonebook_rt import numbers_
+
+        a = numbers_.make_fraction(1, 4294967311)  # two large primes: the
+        b = numbers_.make_fraction(1, 4294967357)  # shared denominator is too big
+        for operation in (numbers_.sum_fraction, numbers_.average_fraction, numbers_.median_fraction):
+            with pytest.raises(PhonebookFault) as excinfo:
+                operation([a, b])
+            assert excinfo.value.code == "overflow"
+
+    def test_ties_keep_the_first(self):
+        from phonebook_rt import numbers_
+
+        values = [Decimal.literal("0.30"), Decimal.literal("0.3")]
+        assert numbers_.smallest(values).text() == "0.30"
+        assert numbers_.largest(values).text() == "0.30"
+        assert numbers_.largest(values[::-1]).text() == "0.3"
+
+    def test_every_empty_list_is_a_contract_error(self):
+        from phonebook_rt import numbers_
+
+        for operation in (
+            numbers_.smallest,
+            numbers_.largest,
+            numbers_.average_float,
+            numbers_.average_fraction,
+            numbers_.median,
+            numbers_.median_float,
+            numbers_.median_big,
+            numbers_.median_dec,
+            numbers_.median_fraction,
+        ):
+            with pytest.raises(PhonebookFault) as excinfo:
+                operation([])
+            assert excinfo.value.code == "empty_list"
+        for operation in (numbers_.average, numbers_.average_big, numbers_.average_dec):
+            with pytest.raises(PhonebookFault) as excinfo:
+                operation([], 2)
+            assert excinfo.value.code == "empty_list"
+
+    def test_big_sums_are_held_to_the_ceiling_only_at_the_end(self):
+        from phonebook_rt import numbers_
+
+        near = 9 * 10**3999  # 4000 digits; two of them make 4001
+        assert numbers_.sum_big([near, near, -near]) == near
+        with pytest.raises(PhonebookFault) as excinfo:
+            numbers_.sum_big([near, near])
+        assert excinfo.value.code == "overflow"
+        assert numbers_.average_big([near, near], 0).coefficient == near
+
+    def test_float_midpoint_is_the_exact_one_rounded_once(self):
+        import math
+        import random
+        import struct
+        from fractions import Fraction
+
+        from phonebook_rt import numbers_
+
+        def any_float(rng):
+            while True:
+                (value,) = struct.unpack("<d", struct.pack("<Q", rng.getrandbits(64)))
+                if math.isfinite(value):
+                    return value
+
+        rng = random.Random(192)
+        for _ in range(20_000):
+            a = any_float(rng)
+            b = rng.choice([any_float(rng), -a, a * 1.5 if abs(a) < 1e307 else a, 5e-324])
+            expected = float((Fraction(a) + Fraction(b)) / 2) or 0.0
+            assert numbers_.median_float([a, b]) == expected
+
+    def test_averages_and_medians_are_the_exact_ones(self):
+        import random
+        from fractions import Fraction
+
+        from phonebook_rt import numbers_
+
+        def rounded(exact, places):
+            scaled = exact * 10**places
+            whole, rest = divmod(abs(scaled.numerator), scaled.denominator)
+            whole += 2 * rest >= scaled.denominator
+            return -whole if scaled < 0 else whole
+
+        def exact_median(values):
+            ordered, half = sorted(values), len(values) // 2
+            if len(values) % 2:
+                return Fraction(ordered[half])
+            return Fraction(ordered[half - 1] + ordered[half]) / 2
+
+        rng = random.Random(186)
+        for _ in range(2_000):
+            places = rng.randrange(7)
+            ints = [rng.randrange(-(2**63), 2**63) for _ in range(rng.randrange(1, 9))]
+            got = numbers_.average(ints, places)
+            assert got.scale == places
+            assert got.coefficient == rounded(Fraction(sum(ints), len(ints)), places)
+            got = numbers_.median(ints)
+            assert Fraction(got.coefficient, 10**got.scale) == exact_median(ints)
+
+            decs = [
+                Decimal(rng.randrange(-(10**9), 10**9), rng.randrange(5))
+                for _ in range(rng.randrange(1, 9))
+            ]
+            exact = [Fraction(d.coefficient, 10**d.scale) for d in decs]
+            got = numbers_.average_dec(decs, places)
+            assert got.coefficient == rounded(sum(exact) / len(exact), places)
+            got = numbers_.median_dec(decs)
+            assert Fraction(got.coefficient, 10**got.scale) == exact_median(exact)
+            got = numbers_.sum_dec(decs)
+            assert Fraction(got.coefficient, 10**got.scale) == sum(exact)
+            assert got.scale == max(d.scale for d in decs)
